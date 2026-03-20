@@ -10,6 +10,19 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
+  function formatError(err: unknown): string {
+    if (err && typeof err === "object") {
+      const maybeMessage = (err as Record<string, unknown>).message;
+      if (typeof maybeMessage === "string") return maybeMessage;
+    }
+    if (typeof err === "string") return err;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-black text-white">
       <main className="mx-auto w-full max-w-4xl px-6 py-12">
@@ -46,7 +59,11 @@ export default function Home() {
                 setLoading(true);
                 setResult(null);
                 const res = await analyzeScriptAction({ projectId, scriptText });
-                setResult(res.success ? `OK: story_memory.id=${res.data.storyMemoryId}` : `Error: ${res.error}`);
+                setResult(
+                  res.success
+                    ? `OK: story_memory.id=${res.data.storyMemoryId}`
+          : `Error: ${JSON.stringify(res.error)}`
+                );
                 setLoading(false);
               }}
               disabled={loading}

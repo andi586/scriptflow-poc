@@ -11,18 +11,30 @@ export async function analyzeScriptAction(input: {
   try {
     const analysis = await parseScript(input.scriptText);
     const supabase = createClient();
+    const analysisObj = analysis as Record<string, unknown>;
+
+    const getString = (v: unknown): string =>
+      typeof v === "string" ? v : "";
+
+    const getArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
     const { data, error } = await supabase
       .from("story_memory")
       .upsert(
         {
           project_id: input.projectId,
-          narrative_arc: analysis.narrative_arc,
-          tone: analysis.tone,
-          visual_style: analysis.visual_style,
-          foreshadowing_map: analysis.foreshadowing_map,
-          core_visual_symbols: analysis.core_visual_symbols,
-          continuity_notes: analysis.cross_episode_continuity_notes,
+          // story_memory has NOT NULL columns; if Claude omits fields,
+          // persist safe defaults to avoid DB constraint errors.
+          narrative_arc:
+            getString(
+              analysisObj.narrative_arc ?? (analysisObj as Record<string, unknown>).narrativeArc,
+            ),
+          tone: getString(analysisObj.tone),
+          visual_style: getString(analysisObj.visual_style),
+          foreshadowing_map: getArray(analysisObj.foreshadowing_map),
+          core_visual_symbols: getArray(analysisObj.core_visual_symbols),
+          continuity_notes:
+            getString(analysisObj.cross_episode_continuity_notes),
           raw_analysis: analysis,
           model_used: "claude-sonnet-4-20250514",
         },
@@ -35,7 +47,7 @@ export async function analyzeScriptAction(input: {
 
     return { success: true, data: { storyMemoryId: data.id as string } };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : String(e) };
+    return { success: false, error: e instanceof Error ? e.message : JSON.stringify(e) };
   }
 }
 
