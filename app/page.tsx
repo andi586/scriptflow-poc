@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import {
   analyzeScriptAction,
   generateKlingPromptsAction,
+  pollKlingTasksAction,
+  submitKlingTasksAction,
 } from "@/actions/narrative.actions";
 
 type PromptCard = {
@@ -12,27 +14,26 @@ type PromptCard = {
   prompt: string;
 };
 
+type TaskCard = {
+  beat_number: number;
+  task_id: string;
+  status: string;
+  video_url?: string;
+  error_message?: string;
+};
+
 export default function Home() {
   const [projectId, setProjectId] = useState("");
   const [scriptText, setScriptText] = useState("");
   const [loading, setLoading] = useState(false);
   const [promptLoading, setPromptLoading] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [pollLoading, setPollLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [promptResult, setPromptResult] = useState<string | null>(null);
   const [promptCards, setPromptCards] = useState<PromptCard[]>([]);
-
-  function formatError(err: unknown): string {
-    if (err && typeof err === "object") {
-      const maybeMessage = (err as Record<string, unknown>).message;
-      if (typeof maybeMessage === "string") return maybeMessage;
-    }
-    if (typeof err === "string") return err;
-    try {
-      return JSON.stringify(err);
-    } catch {
-      return String(err);
-    }
-  }
+  const [videoResult, setVideoResult] = useState<string | null>(null);
+  const [taskCards, setTaskCards] = useState<TaskCard[]>([]);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -73,7 +74,11 @@ export default function Home() {
                 setResult(
                   res.success
                     ? `OK: story_memory.id=${res.data.storyMemoryId}`
-          : `Error: ${JSON.stringify(res.error)}`
+                    : `Error: ${
+                        typeof res.error === "object"
+                          ? JSON.stringify(res.error)
+                          : String(res.error)
+                      }`
                 );
                 setLoading(false);
               }}
@@ -103,7 +108,13 @@ export default function Home() {
                   setPromptCards(res.data.prompts);
                   setPromptResult(`OK: generated ${res.data.prompts.length} prompts`);
                 } else {
-                  setPromptResult(`Error: ${formatError(res.error)}`);
+                  setPromptResult(
+                    `Error: ${
+                      typeof res.error === "object"
+                        ? JSON.stringify(res.error)
+                        : String(res.error)
+                    }`,
+                  );
                 }
                 setPromptLoading(false);
               }}
@@ -141,6 +152,111 @@ export default function Home() {
                   <p className="whitespace-pre-wrap text-sm leading-6 text-white/80">
                     {item.prompt}
                   </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <p className="mt-10 text-sm text-white/60">
+          Step 3: Submit to PiAPI/Kling and generate videos (9:16, 5s, high quality)
+        </p>
+
+        <div className="mt-4 grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={async () => {
+                  setVideoLoading(true);
+                  setVideoResult(null);
+                  setTaskCards([]);
+                  const res = await submitKlingTasksAction({
+                    projectId,
+                    prompts: promptCards,
+                  });
+                  if (res.success) {
+                    setTaskCards(res.data.tasks);
+                    setVideoResult(`Submitted ${res.data.tasks.length} tasks`);
+                  } else {
+                    setVideoResult(
+                      `Error: ${
+                        typeof res.error === "object"
+                          ? JSON.stringify(res.error)
+                          : String(res.error)
+                      }`
+                    );
+                  }
+                  setVideoLoading(false);
+                }}
+                disabled={videoLoading || promptCards.length === 0}
+                className="bg-amber-500 text-black hover:bg-amber-400"
+              >
+                {videoLoading ? "Submitting..." : "Submit Kling Tasks"}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setPollLoading(true);
+                  setVideoResult(null);
+                  const res = await pollKlingTasksAction({
+                    sceneIndices: promptCards.map((t) => t.beat_number),
+                  });
+                  if (res.success) {
+                    setTaskCards(res.data.tasks);
+                    const done = res.data.tasks.filter((t) => t.status === "success").length;
+                    setVideoResult(`Polled ${res.data.tasks.length} tasks, success ${done}`);
+                  } else {
+                    setVideoResult(
+                      `Error: ${
+                        typeof res.error === "object"
+                          ? JSON.stringify(res.error)
+                          : String(res.error)
+                      }`
+                    );
+                  }
+                  setPollLoading(false);
+                }}
+                disabled={pollLoading || promptCards.length === 0}
+              >
+                {pollLoading ? "Polling..." : "Poll Task Status"}
+              </Button>
+            </div>
+
+            {videoResult && <div className="text-sm text-white/70">{videoResult}</div>}
+          </div>
+
+          {taskCards.length > 0 && (
+            <div className="grid gap-3">
+              {taskCards.map((task) => (
+                <div
+                  key={`${task.beat_number}-${task.task_id || task.status}`}
+                  className="rounded-xl border border-white/10 bg-zinc-950/70 p-4"
+                >
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="font-semibold text-amber-400">Scene {task.beat_number}</span>
+                    <span className="text-white/60">Task ID: {task.task_id || "(none)"}</span>
+                    <span className="rounded bg-white/10 px-2 py-0.5 text-white/80">
+                      {task.status}
+                    </span>
+                  </div>
+
+                  {task.error_message && (
+                    <p className="mt-2 text-sm text-red-400">
+                      {task.error_message}
+                    </p>
+                  )}
+
+                  {task.video_url && (
+                    <a
+                      className="mt-2 inline-block text-sm text-emerald-400 underline"
+                      href={task.video_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open video link
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
