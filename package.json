@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate:kling-project-id": "node scripts/apply-sql-migration.cjs supabase/migrations/20260321000003_kling_tasks_project_id.sql"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -28,6 +29,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "pg": "^8.16.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

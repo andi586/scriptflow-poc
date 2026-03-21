@@ -2,7 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## ScriptFlow pipeline (prod)
 
-1. Apply all SQL files under `supabase/migrations/` to your Supabase project (including `20260321000003_kling_tasks_project_id.sql`, which adds `project_id` to `kling_tasks` so tasks don’t collide across projects).
+1. Apply all SQL files under `supabase/migrations/` to your Supabase project (including `20260321000003_kling_tasks_project_id.sql`, which adds `project_id` to `kling_tasks` so tasks don’t collide across projects). With `DATABASE_URL` set in `.env.local` (Database → Connection string URI), run: `npm run db:migrate:kling-project-id`.
 2. Copy `.env.example` → `.env.local` and fill keys. For the **New project (demo)** button, set `SCRIPTFLOW_DEMO_USER_ID` to a real `auth.users.id` UUID in that Supabase project.
 
 ## Getting Started
