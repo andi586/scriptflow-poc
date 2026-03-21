@@ -50,11 +50,13 @@ export async function GET() {
 
     let lastStatus = 0;
     let lastText = "";
+    // PiAPI OpenAPI uses `x-api-key` only. Sending both `X-API-Key` and `x-api-key`
+    // breaks verification (401) on some runtimes (Undici merges duplicate semantics).
     for (const url of candidates) {
       const res = await fetch(url, {
         method: "GET",
+        cache: "no-store",
         headers: {
-          "X-API-Key": key,
           "x-api-key": key,
         },
       });
