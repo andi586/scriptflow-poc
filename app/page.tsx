@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   analyzeScriptAction,
@@ -22,6 +22,37 @@ type TaskCard = {
   error_message?: string;
 };
 
+type HealthPayload = {
+  anthropic: "ok" | "error";
+  piapi: "ok" | "error";
+  supabase: "ok" | "error";
+  errors: Record<string, string>;
+};
+
+function HealthDot({
+  label,
+  status,
+  errorText,
+}: {
+  label: string;
+  status: "ok" | "error" | undefined;
+  errorText?: string;
+}) {
+  const ok = status === "ok";
+  const title = ok ? `${label}: OK` : `${label}: ${errorText ?? "error"}`;
+  return (
+    <span className="inline-flex items-center gap-1.5" title={title}>
+      <span
+        className={`inline-block size-2.5 rounded-full ${
+          ok ? "bg-emerald-500" : "bg-red-500"
+        }`}
+        aria-hidden
+      />
+      <span className="text-[11px] text-white/50">{label}</span>
+    </span>
+  );
+}
+
 export default function Home() {
   const [projectId, setProjectId] = useState("");
   const [scriptText, setScriptText] = useState("");
@@ -34,11 +65,44 @@ export default function Home() {
   const [promptCards, setPromptCards] = useState<PromptCard[]>([]);
   const [videoResult, setVideoResult] = useState<string | null>(null);
   const [taskCards, setTaskCards] = useState<TaskCard[]>([]);
+  const [health, setHealth] = useState<HealthPayload | null>(null);
+
+  useEffect(() => {
+    fetch("/api/healthcheck")
+      .then((r) => r.json())
+      .then((data: HealthPayload) => setHealth(data))
+      .catch(() =>
+        setHealth({
+          anthropic: "error",
+          piapi: "error",
+          supabase: "error",
+          errors: { network: "Failed to fetch /api/healthcheck" },
+        }),
+      );
+  }, []);
 
   return (
     <div className="min-h-screen bg-black text-white">
       <main className="mx-auto w-full max-w-4xl px-6 py-12">
-        <div className="text-xl font-extrabold tracking-tight">ScriptFlow PoC</div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xl font-extrabold tracking-tight">ScriptFlow PoC</div>
+          <div
+            className="flex flex-wrap items-center gap-4 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
+            aria-label="API health (F57)"
+          >
+            <HealthDot
+              label="Anthropic"
+              status={health?.anthropic}
+              errorText={health?.errors?.anthropic}
+            />
+            <HealthDot label="PiAPI" status={health?.piapi} errorText={health?.errors?.piapi} />
+            <HealthDot
+              label="Supabase"
+              status={health?.supabase}
+              errorText={health?.errors?.supabase}
+            />
+          </div>
+        </div>
         <p className="mt-2 text-sm text-white/60">
           Step 1: Script → Story Memory JSON (NEL Sentinel parser)
         </p>

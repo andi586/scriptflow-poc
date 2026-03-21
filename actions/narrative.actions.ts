@@ -5,6 +5,10 @@ import { parseScript } from "@/lib/narrative-engine/parser";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types";
 import { NARRATIVE_TRANSLATOR_PROMPT } from "@/prompts/nel-sentinel";
+import {
+  KLING_VIDEO_ASPECT_RATIO,
+  stripHardcodedAspectRatioFromPrompt,
+} from "@/lib/kling-video";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -184,7 +188,8 @@ export async function generateKlingPromptsAction(input: {
             "2) Character appearance",
             "3) Camera movement",
             "4) Visual style",
-            "5) Aspect ratio 9:16",
+            "",
+            "不要在提示词文本里写画面比例或 9:16；比例由视频生成 API 的 aspect_ratio 参数单独传递。",
             "",
             "输出必须是 JSON 数组，每项结构：",
             '{ "beat_number": number, "prompt": string }',
@@ -297,8 +302,8 @@ export async function submitKlingTasksAction(input: {
         model: "kling",
         task_type: "video_generation",
         input: {
-          prompt: item.prompt,
-          aspect_ratio: "9:16",
+          prompt: stripHardcodedAspectRatioFromPrompt(item.prompt),
+          aspect_ratio: KLING_VIDEO_ASPECT_RATIO,
           duration: 5,
         },
       };
