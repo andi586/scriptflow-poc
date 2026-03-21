@@ -85,7 +85,7 @@ export default function Home() {
     <div className="min-h-screen bg-black text-white">
       <main className="mx-auto w-full max-w-4xl px-6 py-12">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xl font-extrabold tracking-tight">ScriptFlow PoC</div>
+          <div className="text-xl font-extrabold tracking-tight">ScriptFlow</div>
           <div
             className="flex flex-wrap items-center gap-4 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
             aria-label="API health (F57)"
@@ -103,9 +103,7 @@ export default function Home() {
             />
           </div>
         </div>
-        <p className="mt-2 text-sm text-white/60">
-          Step 1: Script → Story Memory JSON (NEL Sentinel parser)
-        </p>
+        <p className="mt-2 text-sm text-white/60">从你的灵感，到你的短剧。</p>
 
         <div className="mt-8 grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="grid gap-2">

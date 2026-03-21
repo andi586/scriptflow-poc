@@ -1,4 +1,4 @@
--- ScriptFlow PoC · 初始数据库Schema v1.0
+-- ScriptFlow · 初始数据库Schema v1.0
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
