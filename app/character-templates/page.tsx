@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
+import { readApiJson } from "@/lib/fetch-json";
 
 export default function CharacterTemplatesPage() {
   const [templates, setTemplates] = useState<CharacterTemplateRow[]>([]);
@@ -65,9 +66,10 @@ export default function CharacterTemplatesPage() {
       const upRes = await fetch(`/api/character-templates/${templateId}`, {
         method: "POST",
         body: formData,
+        cache: "no-store",
       });
-      const upJson = (await upRes.json()) as { reference_image_url?: string; error?: string };
-      if (!upRes.ok) throw new Error(upJson.error ?? upRes.statusText);
+      const upJson = await readApiJson<{ reference_image_url?: string; error?: string }>(upRes);
+      if (!upRes.ok) throw new Error(upJson.error ?? `Upload failed (${upRes.status})`);
       const url = upJson.reference_image_url;
       if (!url) throw new Error("Upload did not return reference_image_url");
 
@@ -75,12 +77,13 @@ export default function CharacterTemplatesPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reference_image_url: url }),
+        cache: "no-store",
       });
-      const patchJson = (await patchRes.json()) as {
+      const patchJson = await readApiJson<{
         template?: CharacterTemplateRow;
         error?: string;
-      };
-      if (!patchRes.ok) throw new Error(patchJson.error ?? patchRes.statusText);
+      }>(patchRes);
+      if (!patchRes.ok) throw new Error(patchJson.error ?? `Update failed (${patchRes.status})`);
       const updated = patchJson.template;
       if (updated) {
         setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));

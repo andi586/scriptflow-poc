@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonError, jsonOk } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 
@@ -13,6 +13,16 @@ function safeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200) || "image";
 }
 
+function isValidTemplateId(id: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id,
+  );
+}
+
+function isAllowedPublicUrl(url: string) {
+  return /^https?:\/\/.+/i.test(url.trim());
+}
+
 /**
  * POST multipart/form-data with field `file` — uploads to bucket `character-images`
  * and returns `{ reference_image_url }`. Client should then call PATCH to persist on the row.
@@ -20,20 +30,26 @@ function safeFileName(name: string) {
 export async function POST(request: Request, ctx: RouteCtx) {
   try {
     const { id: templateId } = await ctx.params;
-    if (!templateId || !/^[0-9a-f-]{36}$/i.test(templateId)) {
-      return NextResponse.json({ error: "Invalid template id" }, { status: 400 });
+    if (!templateId || !isValidTemplateId(templateId)) {
+      return jsonError("Invalid template id", 400);
     }
 
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return jsonError("Invalid multipart body", 400);
+    }
+
     const file = formData.get("file");
     if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: "Missing file field (image/*)" }, { status: 400 });
+      return jsonError("Missing file field (image/*)", 400);
     }
     if (!file.type.startsWith("image/")) {
-      return NextResponse.json({ error: "File must be an image" }, { status: 400 });
+      return jsonError("File must be an image", 400);
     }
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "Image too large (max 10MB)" }, { status: 400 });
+      return jsonError("Image too large (max 10MB)", 400);
     }
 
     const supabase = createClient();
@@ -42,9 +58,11 @@ export async function POST(request: Request, ctx: RouteCtx) {
       .select("id")
       .eq("id", templateId)
       .maybeSingle();
-    if (fetchErr) throw fetchErr;
+    if (fetchErr) {
+      return jsonError(fetchErr.message || "Database error", 500);
+    }
     if (!existing) {
-      return NextResponse.json({ error: "Template not found" }, { status: 404 });
+      return jsonError("Template not found", 404);
     }
 
     const buf = Buffer.from(await file.arrayBuffer());
@@ -56,15 +74,20 @@ export async function POST(request: Request, ctx: RouteCtx) {
         contentType: file.type || "application/octet-stream",
         upsert: true,
       });
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      return jsonError(uploadError.message || "Storage upload failed", 500);
+    }
 
     const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
     const reference_image_url = pub.publicUrl;
+    if (!reference_image_url || !isAllowedPublicUrl(reference_image_url)) {
+      return jsonError("Could not resolve public URL for uploaded object", 500);
+    }
 
-    return NextResponse.json({ reference_image_url });
+    return jsonOk({ reference_image_url });
   } catch (e) {
     const message = e instanceof Error ? e.message : JSON.stringify(e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonError(message || "Unexpected server error", 500);
   }
 }
 
@@ -72,18 +95,21 @@ export async function POST(request: Request, ctx: RouteCtx) {
 export async function PATCH(request: Request, ctx: RouteCtx) {
   try {
     const { id: templateId } = await ctx.params;
-    if (!templateId || !/^[0-9a-f-]{36}$/i.test(templateId)) {
-      return NextResponse.json({ error: "Invalid template id" }, { status: 400 });
+    if (!templateId || !isValidTemplateId(templateId)) {
+      return jsonError("Invalid template id", 400);
     }
 
-    const body = (await request.json()) as Record<string, unknown>;
+    let body: Record<string, unknown>;
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return jsonError("Invalid JSON body", 400);
+    }
+
     const reference_image_url =
       typeof body.reference_image_url === "string" ? body.reference_image_url.trim() : "";
-    if (!reference_image_url || !/^https:\/\//i.test(reference_image_url)) {
-      return NextResponse.json(
-        { error: "reference_image_url must be a non-empty https URL" },
-        { status: 400 },
-      );
+    if (!reference_image_url || !isAllowedPublicUrl(reference_image_url)) {
+      return jsonError("reference_image_url must be a non-empty http(s) URL", 400);
     }
 
     const supabase = createClient();
@@ -92,16 +118,18 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
       .update({ reference_image_url })
       .eq("id", templateId)
       .select("*")
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      return jsonError(error.message || "Database update failed", 500);
+    }
     if (!data) {
-      return NextResponse.json({ error: "Template not found" }, { status: 404 });
+      return jsonError("Template not found", 404);
     }
 
-    return NextResponse.json({ template: data as CharacterTemplateRow });
+    return jsonOk({ template: data as CharacterTemplateRow });
   } catch (e) {
     const message = e instanceof Error ? e.message : JSON.stringify(e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonError(message || "Unexpected server error", 500);
   }
 }
