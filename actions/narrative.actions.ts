@@ -9,14 +9,24 @@ import {
   KLING_VIDEO_ASPECT_RATIO,
   stripHardcodedAspectRatioFromPrompt,
 } from "@/lib/kling-video";
+import { requireProjectId } from "@/lib/project-id";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+/** PiAPI expects lowercase `x-api-key` (duplicate with `X-API-Key` breaks some runtimes). */
+const piapiHeaders = (key: string) => ({
+  "Content-Type": "application/json",
+  "x-api-key": key,
+});
+
+const piapiGetHeaders = (key: string) => ({ "x-api-key": key });
 
 export async function analyzeScriptAction(input: {
   projectId: string;
   scriptText: string;
 }): Promise<ActionResult<{ storyMemoryId: string }>> {
   try {
+    const projectId = requireProjectId(input.projectId);
     const analysis = await parseScript(input.scriptText);
     const supabase = createClient();
     const analysisObj = analysis as Record<string, unknown>;
@@ -30,7 +40,7 @@ export async function analyzeScriptAction(input: {
       .from("story_memory")
       .upsert(
         {
-          project_id: input.projectId,
+          project_id: projectId,
           // story_memory has NOT NULL columns; if Claude omits fields,
           // persist safe defaults to avoid DB constraint errors.
           narrative_arc:
@@ -150,11 +160,12 @@ export async function generateKlingPromptsAction(input: {
   projectId: string;
 }): Promise<ActionResult<{ prompts: KlingPromptItem[] }>> {
   try {
+    const projectId = requireProjectId(input.projectId);
     const supabase = createClient();
     const { data: storyMemory, error } = await supabase
       .from("story_memory")
       .select("project_id, raw_analysis, visual_style, tone")
-      .eq("project_id", input.projectId)
+      .eq("project_id", projectId)
       .single();
 
     if (error || !storyMemory) {
@@ -166,10 +177,18 @@ export async function generateKlingPromptsAction(input: {
         ? (storyMemory.raw_analysis as Record<string, unknown>)
         : {};
 
-    const beats = Array.isArray(rawAnalysis.beats) ? rawAnalysis.beats : [];
-    if (beats.length === 0) {
+    const beatsRaw = Array.isArray(rawAnalysis.beats) ? rawAnalysis.beats : [];
+    if (beatsRaw.length === 0) {
       throw new Error("story_memory 中没有 beats，无法生成提示词。");
     }
+
+    // Normalize beat_number so downstream Claude + Kling steps stay aligned.
+    const beats = beatsRaw.map((b, idx) => {
+      const o = b && typeof b === "object" ? (b as Record<string, unknown>) : {};
+      const n = Number(o.beat_number ?? o.beatNumber ?? o.index ?? idx + 1);
+      const beat_number = Number.isFinite(n) && n > 0 ? n : idx + 1;
+      return { ...o, beat_number };
+    });
 
     const characters = Array.isArray(rawAnalysis.characters) ? rawAnalysis.characters : [];
 
@@ -248,6 +267,7 @@ export async function submitKlingTasksAction(input: {
   prompts: KlingPromptItem[];
 }): Promise<ActionResult<{ tasks: KlingTaskItem[] }>> {
   try {
+    const projectId = requireProjectId(input.projectId);
     if (!Array.isArray(input.prompts) || input.prompts.length === 0) {
       throw new Error("No prompts provided. Please run Step 2 first.");
     }
@@ -255,10 +275,11 @@ export async function submitKlingTasksAction(input: {
     const supabase = createClient();
     const sceneIndices = input.prompts.map((p) => p.beat_number);
 
-    // 1) Check DB first: if a scene already has processing/success, reuse it.
+    // 1) Check DB first: if this project+scene already has processing/success, reuse it.
     const { data: existingRows, error: existingError } = await supabase
       .from("kling_tasks")
       .select("scene_index, task_id, status, video_url, error_message")
+      .eq("project_id", projectId)
       .in("scene_index", sceneIndices)
       .in("status", ["processing", "success"]);
 
@@ -310,10 +331,8 @@ export async function submitKlingTasksAction(input: {
 
       const res = await fetch(`${base}/task`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-Key": key,
-        },
+        cache: "no-store",
+        headers: piapiHeaders(key),
         body: JSON.stringify(payload),
       });
 
@@ -321,6 +340,7 @@ export async function submitKlingTasksAction(input: {
         const text = await res.text();
         // Insert failed placeholder so UI has something persistent (optional).
         await supabase.from("kling_tasks").insert({
+          project_id: projectId,
           task_id: `failed_${item.beat_number}_${Date.now()}`,
           scene_index: item.beat_number,
           status: "failed",
@@ -337,6 +357,7 @@ export async function submitKlingTasksAction(input: {
       const taskId = String(data.task_id ?? data.id ?? nested?.task_id ?? "");
       if (!taskId) {
         await supabase.from("kling_tasks").insert({
+          project_id: projectId,
           task_id: `missing_${item.beat_number}_${Date.now()}`,
           scene_index: item.beat_number,
           status: "failed",
@@ -347,6 +368,7 @@ export async function submitKlingTasksAction(input: {
 
       // 3) Immediately persist task_id to kling_tasks.
       const { error: insertError } = await supabase.from("kling_tasks").insert({
+        project_id: projectId,
         task_id: taskId,
         scene_index: item.beat_number,
         status: "processing",
@@ -365,7 +387,9 @@ export async function submitKlingTasksAction(input: {
     const { data: finalRows, error: finalError } = await supabase
       .from("kling_tasks")
       .select("scene_index, task_id, status, video_url, error_message")
-      .in("scene_index", sceneIndices);
+      .eq("project_id", projectId)
+      .in("scene_index", sceneIndices)
+      .order("created_at", { ascending: false });
 
     if (finalError) throw finalError;
 
@@ -375,6 +399,7 @@ export async function submitKlingTasksAction(input: {
         const r = row as Record<string, unknown>;
         const sceneIndex = Number(r.scene_index);
         if (!Number.isFinite(sceneIndex)) continue;
+        if (finalMap.has(sceneIndex)) continue;
 
         const taskId = typeof r.task_id === "string" ? r.task_id : "";
         const status = typeof r.status === "string" ? r.status : "processing";
@@ -407,19 +432,22 @@ export async function submitKlingTasksAction(input: {
 }
 
 export async function pollKlingTasksAction(input: {
+  projectId: string;
   sceneIndices: number[];
 }): Promise<ActionResult<{ tasks: KlingTaskItem[] }>> {
   try {
+    const projectId = requireProjectId(input.projectId);
     if (!Array.isArray(input.sceneIndices) || input.sceneIndices.length === 0) {
       throw new Error("sceneIndices is required.");
     }
 
     const supabase = createClient();
     const { base, key } = getKlingConfig();
-    // 4) Poll from DB: processing tasks only.
+    // 4) Poll from DB: this project's processing tasks only.
     const { data: processingRows, error: processingError } = await supabase
       .from("kling_tasks")
       .select("scene_index, task_id")
+      .eq("project_id", projectId)
       .eq("status", "processing")
       .in("scene_index", input.sceneIndices);
 
@@ -434,7 +462,8 @@ export async function pollKlingTasksAction(input: {
 
         const res = await fetch(`${base}/task/${taskId}`, {
           method: "GET",
-          headers: { "X-API-Key": key },
+          cache: "no-store",
+          headers: piapiGetHeaders(key),
         });
 
         if (!res.ok) {
@@ -450,18 +479,8 @@ export async function pollKlingTasksAction(input: {
         }
 
         const data = (await res.json()) as Record<string, unknown>;
-        // Debug: inspect PiAPI actual status values for completed tasks.
         const piNested =
           data.data && typeof data.data === "object" ? data.data : undefined;
-        console.log("PiAPI task poll raw response:", {
-          taskId,
-          status_top: (data as Record<string, unknown>).status,
-          status_nested:
-            piNested && typeof piNested === "object" && "status" in (piNested as Record<string, unknown>)
-              ? (piNested as Record<string, unknown>).status
-              : undefined,
-          raw: data,
-        });
 
         const piStatusRaw =
           piNested && typeof piNested === "object" && "status" in (piNested as Record<string, unknown>)
@@ -502,14 +521,21 @@ export async function pollKlingTasksAction(input: {
               ? (piNestedObj.output as Record<string, unknown>)
               : null;
 
+          const errField = piNestedObj ? piNestedObj.error : undefined;
+          const errFromPi =
+            typeof errField === "string"
+              ? errField
+              : errField &&
+                  typeof errField === "object" &&
+                  typeof (errField as { message?: unknown }).message === "string"
+                ? String((errField as { message: string }).message)
+                : undefined;
           const errorMessage =
-            piNestedObj && typeof piNestedObj.error === "string"
-              ? piNestedObj.error
-              : outputObj && typeof outputObj.error === "string"
-                ? outputObj.error
-                : typeof (data as Record<string, unknown>).error === "string"
-                  ? String((data as Record<string, unknown>).error)
-                  : "Kling task failed";
+            errFromPi ??
+            (outputObj && typeof outputObj.error === "string" ? outputObj.error : undefined) ??
+            (typeof (data as Record<string, unknown>).error === "string"
+              ? String((data as Record<string, unknown>).error)
+              : "Kling task failed");
           const { error: updateError } = await supabase
             .from("kling_tasks")
             .update({
@@ -528,7 +554,9 @@ export async function pollKlingTasksAction(input: {
     const { data: finalRows, error: finalError } = await supabase
       .from("kling_tasks")
       .select("scene_index, task_id, status, video_url, error_message")
-      .in("scene_index", input.sceneIndices);
+      .eq("project_id", projectId)
+      .in("scene_index", input.sceneIndices)
+      .order("created_at", { ascending: false });
 
     if (finalError) throw finalError;
 
@@ -538,6 +566,7 @@ export async function pollKlingTasksAction(input: {
         const rr = row as Record<string, unknown>;
         const sceneIndex = Number(rr.scene_index);
         if (!Number.isFinite(sceneIndex)) continue;
+        if (finalMap.has(sceneIndex)) continue;
 
         const taskId = typeof rr.task_id === "string" ? rr.task_id : "";
         const status = typeof rr.status === "string" ? rr.status : "processing";

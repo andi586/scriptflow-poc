@@ -8,6 +8,7 @@ import {
   pollKlingTasksAction,
   submitKlingTasksAction,
 } from "@/actions/narrative.actions";
+import { createDemoProjectAction } from "@/actions/project.actions";
 
 type PromptCard = {
   beat_number: number;
@@ -66,6 +67,7 @@ export default function Home() {
   const [videoResult, setVideoResult] = useState<string | null>(null);
   const [taskCards, setTaskCards] = useState<TaskCard[]>([]);
   const [health, setHealth] = useState<HealthPayload | null>(null);
+  const [projectCreating, setProjectCreating] = useState(false);
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -107,11 +109,40 @@ export default function Home() {
 
         <div className="mt-8 grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="grid gap-2">
-            <label className="text-sm font-medium text-white/80">Project ID</label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-medium text-white/80">Project ID</label>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                disabled={projectCreating}
+                onClick={async () => {
+                  setProjectCreating(true);
+                  setResult(null);
+                  const res = await createDemoProjectAction();
+                  if (res.success) {
+                    setProjectId(res.data.projectId);
+                    setResult(`OK: created project ${res.data.projectId}`);
+                  } else {
+                    setResult(
+                      `Error: ${
+                        typeof res.error === "object"
+                          ? JSON.stringify(res.error)
+                          : String(res.error)
+                      }`,
+                    );
+                  }
+                  setProjectCreating(false);
+                }}
+              >
+                {projectCreating ? "Creating…" : "New project (demo)"}
+              </Button>
+            </div>
             <input
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              placeholder="Paste an existing projects.id"
+              placeholder="projects.id UUID — or click New project if SCRIPTFLOW_DEMO_USER_ID is set"
               className="w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
             />
           </div>
@@ -262,6 +293,7 @@ export default function Home() {
                   setPollLoading(true);
                   setVideoResult(null);
                   const res = await pollKlingTasksAction({
+                    projectId,
                     sceneIndices: promptCards.map((t) => t.beat_number),
                   });
                   if (res.success) {
