@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAnonClient, createClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const supabase = createClient();
+    const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("character_templates")
       .select("*")
