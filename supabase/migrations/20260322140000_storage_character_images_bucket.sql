@@ -20,4 +20,4 @@ create policy "character_images_public_read"
   to public
   using (bucket_id = 'character-images');
 
--- Uploads go through service role (Next.js API); optional direct client uploads would need separate policies
+-- Uploads: browser uses anon key (see 20260322150000_storage_character_images_anon_upload.sql)

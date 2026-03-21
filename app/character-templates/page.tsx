@@ -12,6 +12,21 @@ import {
 } from "@/components/ui/card";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 import { readApiJson } from "@/lib/fetch-json";
+import { prepareImageForUpload } from "@/lib/image-compress";
+import { createClient } from "@/lib/supabase/client";
+
+function storageObjectFileName(originalName: string, contentType: string) {
+  const stem = originalName
+    .replace(/\.[a-zA-Z0-9]+$/, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 120);
+  const ext = contentType.includes("png")
+    ? "png"
+    : contentType.includes("webp")
+      ? "webp"
+      : "jpg";
+  return `${stem || "image"}.${ext}`;
+}
 
 export default function CharacterTemplatesPage() {
   const [templates, setTemplates] = useState<CharacterTemplateRow[]>([]);
@@ -60,18 +75,22 @@ export default function CharacterTemplatesPage() {
 
     setUploadingId(templateId);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const { blob, contentType } = await prepareImageForUpload(file);
+      const supabase = createClient();
+      const objectName = `${Date.now()}_${storageObjectFileName(file.name, contentType)}`;
+      const objectPath = `${templateId}/${objectName}`;
 
-      const upRes = await fetch(`/api/character-templates/${templateId}`, {
-        method: "POST",
-        body: formData,
-        cache: "no-store",
-      });
-      const upJson = await readApiJson<{ reference_image_url?: string; error?: string }>(upRes);
-      if (!upRes.ok) throw new Error(upJson.error ?? `Upload failed (${upRes.status})`);
-      const url = upJson.reference_image_url;
-      if (!url) throw new Error("Upload did not return reference_image_url");
+      const { error: uploadError } = await supabase.storage
+        .from("character-images")
+        .upload(objectPath, blob, {
+          contentType,
+          upsert: true,
+        });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
+      const url = pub.publicUrl;
+      if (!url) throw new Error("Could not get public URL for uploaded image");
 
       const patchRes = await fetch(`/api/character-templates/${templateId}`, {
         method: "PATCH",
