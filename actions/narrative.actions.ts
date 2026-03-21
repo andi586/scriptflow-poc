@@ -9,6 +9,7 @@ import {
   KLING_VIDEO_ASPECT_RATIO,
   stripHardcodedAspectRatioFromPrompt,
 } from "@/lib/kling-video";
+import { buildKlingVideoGenerationInput } from "@/lib/kling-piapi-payload";
 import { requireProjectId } from "@/lib/project-id";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -404,6 +405,12 @@ export async function submitKlingTasksAction(input: {
       ? (projectCharacters as Record<string, unknown>[])
       : [];
 
+    const referenceImageUrls = characterRows
+      .map((c) =>
+        typeof c.reference_image_url === "string" ? c.reference_image_url.trim() : "",
+      )
+      .filter((u) => /^https:\/\//i.test(u));
+
     // 1) Check DB first: if this project+scene already has processing/success, reuse it.
     const { data: existingRows, error: existingError } = await supabase
       .from("kling_tasks")
@@ -448,17 +455,24 @@ export async function submitKlingTasksAction(input: {
     for (const item of input.prompts) {
       if (existingMap.has(item.beat_number)) continue;
 
+      const finalPrompt = injectCharacterReferenceLocks(
+        stripHardcodedAspectRatioFromPrompt(item.prompt),
+        characterRows,
+      );
+
+      // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
+      // `input.elements`: [{ image_url } x 1–4], plus mode/version per docs.
+      const input = buildKlingVideoGenerationInput({
+        prompt: finalPrompt,
+        aspectRatio: KLING_VIDEO_ASPECT_RATIO,
+        duration: 5,
+        referenceImageUrls,
+      });
+
       const payload = {
         model: "kling",
         task_type: "video_generation",
-        input: {
-          prompt: injectCharacterReferenceLocks(
-            stripHardcodedAspectRatioFromPrompt(item.prompt),
-            characterRows,
-          ),
-          aspect_ratio: KLING_VIDEO_ASPECT_RATIO,
-          duration: 5,
-        },
+        input,
       };
 
       const res = await fetch(`${base}/task`, {
