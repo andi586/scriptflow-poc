@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Apply a raw SQL migration file using Postgres (Supabase).
  * Requires DATABASE_URL in .env.local (Dashboard → Project Settings → Database → URI).

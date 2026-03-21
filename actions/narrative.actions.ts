@@ -53,6 +53,8 @@ export async function analyzeScriptAction(input: {
           core_visual_symbols: getArray(analysisObj.core_visual_symbols),
           continuity_notes:
             getString(analysisObj.cross_episode_continuity_notes),
+          prop_registry: getArray(analysisObj.prop_registry),
+          causal_result_frames: getArray(analysisObj.causal_result_frames),
           raw_analysis: analysis,
           model_used: "claude-sonnet-4-20250514",
         },
@@ -72,6 +74,23 @@ export async function analyzeScriptAction(input: {
 type KlingPromptItem = {
   beat_number: number;
   prompt: string;
+};
+
+type PropRegistryItem = {
+  name: string;
+  position?: string;
+  side?: string;
+  color?: string;
+  shape?: string;
+  state?: string;
+  appears_in_beats?: number[];
+  locked_description_en?: string;
+};
+
+type CausalResultItem = {
+  beat_number: number;
+  cause_chain?: string;
+  result_frame_en?: string;
 };
 
 type KlingTaskItem = {
@@ -156,6 +175,107 @@ function extractVideoUrlFromPiOutput(data: Record<string, unknown>): string | un
   return findFirstUrl(output);
 }
 
+function normalizeBeats(rawAnalysis: Record<string, unknown>) {
+  const beatsRaw = Array.isArray(rawAnalysis.beats) ? rawAnalysis.beats : [];
+  return beatsRaw.map((b, idx) => {
+    const o = b && typeof b === "object" ? (b as Record<string, unknown>) : {};
+    const n = Number(o.beat_number ?? o.beatNumber ?? o.index ?? idx + 1);
+    const beat_number = Number.isFinite(n) && n > 0 ? n : idx + 1;
+    return { ...o, beat_number };
+  });
+}
+
+function normalizePropRegistry(rawAnalysis: Record<string, unknown>): PropRegistryItem[] {
+  const raw = Array.isArray(rawAnalysis.prop_registry) ? rawAnalysis.prop_registry : [];
+  return raw
+    .map((item) => {
+      const o = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      const beats = Array.isArray(o.appears_in_beats)
+        ? o.appears_in_beats.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+        : [];
+      return {
+        name: String(o.name ?? "").trim(),
+        position: typeof o.position === "string" ? o.position : undefined,
+        side: typeof o.side === "string" ? o.side : undefined,
+        color: typeof o.color === "string" ? o.color : undefined,
+        shape: typeof o.shape === "string" ? o.shape : undefined,
+        state: typeof o.state === "string" ? o.state : undefined,
+        appears_in_beats: beats,
+        locked_description_en:
+          typeof o.locked_description_en === "string" ? o.locked_description_en : undefined,
+      } satisfies PropRegistryItem;
+    })
+    .filter((x) => x.name.length > 0);
+}
+
+function normalizeCausalResultFrames(rawAnalysis: Record<string, unknown>): CausalResultItem[] {
+  const raw = Array.isArray(rawAnalysis.causal_result_frames) ? rawAnalysis.causal_result_frames : [];
+  return raw
+    .map((item) => {
+      const o = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      const beat = Number(o.beat_number ?? o.beat ?? 0);
+      return {
+        beat_number: Number.isFinite(beat) ? beat : 0,
+        cause_chain: typeof o.cause_chain === "string" ? o.cause_chain : undefined,
+        result_frame_en: typeof o.result_frame_en === "string" ? o.result_frame_en : undefined,
+      };
+    })
+    .filter((x) => x.beat_number > 0 && (x.result_frame_en ?? "").length > 0);
+}
+
+function buildPropLockDescription(item: PropRegistryItem) {
+  if (item.locked_description_en && item.locked_description_en.trim().length > 0) {
+    return item.locked_description_en.trim();
+  }
+  const parts = [item.color, item.shape, item.state, item.name, item.side, item.position]
+    .filter((x) => typeof x === "string" && x.trim().length > 0)
+    .join(" ");
+  return parts.trim();
+}
+
+function injectBeatLocks(
+  prompt: string,
+  beatNumber: number,
+  props: PropRegistryItem[],
+  causalFrames: CausalResultItem[],
+) {
+  const propLines = props
+    .filter((p) => Array.isArray(p.appears_in_beats) && p.appears_in_beats.includes(beatNumber))
+    .map((p) => buildPropLockDescription(p))
+    .filter((x) => x.length > 0);
+  const causalLines = causalFrames
+    .filter((c) => c.beat_number === beatNumber)
+    .map((c) => c.result_frame_en?.trim() ?? "")
+    .filter((x) => x.length > 0);
+
+  const suffix: string[] = [];
+  if (propLines.length > 0) {
+    suffix.push("Prop locks:");
+    for (const line of propLines) suffix.push(`- ${line}`);
+  }
+  if (causalLines.length > 0) {
+    suffix.push("Static result frame constraints (no process/action narration):");
+    for (const line of causalLines) suffix.push(`- ${line}`);
+  }
+  if (suffix.length === 0) return prompt;
+  return `${prompt.trim()}\n\n${suffix.join("\n")}`.trim();
+}
+
+function injectCharacterReferenceLocks(prompt: string, characters: Record<string, unknown>[]) {
+  if (characters.length === 0) return prompt;
+  const lines = characters
+    .map((c) => {
+      const name = typeof c.name === "string" ? c.name : "";
+      const appearance = typeof c.appearance === "string" ? c.appearance : "";
+      const ref = typeof c.reference_image_url === "string" ? c.reference_image_url : "";
+      if (!name) return "";
+      return `- ${name}: appearance lock = ${appearance || "locked by reference image"}; ref = ${ref}`;
+    })
+    .filter((x) => x.length > 0);
+  if (lines.length === 0) return prompt;
+  return `${prompt.trim()}\n\nCharacter appearance locks:\n${lines.join("\n")}`.trim();
+}
+
 export async function generateKlingPromptsAction(input: {
   projectId: string;
 }): Promise<ActionResult<{ prompts: KlingPromptItem[] }>> {
@@ -177,20 +297,14 @@ export async function generateKlingPromptsAction(input: {
         ? (storyMemory.raw_analysis as Record<string, unknown>)
         : {};
 
-    const beatsRaw = Array.isArray(rawAnalysis.beats) ? rawAnalysis.beats : [];
-    if (beatsRaw.length === 0) {
+    const beats = normalizeBeats(rawAnalysis);
+    if (beats.length === 0) {
       throw new Error("story_memory 中没有 beats，无法生成提示词。");
     }
 
-    // Normalize beat_number so downstream Claude + Kling steps stay aligned.
-    const beats = beatsRaw.map((b, idx) => {
-      const o = b && typeof b === "object" ? (b as Record<string, unknown>) : {};
-      const n = Number(o.beat_number ?? o.beatNumber ?? o.index ?? idx + 1);
-      const beat_number = Number.isFinite(n) && n > 0 ? n : idx + 1;
-      return { ...o, beat_number };
-    });
-
     const characters = Array.isArray(rawAnalysis.characters) ? rawAnalysis.characters : [];
+    const propRegistry = normalizePropRegistry(rawAnalysis);
+    const causalResultFrames = normalizeCausalResultFrames(rawAnalysis);
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -209,6 +323,8 @@ export async function generateKlingPromptsAction(input: {
             "4) Visual style",
             "",
             "不要在提示词文本里写画面比例或 9:16；比例由视频生成 API 的 aspect_ratio 参数单独传递。",
+            "若该 beat 涉及关键道具，必须精确复现道具锁定描述（位置/左右手/颜色/形状/状态）。",
+            "若该 beat 涉及动作因果链，禁止写动作过程，只写结果定格画面（state-after-causality）。",
             "",
             "输出必须是 JSON 数组，每项结构：",
             '{ "beat_number": number, "prompt": string }',
@@ -217,6 +333,8 @@ export async function generateKlingPromptsAction(input: {
             `Visual style: ${String(storyMemory.visual_style ?? "")}`,
             "",
             `Characters JSON: ${JSON.stringify(characters)}`,
+            `Prop registry JSON: ${JSON.stringify(propRegistry)}`,
+            `Causal result frames JSON: ${JSON.stringify(causalResultFrames)}`,
             `Beats JSON: ${JSON.stringify(beats)}`,
           ].join("\n"),
         },
@@ -240,7 +358,11 @@ export async function generateKlingPromptsAction(input: {
         const obj = item as Record<string, unknown>;
         const beatNumber = Number(obj.beat_number);
         const prompt = typeof obj.prompt === "string" ? obj.prompt : "";
-        return { beat_number: Number.isFinite(beatNumber) ? beatNumber : 0, prompt };
+        const normalizedBeat = Number.isFinite(beatNumber) ? beatNumber : 0;
+        return {
+          beat_number: normalizedBeat,
+          prompt: injectBeatLocks(prompt, normalizedBeat, propRegistry, causalResultFrames),
+        };
       })
       .filter((item) => item.beat_number > 0 && item.prompt.length > 0);
 
@@ -274,6 +396,13 @@ export async function submitKlingTasksAction(input: {
 
     const supabase = createClient();
     const sceneIndices = input.prompts.map((p) => p.beat_number);
+    const { data: projectCharacters } = await supabase
+      .from("characters")
+      .select("name, appearance, reference_image_url")
+      .eq("project_id", projectId);
+    const characterRows = Array.isArray(projectCharacters)
+      ? (projectCharacters as Record<string, unknown>[])
+      : [];
 
     // 1) Check DB first: if this project+scene already has processing/success, reuse it.
     const { data: existingRows, error: existingError } = await supabase
@@ -323,7 +452,10 @@ export async function submitKlingTasksAction(input: {
         model: "kling",
         task_type: "video_generation",
         input: {
-          prompt: stripHardcodedAspectRatioFromPrompt(item.prompt),
+          prompt: injectCharacterReferenceLocks(
+            stripHardcodedAspectRatioFromPrompt(item.prompt),
+            characterRows,
+          ),
           aspect_ratio: KLING_VIDEO_ASPECT_RATIO,
           duration: 5,
         },

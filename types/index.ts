@@ -58,6 +58,8 @@ export interface StoryMemory {
   foreshadowing_map: ForeshadowingItem[];
   core_visual_symbols: string[];
   continuity_notes: string;
+  prop_registry: Record<string, unknown>[];
+  causal_result_frames: Record<string, unknown>[];
   raw_analysis: Record<string, unknown>;
   model_used: string;
   parsed_at: string;

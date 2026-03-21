@@ -8,7 +8,13 @@ import {
   pollKlingTasksAction,
   submitKlingTasksAction,
 } from "@/actions/narrative.actions";
+import {
+  bindTemplateCharactersAction,
+  listCharacterTemplatesAction,
+  uploadCustomCharacterAction,
+} from "@/actions/character.actions";
 import { createDemoProjectAction } from "@/actions/project.actions";
+import type { CharacterRole } from "@/types";
 
 type PromptCard = {
   beat_number: number;
@@ -28,6 +34,17 @@ type HealthPayload = {
   piapi: "ok" | "error";
   supabase: "ok" | "error";
   errors: Record<string, string>;
+};
+
+type CharacterTemplate = {
+  id: string;
+  label: string;
+  role: CharacterRole;
+  name: string;
+  appearance: string;
+  personality: string;
+  language_fingerprint: string;
+  reference_image_url: string;
 };
 
 function HealthDot({
@@ -68,6 +85,10 @@ export default function Home() {
   const [taskCards, setTaskCards] = useState<TaskCard[]>([]);
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [projectCreating, setProjectCreating] = useState(false);
+  const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  const [characterLoading, setCharacterLoading] = useState(false);
+  const [characterResult, setCharacterResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -81,6 +102,12 @@ export default function Home() {
           errors: { network: "Failed to fetch /api/healthcheck" },
         }),
       );
+  }, []);
+
+  useEffect(() => {
+    listCharacterTemplatesAction().then((res) => {
+      if (res.success) setTemplates(res.data.templates as CharacterTemplate[]);
+    });
   }, []);
 
   return (
@@ -106,6 +133,107 @@ export default function Home() {
           </div>
         </div>
         <p className="mt-2 text-sm text-white/60">从你的灵感，到你的短剧。</p>
+
+        <p className="mt-8 text-sm text-white/60">
+          Step 0: 角色设置（模板库或上传参考图）→ 绑定到当前项目
+        </p>
+
+        <div className="mt-4 grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="grid gap-2">
+            <label className="text-sm font-medium text-white/80">角色模板库（F63/F64）</label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {templates.map((tpl) => {
+                const checked = selectedTemplateIds.includes(tpl.id);
+                return (
+                  <label
+                    key={tpl.id}
+                    className={`cursor-pointer rounded-xl border p-3 text-sm ${
+                      checked ? "border-amber-500 bg-amber-500/10" : "border-white/10 bg-zinc-950/70"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={checked}
+                      onChange={(e) => {
+                        setSelectedTemplateIds((prev) =>
+                          e.target.checked ? [...prev, tpl.id] : prev.filter((id) => id !== tpl.id),
+                        );
+                      }}
+                    />
+                    {tpl.label}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              disabled={characterLoading}
+              onClick={async () => {
+                setCharacterLoading(true);
+                setCharacterResult(null);
+                const res = await bindTemplateCharactersAction({
+                  projectId,
+                  templateIds: selectedTemplateIds,
+                });
+                setCharacterResult(
+                  res.success
+                    ? `OK: bound ${res.data.count} template characters`
+                    : `Error: ${String(res.error)}`,
+                );
+                setCharacterLoading(false);
+              }}
+            >
+              {characterLoading ? "Binding..." : "Bind selected templates"}
+            </Button>
+
+            <label className="inline-flex cursor-pointer items-center rounded-lg border border-white/10 px-3 py-2 text-sm">
+              Upload custom image
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (!projectId) {
+                    setCharacterResult("Error: set Project ID first.");
+                    return;
+                  }
+                  setCharacterLoading(true);
+                  const base64 = await file.arrayBuffer().then((buf) => {
+                    let binary = "";
+                    const bytes = new Uint8Array(buf);
+                    const chunk = 0x8000;
+                    for (let i = 0; i < bytes.length; i += chunk) {
+                      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+                    }
+                    return btoa(binary);
+                  });
+                  const res = await uploadCustomCharacterAction({
+                    projectId,
+                    name: file.name.replace(/\.[a-zA-Z0-9]+$/, ""),
+                    role: "supporting",
+                    fileName: file.name,
+                    mimeType: file.type || "image/jpeg",
+                    base64Data: base64,
+                  });
+                  setCharacterResult(
+                    res.success
+                      ? `OK: uploaded custom character image (${res.data.path})`
+                      : `Error: ${String(res.error)}`,
+                  );
+                  setCharacterLoading(false);
+                }}
+              />
+            </label>
+          </div>
+
+          {characterResult && <div className="text-sm text-white/70">{characterResult}</div>}
+        </div>
 
         <div className="mt-8 grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="grid gap-2">
