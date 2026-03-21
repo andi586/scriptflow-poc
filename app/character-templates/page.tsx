@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +25,10 @@ export default function CharacterTemplatesPage() {
   const [referenceImageUrl, setReferenceImageUrl] = useState("");
   const [klingPromptBase, setKlingPromptBase] = useState("");
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadForId, setUploadForId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -46,6 +50,50 @@ export default function CharacterTemplatesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function handleTemplateImageSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const templateId = uploadForId;
+    e.target.value = "";
+    if (!file || !templateId) return;
+
+    setUploadingId(templateId);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const upRes = await fetch(`/api/character-templates/${templateId}`, {
+        method: "POST",
+        body: formData,
+      });
+      const upJson = (await upRes.json()) as { reference_image_url?: string; error?: string };
+      if (!upRes.ok) throw new Error(upJson.error ?? upRes.statusText);
+      const url = upJson.reference_image_url;
+      if (!url) throw new Error("Upload did not return reference_image_url");
+
+      const patchRes = await fetch(`/api/character-templates/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference_image_url: url }),
+      });
+      const patchJson = (await patchRes.json()) as {
+        template?: CharacterTemplateRow;
+        error?: string;
+      };
+      if (!patchRes.ok) throw new Error(patchJson.error ?? patchRes.statusText);
+      const updated = patchJson.template;
+      if (updated) {
+        setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
+      } else {
+        await load();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploadingId(null);
+      setUploadForId(null);
+    }
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -101,42 +149,65 @@ export default function CharacterTemplatesPage() {
         )}
 
         {!loading && !error && (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {templates.map((tpl) => (
-              <Card key={tpl.id} className="overflow-hidden border-white/10 bg-white/5">
-                <div className="aspect-[2/3] w-full overflow-hidden bg-zinc-900">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={tpl.reference_image_url}
-                    alt={tpl.name}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                <CardHeader className="pb-2">
-                  <CardTitle>{tpl.name}</CardTitle>
-                  <CardDescription className="text-amber-200/80">{tpl.archetype}</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex flex-wrap gap-1.5">
-                    {(tpl.style_tags ?? []).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200/90"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleTemplateImageSelected}
+            />
+            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {templates.map((tpl) => (
+                <Card key={tpl.id} className="overflow-hidden border-white/10 bg-white/5">
+                  <div className="aspect-[2/3] w-full overflow-hidden bg-zinc-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={tpl.reference_image_url}
+                      alt={tpl.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
-                </CardContent>
-                {tpl.kling_prompt_base ? (
-                  <CardFooter className="border-t border-white/5 pt-3 text-xs text-white/45">
-                    <span className="line-clamp-2">{tpl.kling_prompt_base}</span>
-                  </CardFooter>
-                ) : null}
-              </Card>
-            ))}
-          </div>
+                  <CardHeader className="pb-2">
+                    <CardTitle>{tpl.name}</CardTitle>
+                    <CardDescription className="text-amber-200/80">{tpl.archetype}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-0">
+                    <div className="flex flex-wrap gap-1.5">
+                      {(tpl.style_tags ?? []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200/90"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={uploadingId === tpl.id}
+                      className="w-full border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                      onClick={() => {
+                        setUploadForId(tpl.id);
+                        setError(null);
+                        requestAnimationFrame(() => fileInputRef.current?.click());
+                      }}
+                    >
+                      {uploadingId === tpl.id ? "上传中…" : "上传图片"}
+                    </Button>
+                  </CardContent>
+                  {tpl.kling_prompt_base ? (
+                    <CardFooter className="border-t border-white/5 pt-3 text-xs text-white/45">
+                      <span className="line-clamp-2">{tpl.kling_prompt_base}</span>
+                    </CardFooter>
+                  ) : null}
+                </Card>
+              ))}
+            </div>
+          </>
         )}
 
         <section className="mt-14 rounded-2xl border border-white/10 bg-white/5 p-6">
