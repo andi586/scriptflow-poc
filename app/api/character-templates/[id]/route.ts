@@ -1,5 +1,5 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
-import { createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
       return jsonError("reference_image_url must be a non-empty http(s) URL", 400);
     }
 
-    const supabase = createClient();
+    const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("character_templates")
       .update({ reference_image_url })

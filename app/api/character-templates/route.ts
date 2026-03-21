@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAnonClient, createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("character_templates")
       .insert({
@@ -63,4 +63,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-// force redeploy Sat Mar 21 17:35:24 +07 2026
