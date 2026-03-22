@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   analyzeScriptAction,
+  formatStoryIdeaAction,
   generateKlingPromptsAction,
   pollKlingTasksAction,
   submitKlingTasksAction,
 } from "@/actions/narrative.actions";
+import {
+  storyboardShotsToNelScriptText,
+  type StoryboardShot,
+} from "@/lib/story-idea-format";
 import {
   bindTemplateCharactersAction,
   listCharacterTemplatesAction,
@@ -90,6 +95,18 @@ export default function Home() {
   const [characterLoading, setCharacterLoading] = useState(false);
   const [characterResult, setCharacterResult] = useState<string | null>(null);
 
+  const [entryMode, setEntryMode] = useState<"inspiration" | "script">("inspiration");
+  const [storyIdea, setStoryIdea] = useState("");
+  const [storyboardShots, setStoryboardShots] = useState<StoryboardShot[] | null>(null);
+  const [inspirationAnalyzing, setInspirationAnalyzing] = useState(false);
+  const [inspirationError, setInspirationError] = useState<string | null>(null);
+
+  function updateStoryboardShot(index: number, patch: Partial<StoryboardShot>) {
+    setStoryboardShots((prev) =>
+      prev ? prev.map((s, i) => (i === index ? { ...s, ...patch } : s)) : null,
+    );
+  }
+
   useEffect(() => {
     fetch("/api/healthcheck")
       .then((r) => r.json())
@@ -133,6 +150,202 @@ export default function Home() {
           </div>
         </div>
         <p className="mt-2 text-sm text-white/60">从你的灵感，到你的短剧。</p>
+
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <h2 className="text-sm font-semibold text-amber-400">Start</h2>
+          <p className="mt-1 text-xs text-white/45">
+            Inspiration mode uses Claude to build 9 shots; Script mode runs NEL Sentinel on your
+            paste.
+          </p>
+
+          {entryMode === "inspiration" ? (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-white/80">Inspiration</label>
+                <textarea
+                  value={storyIdea}
+                  onChange={(e) => setStoryIdea(e.target.value)}
+                  rows={5}
+                  placeholder={
+                    "Tell me your story idea...\n(e.g. 'A werewolf CEO falls for a human girl,\nbut his old enemy arrives')"
+                  }
+                  className="w-full resize-y rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  className="bg-amber-500 text-black hover:bg-amber-400"
+                  disabled={inspirationAnalyzing}
+                  onClick={async () => {
+                    setInspirationError(null);
+                    setInspirationAnalyzing(true);
+                    const res = await formatStoryIdeaAction({ idea: storyIdea });
+                    if (res.success) {
+                      setStoryboardShots(res.data.shots);
+                    } else {
+                      setStoryboardShots(null);
+                      setInspirationError(
+                        typeof res.error === "string" ? res.error : JSON.stringify(res.error),
+                      );
+                    }
+                    setInspirationAnalyzing(false);
+                  }}
+                >
+                  {inspirationAnalyzing ? "Analyzing your story..." : "Generate Script"}
+                </Button>
+              </div>
+              {inspirationError && (
+                <p className="text-sm text-red-400" role="alert">
+                  {inspirationError}
+                </p>
+              )}
+              <button
+                type="button"
+                className="text-left text-sm text-amber-300/90 underline decoration-amber-500/40 underline-offset-4 hover:text-amber-200"
+                onClick={() => {
+                  setEntryMode("script");
+                  setInspirationError(null);
+                }}
+              >
+                Already have a script? Switch to Script Mode
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-white/80">Script mode</label>
+                <textarea
+                  value={scriptText}
+                  onChange={(e) => setScriptText(e.target.value)}
+                  rows={14}
+                  placeholder="Paste your formatted script here..."
+                  className="w-full resize-y rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  className="bg-amber-500 text-black hover:bg-amber-400"
+                  disabled={loading || !projectId.trim()}
+                  onClick={async () => {
+                    setLoading(true);
+                    setResult(null);
+                    const res = await analyzeScriptAction({ projectId, scriptText });
+                    setResult(
+                      res.success
+                        ? `OK: story_memory.id=${res.data.storyMemoryId}`
+                        : `Error: ${
+                            typeof res.error === "object"
+                              ? JSON.stringify(res.error)
+                              : String(res.error)
+                          }`,
+                    );
+                    setLoading(false);
+                  }}
+                >
+                  {loading ? "Analyzing..." : "Analyze Script"}
+                </Button>
+                {!projectId.trim() && (
+                  <p className="text-xs text-white/45">Set Project ID below before analyzing.</p>
+                )}
+                {result && <div className="text-sm text-white/70">{result}</div>}
+              </div>
+              <button
+                type="button"
+                className="text-left text-sm text-amber-300/90 underline decoration-amber-500/40 underline-offset-4 hover:text-amber-200"
+                onClick={() => {
+                  setEntryMode("inspiration");
+                  setInspirationError(null);
+                }}
+              >
+                Switch to Inspiration Mode
+              </button>
+            </div>
+          )}
+
+          {storyboardShots && entryMode === "inspiration" && (
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <h3 className="text-sm font-semibold text-white/90">9-shot storyboard</h3>
+              <p className="mt-1 text-xs text-white/45">
+                Edit shots, then continue — runs NEL Sentinel on the formatted script (same as
+                Analyze Script).
+              </p>
+              <div className="mt-4 grid gap-4">
+                {storyboardShots.map((shot, index) => (
+                  <div
+                    key={`${shot.number}-${index}`}
+                    className="rounded-xl border border-white/10 bg-zinc-950/70 p-4"
+                  >
+                    <div className="mb-2 text-xs font-semibold text-amber-400">
+                      Shot {shot.number}
+                    </div>
+                    <div className="grid gap-2">
+                      <label className="text-[11px] text-white/50">Scene (visual)</label>
+                      <textarea
+                        value={shot.sceneDescription}
+                        onChange={(e) =>
+                          updateStoryboardShot(index, { sceneDescription: e.target.value })
+                        }
+                        rows={2}
+                        className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm text-white outline-none focus:border-amber-500"
+                      />
+                      <label className="text-[11px] text-white/50">Dialogue / voiceover</label>
+                      <textarea
+                        value={shot.dialogueOrVoiceover}
+                        onChange={(e) =>
+                          updateStoryboardShot(index, { dialogueOrVoiceover: e.target.value })
+                        }
+                        rows={2}
+                        className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm text-white outline-none focus:border-amber-500"
+                      />
+                      <label className="text-[11px] text-white/50">Emotional tone</label>
+                      <input
+                        value={shot.emotionalTone}
+                        onChange={(e) =>
+                          updateStoryboardShot(index, { emotionalTone: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm text-white outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  className="bg-amber-500 text-black hover:bg-amber-400"
+                  disabled={loading || !projectId.trim()}
+                  onClick={async () => {
+                    const nelScript = storyboardShotsToNelScriptText(storyboardShots);
+                    setScriptText(nelScript);
+                    setLoading(true);
+                    setResult(null);
+                    const res = await analyzeScriptAction({
+                      projectId,
+                      scriptText: nelScript,
+                    });
+                    setResult(
+                      res.success
+                        ? `OK: story_memory.id=${res.data.storyMemoryId}`
+                        : `Error: ${
+                            typeof res.error === "object"
+                              ? JSON.stringify(res.error)
+                              : String(res.error)
+                          }`,
+                    );
+                    setLoading(false);
+                  }}
+                >
+                  {loading ? "Analyzing..." : "Continue to NEL analysis"}
+                </Button>
+                {!projectId.trim() && (
+                  <p className="text-xs text-white/45">Create or paste Project ID in the section below.</p>
+                )}
+              </div>
+              {result && entryMode === "inspiration" && (
+                <p className="mt-2 text-sm text-white/70">{result}</p>
+              )}
+            </div>
+          )}
+        </section>
 
         <p className="mt-8 text-sm text-white/60">
           Step 0: 角色设置（模板库或上传参考图）→ 绑定到当前项目
@@ -275,42 +488,11 @@ export default function Home() {
             />
           </div>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium text-white/80">Script</label>
-            <textarea
-              value={scriptText}
-              onChange={(e) => setScriptText(e.target.value)}
-              placeholder="Paste your short drama script here..."
-              rows={12}
-              className="w-full resize-y rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
-            />
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Button
-              onClick={async () => {
-                setLoading(true);
-                setResult(null);
-                const res = await analyzeScriptAction({ projectId, scriptText });
-                setResult(
-                  res.success
-                    ? `OK: story_memory.id=${res.data.storyMemoryId}`
-                    : `Error: ${
-                        typeof res.error === "object"
-                          ? JSON.stringify(res.error)
-                          : String(res.error)
-                      }`
-                );
-                setLoading(false);
-              }}
-              disabled={loading}
-              className="bg-amber-500 text-black hover:bg-amber-400"
-            >
-              {loading ? "Analyzing..." : "Analyze Script"}
-            </Button>
-
-            {result && <div className="text-sm text-white/70">{result}</div>}
-          </div>
+          <p className="text-xs text-white/45">
+            Enter your script in <span className="text-amber-200/80">Start → Script mode</span>, or
+            use Inspiration mode and continue after the 9-shot board. NEL analysis results appear
+            there.
+          </p>
         </div>
 
         <p className="mt-10 text-sm text-white/60">

@@ -5,6 +5,8 @@ import { parseScript } from "@/lib/narrative-engine/parser";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types";
 import { NARRATIVE_TRANSLATOR_PROMPT } from "@/prompts/nel-sentinel";
+import { STORY_IDEA_FORMATTER_PROMPT } from "@/prompts/story-idea-formatter";
+import { normalizeShotFromClaude, type StoryboardShot } from "@/lib/story-idea-format";
 import {
   KLING_VIDEO_ASPECT_RATIO,
   stripHardcodedAspectRatioFromPrompt,
@@ -13,6 +15,53 @@ import { buildKlingVideoGenerationInput } from "@/lib/kling-piapi-payload";
 import { requireProjectId } from "@/lib/project-id";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+export async function formatStoryIdeaAction(input: {
+  idea: string;
+}): Promise<ActionResult<{ shots: StoryboardShot[] }>> {
+  try {
+    const idea = (input.idea ?? "").trim();
+    if (idea.length < 8) {
+      return { success: false, error: "Story idea is too short." };
+    }
+
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4096,
+      system: STORY_IDEA_FORMATTER_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: idea,
+        },
+      ],
+    });
+
+    const textContent = message.content.find((c) => c.type === "text");
+    if (!textContent || textContent.type !== "text") {
+      throw new Error("Claude returned no text");
+    }
+
+    let jsonText = textContent.text.trim();
+    jsonText = jsonText
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    const parsed: unknown = JSON.parse(jsonText);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Claude did not return a JSON array");
+    }
+    if (parsed.length !== 9) {
+      throw new Error(`Expected exactly 9 shots, got ${parsed.length}`);
+    }
+
+    const shots = parsed.map((item, idx) => normalizeShotFromClaude(item, idx));
+    return { success: true, data: { shots } };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : JSON.stringify(e) };
+  }
+}
 
 /** PiAPI expects lowercase `x-api-key` (duplicate with `X-API-Key` breaks some runtimes). */
 const piapiHeaders = (key: string) => ({
