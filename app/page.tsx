@@ -6,9 +6,12 @@ import {
   analyzeScriptAction,
   formatStoryIdeaAction,
   generateKlingPromptsAction,
+  getStoryMemoryForProjectAction,
   pollKlingTasksAction,
   submitKlingTasksAction,
+  type StoryMemorySummary,
 } from "@/actions/narrative.actions";
+import { formatUnknownError } from "@/lib/format-error";
 import {
   storyboardShotsToNelScriptText,
   type StoryboardShot,
@@ -52,6 +55,10 @@ type CharacterTemplate = {
   reference_image_url: string;
 };
 
+function errMsg(e: unknown): string {
+  return formatUnknownError(e);
+}
+
 function HealthDot({
   label,
   status,
@@ -94,6 +101,10 @@ export default function Home() {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [characterLoading, setCharacterLoading] = useState(false);
   const [characterResult, setCharacterResult] = useState<string | null>(null);
+
+  const [nelSummary, setNelSummary] = useState<StoryMemorySummary | null>(null);
+  const [nelStoryMemoryId, setNelStoryMemoryId] = useState<string | null>(null);
+  const [nelRefreshLoading, setNelRefreshLoading] = useState(false);
 
   const [entryMode, setEntryMode] = useState<"inspiration" | "script">("inspiration");
   const [storyIdea, setStoryIdea] = useState("");
@@ -184,9 +195,7 @@ export default function Home() {
                       setStoryboardShots(res.data.shots);
                     } else {
                       setStoryboardShots(null);
-                      setInspirationError(
-                        typeof res.error === "string" ? res.error : JSON.stringify(res.error),
-                      );
+                      setInspirationError(errMsg(res.error));
                     }
                     setInspirationAnalyzing(false);
                   }}
@@ -230,15 +239,15 @@ export default function Home() {
                     setLoading(true);
                     setResult(null);
                     const res = await analyzeScriptAction({ projectId, scriptText });
-                    setResult(
-                      res.success
-                        ? `OK: story_memory.id=${res.data.storyMemoryId}`
-                        : `Error: ${
-                            typeof res.error === "object"
-                              ? JSON.stringify(res.error)
-                              : String(res.error)
-                          }`,
-                    );
+                    if (res.success) {
+                      setNelSummary(res.data.summary);
+                      setNelStoryMemoryId(res.data.storyMemoryId);
+                      setResult(`OK: story_memory.id=${res.data.storyMemoryId}`);
+                    } else {
+                      setNelSummary(null);
+                      setNelStoryMemoryId(null);
+                      setResult(`Error: ${errMsg(res.error)}`);
+                    }
                     setLoading(false);
                   }}
                 >
@@ -322,15 +331,15 @@ export default function Home() {
                       projectId,
                       scriptText: nelScript,
                     });
-                    setResult(
-                      res.success
-                        ? `OK: story_memory.id=${res.data.storyMemoryId}`
-                        : `Error: ${
-                            typeof res.error === "object"
-                              ? JSON.stringify(res.error)
-                              : String(res.error)
-                          }`,
-                    );
+                    if (res.success) {
+                      setNelSummary(res.data.summary);
+                      setNelStoryMemoryId(res.data.storyMemoryId);
+                      setResult(`OK: story_memory.id=${res.data.storyMemoryId}`);
+                    } else {
+                      setNelSummary(null);
+                      setNelStoryMemoryId(null);
+                      setResult(`Error: ${errMsg(res.error)}`);
+                    }
                     setLoading(false);
                   }}
                 >
@@ -344,6 +353,101 @@ export default function Home() {
                 <p className="mt-2 text-sm text-white/70">{result}</p>
               )}
             </div>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-amber-400">NEL Sentinel · story_memory</h2>
+              <p className="mt-1 text-xs text-white/45">
+                After analysis succeeds, a summary appears here. Use refresh to re-read from Supabase
+                for this Project ID.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="shrink-0 border-amber-500/40 text-amber-200"
+              disabled={nelRefreshLoading || !projectId.trim()}
+              onClick={async () => {
+                setNelRefreshLoading(true);
+                const res = await getStoryMemoryForProjectAction({ projectId });
+                if (res.success) {
+                  setNelSummary(res.data.summary);
+                  setNelStoryMemoryId(res.data.storyMemoryId);
+                  setResult(`OK: loaded story_memory.id=${res.data.storyMemoryId}`);
+                } else {
+                  setNelSummary(null);
+                  setNelStoryMemoryId(null);
+                  setResult(`Error: ${errMsg(res.error)}`);
+                }
+                setNelRefreshLoading(false);
+              }}
+            >
+              {nelRefreshLoading ? "Loading…" : "Load / refresh from Supabase"}
+            </Button>
+          </div>
+
+          {nelStoryMemoryId && (
+            <p className="mt-3 text-xs text-white/50">
+              <span className="text-white/70">story_memory.id</span>{" "}
+              <code className="rounded bg-black/40 px-1.5 py-0.5 text-amber-200/90">
+                {nelStoryMemoryId}
+              </code>
+            </p>
+          )}
+
+          {nelSummary && (
+            <div className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-zinc-950/70 p-4 text-sm">
+              {(nelSummary.seriesTitle || nelSummary.episodeTitle) && (
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-white/40">
+                    Title
+                  </div>
+                  <div className="text-white/90">
+                    {nelSummary.seriesTitle}
+                    {nelSummary.episodeTitle ? ` — ${nelSummary.episodeTitle}` : ""}
+                  </div>
+                </div>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-white/40">
+                    Narrative arc
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-white/80">{nelSummary.narrativeArc || "—"}</p>
+                </div>
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-white/40">
+                    Tone / visual
+                  </div>
+                  <p className="mt-1 text-white/80">
+                    <span className="text-amber-200/90">{nelSummary.tone || "—"}</span>
+                    <span className="text-white/40"> · </span>
+                    <span>{nelSummary.visualStyle || "—"}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 text-xs text-white/60">
+                <span>
+                  Beats:{" "}
+                  <strong className="text-amber-200">{nelSummary.beatCount}</strong>
+                </span>
+                <span>
+                  Characters:{" "}
+                  <strong className="text-amber-200">{nelSummary.characterCount}</strong>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {!nelSummary && !nelRefreshLoading && projectId.trim() && (
+            <p className="mt-3 text-xs text-white/35">
+              No summary in UI yet — run <span className="text-white/55">Analyze Script</span> or{" "}
+              <span className="text-white/55">Continue to NEL analysis</span>, or click refresh above.
+            </p>
           )}
         </section>
 
@@ -395,7 +499,7 @@ export default function Home() {
                 setCharacterResult(
                   res.success
                     ? `OK: bound ${res.data.count} template characters`
-                    : `Error: ${String(res.error)}`,
+                    : `Error: ${errMsg(res.error)}`,
                 );
                 setCharacterLoading(false);
               }}
@@ -437,7 +541,7 @@ export default function Home() {
                   setCharacterResult(
                     res.success
                       ? `OK: uploaded custom character image (${res.data.path})`
-                      : `Error: ${String(res.error)}`,
+                      : `Error: ${errMsg(res.error)}`,
                   );
                   setCharacterLoading(false);
                 }}
@@ -474,13 +578,7 @@ export default function Home() {
                     setProjectId(res.data.projectId);
                     setResult(`OK: created project ${res.data.projectId}`);
                   } else {
-                    setResult(
-                      `Error: ${
-                        typeof res.error === "object"
-                          ? JSON.stringify(res.error)
-                          : String(res.error)
-                      }`,
-                    );
+                    setResult(`Error: ${errMsg(res.error)}`);
                   }
                   setProjectCreating(false);
                 }}
@@ -519,13 +617,7 @@ export default function Home() {
                   setPromptCards(res.data.prompts);
                   setPromptResult(`OK: generated ${res.data.prompts.length} prompts`);
                 } else {
-                  setPromptResult(
-                    `Error: ${
-                      typeof res.error === "object"
-                        ? JSON.stringify(res.error)
-                        : String(res.error)
-                    }`,
-                  );
+                  setPromptResult(`Error: ${errMsg(res.error)}`);
                 }
                 setPromptLoading(false);
               }}
@@ -589,13 +681,7 @@ export default function Home() {
                     setTaskCards(res.data.tasks);
                     setVideoResult(`Submitted ${res.data.tasks.length} tasks`);
                   } else {
-                    setVideoResult(
-                      `Error: ${
-                        typeof res.error === "object"
-                          ? JSON.stringify(res.error)
-                          : String(res.error)
-                      }`
-                    );
+                    setVideoResult(`Error: ${errMsg(res.error)}`);
                   }
                   setVideoLoading(false);
                 }}
@@ -619,13 +705,7 @@ export default function Home() {
                     const done = res.data.tasks.filter((t) => t.status === "success").length;
                     setVideoResult(`Polled ${res.data.tasks.length} tasks, success ${done}`);
                   } else {
-                    setVideoResult(
-                      `Error: ${
-                        typeof res.error === "object"
-                          ? JSON.stringify(res.error)
-                          : String(res.error)
-                      }`
-                    );
+                    setVideoResult(`Error: ${errMsg(res.error)}`);
                   }
                   setPollLoading(false);
                 }}

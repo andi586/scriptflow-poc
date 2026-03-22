@@ -12,7 +12,18 @@ import {
   stripHardcodedAspectRatioFromPrompt,
 } from "@/lib/kling-video";
 import { buildKlingVideoGenerationInput } from "@/lib/kling-piapi-payload";
+import { formatUnknownError } from "@/lib/format-error";
 import { requireProjectId } from "@/lib/project-id";
+
+export type StoryMemorySummary = {
+  seriesTitle: string;
+  episodeTitle: string;
+  narrativeArc: string;
+  tone: string;
+  visualStyle: string;
+  beatCount: number;
+  characterCount: number;
+};
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -59,7 +70,7 @@ export async function formatStoryIdeaAction(input: {
     const shots = parsed.map((item, idx) => normalizeShotFromClaude(item, idx));
     return { success: true, data: { shots } };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : JSON.stringify(e) };
+    return { success: false, error: formatUnknownError(e) };
   }
 }
 
@@ -74,7 +85,7 @@ const piapiGetHeaders = (key: string) => ({ "x-api-key": key });
 export async function analyzeScriptAction(input: {
   projectId: string;
   scriptText: string;
-}): Promise<ActionResult<{ storyMemoryId: string }>> {
+}): Promise<ActionResult<{ storyMemoryId: string; summary: StoryMemorySummary }>> {
   try {
     const projectId = requireProjectId(input.projectId);
     const analysis = await parseScript(input.scriptText);
@@ -85,6 +96,9 @@ export async function analyzeScriptAction(input: {
       typeof v === "string" ? v : "";
 
     const getArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+    const beats = getArray(analysisObj.beats);
+    const characters = getArray(analysisObj.characters);
 
     const { data, error } = await supabase
       .from("story_memory")
@@ -115,9 +129,71 @@ export async function analyzeScriptAction(input: {
 
     if (error) throw error;
 
-    return { success: true, data: { storyMemoryId: data.id as string } };
+    const summary: StoryMemorySummary = {
+      seriesTitle: getString(analysisObj.series_title),
+      episodeTitle: getString(analysisObj.episode_title),
+      narrativeArc: getString(
+        analysisObj.narrative_arc ?? (analysisObj as Record<string, unknown>).narrativeArc,
+      ),
+      tone: getString(analysisObj.tone),
+      visualStyle: getString(analysisObj.visual_style),
+      beatCount: beats.length,
+      characterCount: characters.length,
+    };
+
+    return {
+      success: true,
+      data: { storyMemoryId: data.id as string, summary },
+    };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : JSON.stringify(e) };
+    return { success: false, error: formatUnknownError(e) };
+  }
+}
+
+export async function getStoryMemoryForProjectAction(input: {
+  projectId: string;
+}): Promise<ActionResult<{ storyMemoryId: string; summary: StoryMemorySummary }>> {
+  try {
+    const projectId = requireProjectId(input.projectId);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("story_memory")
+      .select("id, narrative_arc, tone, visual_style, raw_analysis")
+      .eq("project_id", projectId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      return {
+        success: false,
+        error: "No story_memory for this project — run NEL analysis first.",
+      };
+    }
+
+    const raw =
+      data.raw_analysis && typeof data.raw_analysis === "object"
+        ? (data.raw_analysis as Record<string, unknown>)
+        : {};
+
+    const beats = Array.isArray(raw.beats) ? raw.beats : [];
+    const chars = Array.isArray(raw.characters) ? raw.characters : [];
+
+    const summary: StoryMemorySummary = {
+      seriesTitle: typeof raw.series_title === "string" ? raw.series_title : "",
+      episodeTitle: typeof raw.episode_title === "string" ? raw.episode_title : "",
+      narrativeArc: String(data.narrative_arc ?? ""),
+      tone: String(data.tone ?? ""),
+      visualStyle: String(data.visual_style ?? ""),
+      beatCount: beats.length,
+      characterCount: chars.length,
+    };
+
+    return {
+      success: true,
+      data: { storyMemoryId: data.id as string, summary },
+    };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
   }
 }
 
