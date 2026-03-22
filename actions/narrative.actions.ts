@@ -983,6 +983,76 @@ export async function pollSessionKlingVideoStatusAction(input: {
   }
 }
 
+/**
+ * Fresh PiAPI video URL for playback/download. DB `video_url` expires; always use this before play/zip.
+ * GET KLING_VIDEO_STATUS_BASE/video/{task_id} → extractVideoUrlFromPiResponse (works[0].resource.resource).
+ */
+export async function resolveKlingVideoPlaybackUrlAction(input: {
+  sessionId: string;
+  taskId: string;
+}): Promise<ActionResult<{ videoUrl: string }>> {
+  try {
+    const projectId = requireProjectId(input.sessionId);
+    const taskId = input.taskId.trim();
+    if (!taskId || taskId.startsWith("failed_") || taskId.startsWith("missing_")) {
+      return { success: false, error: "Invalid task id." };
+    }
+
+    const supabase = createClient();
+    const { data: rows, error: rowErr } = await supabase
+      .from("kling_tasks")
+      .select("task_id")
+      .eq("project_id", projectId)
+      .eq("task_id", taskId)
+      .limit(1);
+
+    if (rowErr) throw rowErr;
+    if (!rows?.length) {
+      return { success: false, error: "Task not found for this session." };
+    }
+
+    const { key } = getKlingConfig();
+    const pollUrl = getKlingVideoStatusPollUrl(taskId);
+    const res = await fetch(pollUrl, {
+      method: "GET",
+      cache: "no-store",
+      headers: piapiGetHeaders(key),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return {
+        success: false,
+        error: `PiAPI ${res.status}: ${text.slice(0, 300)}`,
+      };
+    }
+
+    const data = (await res.json()) as Record<string, unknown>;
+    const videoUrl = extractVideoUrlFromPiResponse(data);
+    if (!videoUrl?.trim()) {
+      return {
+        success: false,
+        error: "PiAPI did not return a playable video URL yet.",
+      };
+    }
+
+    const trimmed = videoUrl.trim();
+    const { error: cacheErr } = await supabase
+      .from("kling_tasks")
+      .update({ video_url: trimmed })
+      .eq("project_id", projectId)
+      .eq("task_id", taskId);
+    if (cacheErr) {
+      // Playback URL is still valid; DB cache update is best-effort.
+      console.warn("[resolveKlingVideoPlaybackUrl] cache update failed:", cacheErr.message);
+    }
+
+    return { success: true, data: { videoUrl: trimmed } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
+  }
+}
+
 export async function pollSingleSessionKlingVideoTaskAction(input: {
   sessionId: string;
   taskId: string;

@@ -7,6 +7,7 @@ import {
   listKlingTaskIdsForSessionAction,
   pollSessionKlingVideoStatusAction,
   pollSingleSessionKlingVideoTaskAction,
+  resolveKlingVideoPlaybackUrlAction,
   type KlingTaskItem,
 } from "@/actions/narrative.actions";
 
@@ -27,8 +28,9 @@ export type VideoResultsPanelProps = {
   className?: string;
 };
 
+/** DB `video_url` may be expired; success clips still show player after live PiAPI resolve. */
 function isClipDone(t: KlingTaskItem) {
-  return t.status === "success" && !!t.video_url?.trim();
+  return t.status === "success";
 }
 function isClipFailed(t: KlingTaskItem) {
   return t.status === "failed";
@@ -50,6 +52,11 @@ export function VideoResultsPanel({
   const [clipPollErrors, setClipPollErrors] = useState<Record<string, string>>({});
   const [videoUnlocked, setVideoUnlocked] = useState<Record<string, boolean>>({});
   const [zipBusy, setZipBusy] = useState(false);
+  /** Fresh URLs from PiAPI at play/download time (not stale DB video_url). */
+  const [playUrlByTaskId, setPlayUrlByTaskId] = useState<Record<string, string>>({});
+  const [playbackResolving, setPlaybackResolving] = useState<Record<string, boolean>>({});
+  const [playbackErrorByTaskId, setPlaybackErrorByTaskId] = useState<Record<string, string>>({});
+  const [downloadBusyTaskId, setDownloadBusyTaskId] = useState<string | null>(null);
   const [autoPollActive, setAutoPollActive] = useState(false);
   const [dbTaskIds, setDbTaskIds] = useState<string[] | undefined>(undefined);
   const [dbLoadError, setDbLoadError] = useState<string | null>(null);
@@ -133,6 +140,20 @@ export function VideoResultsPanel({
     }
   }, [sessionId]);
 
+  const fetchFreshPlaybackUrl = useCallback(
+    async (taskId: string): Promise<string> => {
+      const tid = taskId.trim();
+      if (!tid) throw new Error("Missing task id");
+      const res = await resolveKlingVideoPlaybackUrlAction({
+        sessionId,
+        taskId: tid,
+      });
+      if (!res.success) throw new Error(res.error);
+      return res.data.videoUrl;
+    },
+    [sessionId],
+  );
+
   const retryClipPoll = useCallback(
     async (taskId: string) => {
       if (!sessionId.trim()) return;
@@ -163,9 +184,7 @@ export function VideoResultsPanel({
   );
 
   const downloadAllAsZip = useCallback(async () => {
-    const clips = tasks.filter(
-      (t) => t.status === "success" && !!t.video_url?.trim(),
-    );
+    const clips = tasks.filter((t) => t.status === "success" && t.task_id.trim());
     if (clips.length === 0) return;
     setZipBusy(true);
     try {
@@ -173,7 +192,12 @@ export function VideoResultsPanel({
       const zip = new JSZip();
       let added = 0;
       for (const t of clips) {
-        const url = t.video_url!;
+        let url: string;
+        try {
+          url = await fetchFreshPlaybackUrl(t.task_id);
+        } catch {
+          continue;
+        }
         try {
           const res = await fetch(url);
           if (!res.ok) throw new Error(String(res.status));
@@ -194,8 +218,14 @@ export function VideoResultsPanel({
         return;
       }
       for (const t of clips) {
+        let url: string;
+        try {
+          url = await fetchFreshPlaybackUrl(t.task_id);
+        } catch {
+          continue;
+        }
         const a = document.createElement("a");
-        a.href = t.video_url!;
+        a.href = url;
         a.download = `scene_${t.beat_number}.mp4`;
         a.rel = "noreferrer";
         a.target = "_blank";
@@ -206,7 +236,7 @@ export function VideoResultsPanel({
     } finally {
       setZipBusy(false);
     }
-  }, [tasks]);
+  }, [tasks, fetchFreshPlaybackUrl]);
 
   useEffect(() => {
     if (!sessionId.trim() || stillResolvingIds) {
@@ -404,62 +434,154 @@ export function VideoResultsPanel({
                   </div>
                 )}
 
-                {done && task.video_url && (
-                  <div className="relative mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
-                    <video
-                      ref={(el) => {
-                        clipVideoRefs.current[vk] = el;
-                      }}
-                      src={task.video_url}
-                      className="max-h-64 w-full object-cover"
-                      playsInline
-                      preload="metadata"
-                      controls={unlocked}
-                      muted={!unlocked}
-                      onPlay={() =>
-                        setVideoUnlocked((u) => ({ ...u, [task.task_id]: true }))
-                      }
-                    />
-                    {!unlocked && (
-                      <button
-                        type="button"
-                        className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45"
-                        onClick={() => {
-                          setVideoUnlocked((u) => ({ ...u, [task.task_id]: true }));
-                          requestAnimationFrame(() => {
-                            const v = clipVideoRefs.current[vk];
-                            if (v) {
-                              v.muted = false;
-                              void v.play();
-                            }
+                {done && task.task_id && (
+                  <>
+                    {playbackErrorByTaskId[task.task_id] && (
+                      <p className="mt-2 text-xs text-red-400" role="alert">
+                        {playbackErrorByTaskId[task.task_id]}
+                      </p>
+                    )}
+                    <div className="relative mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
+                      <video
+                        key={playUrlByTaskId[task.task_id] ?? "pending-url"}
+                        ref={(el) => {
+                          clipVideoRefs.current[vk] = el;
+                        }}
+                        src={playUrlByTaskId[task.task_id] || undefined}
+                        className="max-h-64 w-full object-cover"
+                        playsInline
+                        preload="metadata"
+                        controls={unlocked && !!playUrlByTaskId[task.task_id]}
+                        muted={!unlocked}
+                        onPlay={() =>
+                          setVideoUnlocked((u) => ({ ...u, [task.task_id]: true }))
+                        }
+                        onError={() => {
+                          const tid = task.task_id;
+                          setPlaybackErrorByTaskId((prev) => ({
+                            ...prev,
+                            [tid]: "视频加载失败（链接可能已过期），请再点一次播放以从 PiAPI 拉取新地址。",
+                          }));
+                          setPlayUrlByTaskId((prev) => {
+                            const next = { ...prev };
+                            delete next[tid];
+                            return next;
+                          });
+                          setVideoUnlocked((u) => {
+                            const next = { ...u };
+                            delete next[tid];
+                            return next;
                           });
                         }}
-                        aria-label={`Play scene ${task.beat_number}`}
-                      >
-                        <Play
-                          className="size-14 text-amber-400 drop-shadow-md"
-                          fill="currentColor"
-                          strokeWidth={0}
-                        />
-                        <span className="text-xs font-medium text-white/90">点击播放</span>
-                      </button>
-                    )}
-                  </div>
-                )}
+                      />
+                      {(!unlocked || !playUrlByTaskId[task.task_id]) && (
+                        <button
+                          type="button"
+                          disabled={!!playbackResolving[task.task_id]}
+                          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45 disabled:cursor-wait disabled:opacity-80"
+                          onClick={() => {
+                            void (async () => {
+                              const tid = task.task_id;
+                              setPlaybackErrorByTaskId((prev) => {
+                                const next = { ...prev };
+                                delete next[tid];
+                                return next;
+                              });
+                              setPlaybackResolving((prev) => ({ ...prev, [tid]: true }));
+                              try {
+                                const url = await fetchFreshPlaybackUrl(tid);
+                                setPlayUrlByTaskId((prev) => ({ ...prev, [tid]: url }));
+                                setVideoUnlocked((u) => ({ ...u, [tid]: true }));
+                                requestAnimationFrame(() => {
+                                  const v = clipVideoRefs.current[vk];
+                                  if (v) {
+                                    v.muted = false;
+                                    void v.play();
+                                  }
+                                });
+                              } catch (e) {
+                                setPlaybackErrorByTaskId((prev) => ({
+                                  ...prev,
+                                  [tid]:
+                                    e instanceof Error ? e.message : String(e),
+                                }));
+                              } finally {
+                                setPlaybackResolving((prev) => {
+                                  const next = { ...prev };
+                                  delete next[tid];
+                                  return next;
+                                });
+                              }
+                            })();
+                          }}
+                          aria-label={`Play scene ${task.beat_number}`}
+                        >
+                          {playbackResolving[task.task_id] ? (
+                            <Loader2
+                              className="size-14 animate-spin text-amber-400"
+                              aria-hidden
+                            />
+                          ) : (
+                            <Play
+                              className="size-14 text-amber-400 drop-shadow-md"
+                              fill="currentColor"
+                              strokeWidth={0}
+                            />
+                          )}
+                          <span className="text-xs font-medium text-white/90">
+                            {playbackResolving[task.task_id]
+                              ? "正在从 PiAPI 获取播放地址…"
+                              : "点击播放"}
+                          </span>
+                        </button>
+                      )}
+                    </div>
 
-                {done && task.video_url && (
-                  <div className="mt-2">
-                    <a
-                      href={task.video_url}
-                      download={`scene_${task.beat_number}.mp4`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20"
-                    >
-                      <Download className="size-3.5" aria-hidden />
-                      下载 scene_{task.beat_number}.mp4
-                    </a>
-                  </div>
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        disabled={downloadBusyTaskId === task.task_id}
+                        onClick={() => {
+                          void (async () => {
+                            const tid = task.task_id;
+                            setPlaybackErrorByTaskId((prev) => {
+                              const next = { ...prev };
+                              delete next[tid];
+                              return next;
+                            });
+                            setDownloadBusyTaskId(tid);
+                            try {
+                              const url = await fetchFreshPlaybackUrl(tid);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `scene_${task.beat_number}.mp4`;
+                              a.rel = "noreferrer";
+                              a.target = "_blank";
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                            } catch (e) {
+                              setPlaybackErrorByTaskId((prev) => ({
+                                ...prev,
+                                [tid]:
+                                  e instanceof Error ? e.message : String(e),
+                              }));
+                            } finally {
+                              setDownloadBusyTaskId(null);
+                            }
+                          })();
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {downloadBusyTaskId === task.task_id ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="size-3.5" aria-hidden />
+                        )}
+                        下载 scene_{task.beat_number}.mp4
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             );
