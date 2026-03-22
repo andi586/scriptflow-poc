@@ -13,6 +13,11 @@ import {
 } from "@/lib/kling-video";
 import { buildKlingVideoGenerationInput } from "@/lib/kling-piapi-payload";
 import { formatUnknownError } from "@/lib/format-error";
+import {
+  extractVideoUrlFromPiResponse,
+  parseKlingVideoPollTerminal,
+} from "@/lib/kling-piapi-output";
+import { getKlingVideoStatusPollUrl } from "@/lib/kling-video-poll";
 import { PROJECT_CAST_TABLE } from "@/lib/project-cast-table";
 import { requireProjectId } from "@/lib/project-id";
 
@@ -220,7 +225,7 @@ type CausalResultItem = {
   result_frame_en?: string;
 };
 
-type KlingTaskItem = {
+export type KlingTaskItem = {
   beat_number: number;
   task_id: string;
   status: string;
@@ -233,73 +238,6 @@ function stripMarkdownFences(content: string): string {
     .replace(/```json\n?/g, "")
     .replace(/```\n?/g, "")
     .trim();
-}
-
-function findFirstUrl(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    const m = value.match(/https?:\/\/[^\s"']+/i);
-    return m ? m[0] : undefined;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findFirstUrl(item);
-      if (found) return found;
-    }
-  }
-  if (value && typeof value === "object") {
-    for (const v of Object.values(value as Record<string, unknown>)) {
-      const found = findFirstUrl(v);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
-function extractVideoUrlFromPiOutput(data: Record<string, unknown>): string | undefined {
-  const nested =
-    data.data && typeof data.data === "object" ? (data.data as Record<string, unknown>) : null;
-  const output =
-    nested && nested.output && typeof nested.output === "object"
-      ? (nested.output as Record<string, unknown>)
-      : null;
-
-  if (!output) return undefined;
-
-  // Common shapes
-  const outputObj = output as Record<string, unknown>;
-  const videoObj =
-    outputObj.video && typeof outputObj.video === "object"
-      ? (outputObj.video as Record<string, unknown>)
-      : null;
-
-  const videoUrlFields = [
-    outputObj.video_url,
-    outputObj.videoUrl,
-    outputObj.url,
-    videoObj ? videoObj.url : undefined,
-  ];
-  for (const f of videoUrlFields) {
-    if (typeof f === "string" && f.startsWith("http")) return f;
-  }
-
-  const works =
-    output.works && Array.isArray(output.works) ? (output.works as unknown[]) : null;
-  if (works && works.length > 0) {
-    // Try works[0].video.url
-    const first = works[0];
-    const videoField =
-      first && typeof first === "object"
-        ? (first as Record<string, unknown>).video
-        : undefined;
-    const urlCandidate =
-      videoField && typeof videoField === "object" && typeof (videoField as Record<string, unknown>).url === "string"
-        ? String((videoField as Record<string, unknown>).url)
-        : undefined;
-    if (urlCandidate) return urlCandidate;
-  }
-
-  // Fallback: search first URL anywhere in output
-  return findFirstUrl(output);
 }
 
 function normalizeBeats(rawAnalysis: Record<string, unknown>) {
@@ -787,7 +725,7 @@ export async function pollKlingTasksAction(input: {
             : (data as Record<string, unknown>).status;
 
         const providerStatus = String(piStatusRaw ?? "").toLowerCase();
-        const videoUrl = extractVideoUrlFromPiOutput(data);
+        const videoUrl = extractVideoUrlFromPiResponse(data);
 
         const normalized = providerStatus.replace(/[^a-z]/g, "");
         const hasVideo = typeof videoUrl === "string" && videoUrl.length > 0;
@@ -889,6 +827,182 @@ export async function pollKlingTasksAction(input: {
     return { success: true, data: { tasks } };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : JSON.stringify(e) };
+  }
+}
+
+async function fetchKlingTasksForProjectAggregated(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string,
+): Promise<KlingTaskItem[]> {
+  const { data: rows, error } = await supabase
+    .from("kling_tasks")
+    .select("scene_index, task_id, status, video_url, error_message")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  const byScene = new Map<number, KlingTaskItem>();
+  for (const row of rows ?? []) {
+    const r = row as Record<string, unknown>;
+    const si = Number(r.scene_index);
+    if (!Number.isFinite(si) || byScene.has(si)) continue;
+    byScene.set(si, {
+      beat_number: si,
+      task_id: typeof r.task_id === "string" ? r.task_id : "",
+      status: typeof r.status === "string" ? r.status : "processing",
+      video_url: typeof r.video_url === "string" ? r.video_url : undefined,
+      error_message: typeof r.error_message === "string" ? r.error_message : undefined,
+    });
+  }
+  return [...byScene.keys()].sort((a, b) => a - b).map((b) => byScene.get(b)!);
+}
+
+async function pollOneKlingTaskFromVideoApi(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string,
+  key: string,
+  sceneIndex: number,
+  taskId: string,
+  currentStatus: string,
+  options?: { includeFailed?: boolean },
+): Promise<{ pollError?: string }> {
+  if (currentStatus === "success") return {};
+  if (currentStatus === "failed" && !options?.includeFailed) return {};
+  if (!taskId || taskId.startsWith("failed_") || taskId.startsWith("missing_")) return {};
+
+  const pollUrl = getKlingVideoStatusPollUrl(taskId);
+  const res = await fetch(pollUrl, {
+    method: "GET",
+    cache: "no-store",
+    headers: piapiGetHeaders(key),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    return { pollError: `HTTP ${res.status} ${text.slice(0, 200)}` };
+  }
+
+  const data = (await res.json()) as Record<string, unknown>;
+  const videoUrl = extractVideoUrlFromPiResponse(data);
+  const terminal = parseKlingVideoPollTerminal(data, videoUrl);
+
+  if (terminal === "success" && videoUrl) {
+    const { error: upErr } = await supabase
+      .from("kling_tasks")
+      .update({
+        status: "success",
+        video_url: videoUrl,
+        error_message: null,
+      })
+      .eq("project_id", projectId)
+      .eq("task_id", taskId);
+    if (upErr) throw upErr;
+    return {};
+  }
+
+  if (terminal === "failed") {
+    const msg =
+      (typeof data.message === "string" && data.message) ||
+      (typeof data.error === "string" && data.error) ||
+      "Kling task failed";
+    const { error: upErr } = await supabase
+      .from("kling_tasks")
+      .update({
+        status: "failed",
+        error_message: String(msg).slice(0, 2000),
+      })
+      .eq("project_id", projectId)
+      .eq("task_id", taskId);
+    if (upErr) throw upErr;
+  }
+
+  return {};
+}
+
+/**
+ * Lazy-mode polling: GET Kling v1 video status per processing task; transient HTTP errors
+ * do not mark DB failed (only returned in pollErrors).
+ */
+export async function pollProjectKlingVideoStatusAction(input: {
+  projectId: string;
+}): Promise<ActionResult<{ tasks: KlingTaskItem[]; pollErrors: Record<string, string> }>> {
+  try {
+    const projectId = requireProjectId(input.projectId);
+    const supabase = createClient();
+    const { key } = getKlingConfig();
+
+    const tasksSnapshot = await fetchKlingTasksForProjectAggregated(supabase, projectId);
+    const pollErrors: Record<string, string> = {};
+
+    for (const t of tasksSnapshot) {
+      try {
+        const err = await pollOneKlingTaskFromVideoApi(
+          supabase,
+          projectId,
+          key,
+          t.beat_number,
+          t.task_id,
+          t.status,
+        );
+        if (err.pollError) pollErrors[String(t.beat_number)] = err.pollError;
+      } catch (e) {
+        pollErrors[String(t.beat_number)] = formatUnknownError(e);
+      }
+    }
+
+    const tasks = await fetchKlingTasksForProjectAggregated(supabase, projectId);
+    return { success: true, data: { tasks, pollErrors } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
+  }
+}
+
+export async function pollSingleKlingVideoTaskAction(input: {
+  projectId: string;
+  sceneIndex: number;
+}): Promise<ActionResult<{ tasks: KlingTaskItem[]; pollError?: string }>> {
+  try {
+    const projectId = requireProjectId(input.projectId);
+    const supabase = createClient();
+    const { key } = getKlingConfig();
+    const sceneIndex = input.sceneIndex;
+
+    const { data: rowList, error } = await supabase
+      .from("kling_tasks")
+      .select("scene_index, task_id, status, video_url, error_message")
+      .eq("project_id", projectId)
+      .eq("scene_index", sceneIndex)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+    const row = rowList?.[0] as Record<string, unknown> | undefined;
+
+    let pollError: string | undefined;
+    if (row) {
+      const taskId = typeof row.task_id === "string" ? row.task_id : "";
+      const status = typeof row.status === "string" ? row.status : "processing";
+      try {
+        const err = await pollOneKlingTaskFromVideoApi(
+          supabase,
+          projectId,
+          key,
+          sceneIndex,
+          taskId,
+          status,
+          { includeFailed: true },
+        );
+        pollError = err.pollError;
+      } catch (e) {
+        pollError = formatUnknownError(e);
+      }
+    }
+
+    const tasks = await fetchKlingTasksForProjectAggregated(supabase, projectId);
+    return { success: true, data: { tasks, pollError } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
   }
 }
 

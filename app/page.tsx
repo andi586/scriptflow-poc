@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Download, Loader2, Play } from "lucide-react";
 import {
   analyzeScriptAction,
   formatStoryIdeaAction,
   generateKlingPromptsAction,
   getStoryMemoryForProjectAction,
   pollKlingTasksAction,
+  pollProjectKlingVideoStatusAction,
+  pollSingleKlingVideoTaskAction,
   submitKlingTasksAction,
   type StoryMemorySummary,
 } from "@/actions/narrative.actions";
@@ -158,6 +161,138 @@ export default function Home() {
   const [pipelineRunning, setPipelineRunning] = useState(false);
   /** Hidden entry: full manual pipeline (NEL / bind / prompts / submit / poll). */
   const [proMode, setProMode] = useState(false);
+
+  /** Lazy results: PiAPI Kling v1 poll + UI */
+  const [lazyPollBusy, setLazyPollBusy] = useState(false);
+  const [clipPollErrors, setClipPollErrors] = useState<Record<number, string>>({});
+  const [videoUnlocked, setVideoUnlocked] = useState<Record<number, boolean>>({});
+  const [zipBusy, setZipBusy] = useState(false);
+  const [autoPollActive, setAutoPollActive] = useState(false);
+  const lazyPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const clipVideoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
+
+  const isClipDone = (t: TaskCard) => t.status === "success" && !!t.video_url?.trim();
+  const isClipFailed = (t: TaskCard) => t.status === "failed";
+  const isClipProcessing = (t: TaskCard) => !isClipDone(t) && !isClipFailed(t);
+
+  const refreshLazyPoll = useCallback(async () => {
+    if (!projectId.trim()) return;
+    setLazyPollBusy(true);
+    try {
+      const res = await pollProjectKlingVideoStatusAction({ projectId });
+      if (res.success) {
+        setDramaTaskCards(res.data.tasks);
+        const next: Record<number, string> = {};
+        for (const [k, v] of Object.entries(res.data.pollErrors)) {
+          next[Number(k)] = v;
+        }
+        setClipPollErrors((prev) => ({ ...prev, ...next }));
+        const allTerminal = res.data.tasks.every(
+          (t) => t.status === "success" || t.status === "failed",
+        );
+        if (allTerminal && lazyPollIntervalRef.current) {
+          clearInterval(lazyPollIntervalRef.current);
+          lazyPollIntervalRef.current = null;
+          setAutoPollActive(false);
+        }
+      }
+    } finally {
+      setLazyPollBusy(false);
+    }
+  }, [projectId]);
+
+  const retryClipPoll = useCallback(
+    async (sceneIndex: number) => {
+      if (!projectId.trim()) return;
+      setClipPollErrors((prev) => {
+        const n = { ...prev };
+        delete n[sceneIndex];
+        return n;
+      });
+      setLazyPollBusy(true);
+      try {
+        const res = await pollSingleKlingVideoTaskAction({ projectId, sceneIndex });
+        if (res.success) {
+          setDramaTaskCards(res.data.tasks);
+          if (res.data.pollError) {
+            setClipPollErrors((prev) => ({ ...prev, [sceneIndex]: res.data.pollError! }));
+          }
+        }
+      } finally {
+        setLazyPollBusy(false);
+      }
+    },
+    [projectId],
+  );
+
+  const downloadAllAsZip = useCallback(async () => {
+    const clips = dramaTaskCards.filter(
+      (t) => t.status === "success" && !!t.video_url?.trim(),
+    );
+    if (clips.length === 0) return;
+    setZipBusy(true);
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      let added = 0;
+      for (const t of clips) {
+        const url = t.video_url!;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(String(res.status));
+          const buf = await res.arrayBuffer();
+          zip.file(`scene_${t.beat_number}.mp4`, buf);
+          added += 1;
+        } catch {
+          /* CORS — cannot add to zip from browser */
+        }
+      }
+      if (added > 0) {
+        const blob = await zip.generateAsync({ type: "blob" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "scriptflow_clips.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        return;
+      }
+      for (const t of clips) {
+        const a = document.createElement("a");
+        a.href = t.video_url!;
+        a.download = `scene_${t.beat_number}.mp4`;
+        a.rel = "noreferrer";
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    } finally {
+      setZipBusy(false);
+    }
+  }, [dramaTaskCards]);
+
+  useEffect(() => {
+    if (pipelinePhase !== "done" || !projectId.trim()) {
+      if (lazyPollIntervalRef.current) {
+        clearInterval(lazyPollIntervalRef.current);
+        lazyPollIntervalRef.current = null;
+      }
+      setAutoPollActive(false);
+      return;
+    }
+
+    void refreshLazyPoll();
+    setAutoPollActive(true);
+    lazyPollIntervalRef.current = setInterval(() => void refreshLazyPoll(), 30_000);
+
+    return () => {
+      if (lazyPollIntervalRef.current) {
+        clearInterval(lazyPollIntervalRef.current);
+        lazyPollIntervalRef.current = null;
+      }
+      setAutoPollActive(false);
+    };
+  }, [pipelinePhase, projectId, refreshLazyPoll]);
 
   function updateStoryboardShot(index: number, patch: Partial<StoryboardShot>) {
     setStoryboardShots((prev) =>
@@ -466,40 +601,172 @@ export default function Home() {
 
           {pipelinePhase === "done" && dramaTaskCards.length > 0 && (
             <div className="mt-8 space-y-4 border-t border-white/10 pt-6">
-              <h3 className="text-sm font-semibold text-white">Your clips</h3>
-              <p className="text-xs text-white/50">
-                Videos are rendering on Kling — often about{" "}
-                <strong className="text-amber-200">{estimatedMinutes} minutes</strong> total for{" "}
-                {dramaTaskCards.length} scenes (rough estimate). Refresh status in{" "}
-                <span className="text-white/70">Pro Mode</span> if needed.
-              </p>
-              <div className="grid gap-3">
-                {dramaTaskCards.map((task) => (
-                  <div
-                    key={`${task.beat_number}-${task.status}`}
-                    className="rounded-xl border border-white/10 bg-zinc-950/70 p-4"
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-white">Your clips</h3>
+                {dramaTaskCards.every(isClipDone) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={zipBusy}
+                    onClick={() => void downloadAllAsZip()}
+                    className="border border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25"
                   >
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
-                      <span className="font-semibold text-amber-400">Scene {task.beat_number}</span>
-                      <span className="rounded bg-white/10 px-2 py-0.5 capitalize text-white/80">
-                        {task.status}
-                      </span>
+                    {zipBusy ? (
+                      <>
+                        <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
+                        打包中…
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-1.5 size-4" aria-hidden />
+                        下载全部
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-white/50">
+                {autoPollActive ? (
+                  <>
+                    已开启自动同步（每 30 秒）· PiAPI Kling 视频状态
+                    {lazyPollBusy ? (
+                      <Loader2 className="ml-1 inline size-3.5 animate-spin text-amber-400" aria-hidden />
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    全部场景已结束（成功或失败）。原始排队约{" "}
+                    <strong className="text-amber-200">{estimatedMinutes} 分钟</strong>（估算）。
+                  </>
+                )}
+              </p>
+              <div className="grid gap-4">
+                {dramaTaskCards.map((task) => {
+                  const done = isClipDone(task);
+                  const failed = isClipFailed(task);
+                  const processing = isClipProcessing(task);
+                  const pollErr = clipPollErrors[task.beat_number];
+                  const unlocked = !!videoUnlocked[task.beat_number];
+                  return (
+                    <div
+                      key={task.task_id || `scene-${task.beat_number}`}
+                      className="rounded-xl border border-white/10 bg-zinc-950/70 p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <span className="font-semibold text-amber-400">
+                          Scene {task.beat_number}
+                        </span>
+                        {processing && (
+                          <>
+                            <span className="inline-flex items-center gap-1.5 rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium capitalize text-amber-200">
+                              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                              Processing
+                            </span>
+                          </>
+                        )}
+                        {done && (
+                          <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                            Completed
+                          </span>
+                        )}
+                        {failed && (
+                          <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-300">
+                            Failed
+                          </span>
+                        )}
+                      </div>
+
+                      {task.error_message && (
+                        <p className="mt-2 text-sm text-red-400">{task.error_message}</p>
+                      )}
+                      {failed && !pollErr && (
+                        <div className="mt-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-amber-500/40 text-xs text-amber-200"
+                            onClick={() => void retryClipPoll(task.beat_number)}
+                          >
+                            重试
+                          </Button>
+                        </div>
+                      )}
+                      {pollErr && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <p className="text-xs text-amber-200/90">{pollErr}</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-amber-500/40 text-xs text-amber-200"
+                            onClick={() => void retryClipPoll(task.beat_number)}
+                          >
+                            重试
+                          </Button>
+                        </div>
+                      )}
+
+                      {done && task.video_url && (
+                        <div className="relative mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
+                          <video
+                            ref={(el) => {
+                              clipVideoRefs.current[task.beat_number] = el;
+                            }}
+                            src={task.video_url}
+                            className="max-h-64 w-full object-cover"
+                            playsInline
+                            preload="metadata"
+                            controls={unlocked}
+                            muted={!unlocked}
+                            onPlay={() =>
+                              setVideoUnlocked((u) => ({ ...u, [task.beat_number]: true }))
+                            }
+                          />
+                          {!unlocked && (
+                            <button
+                              type="button"
+                              className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45"
+                              onClick={() => {
+                                setVideoUnlocked((u) => ({ ...u, [task.beat_number]: true }));
+                                requestAnimationFrame(() => {
+                                  const v = clipVideoRefs.current[task.beat_number];
+                                  if (v) {
+                                    v.muted = false;
+                                    void v.play();
+                                  }
+                                });
+                              }}
+                              aria-label={`Play scene ${task.beat_number}`}
+                            >
+                              <Play
+                                className="size-14 text-amber-400 drop-shadow-md"
+                                fill="currentColor"
+                                strokeWidth={0}
+                              />
+                              <span className="text-xs font-medium text-white/90">点击播放</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {done && task.video_url && (
+                        <div className="mt-2">
+                          <a
+                            href={task.video_url}
+                            download={`scene_${task.beat_number}.mp4`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20"
+                          >
+                            <Download className="size-3.5" aria-hidden />
+                            下载 scene_{task.beat_number}.mp4
+                          </a>
+                        </div>
+                      )}
                     </div>
-                    {task.error_message && (
-                      <p className="mt-2 text-sm text-red-400">{task.error_message}</p>
-                    )}
-                    {task.video_url && (
-                      <a
-                        className="mt-2 inline-block text-sm text-emerald-400 underline"
-                        href={task.video_url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open video
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
