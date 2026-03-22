@@ -16,6 +16,7 @@ import { formatUnknownError } from "@/lib/format-error";
 import {
   clearLazySessionFromStorage,
   readLazySessionIdFromStorage,
+  SCRIPTFLOW_SESSION_STORAGE_KEY,
   writeLazySessionIdToStorage,
 } from "@/lib/lazy-session-storage";
 import {
@@ -319,7 +320,18 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      setLazyStorageChecked(true);
+      return;
+    }
+    const rawPrimary = window.localStorage.getItem(SCRIPTFLOW_SESSION_STORAGE_KEY);
     const id = readLazySessionIdFromStorage();
+    // #17 debug: confirm mount read + key (check DevTools → Console)
+    console.log("[ScriptFlow] session restore (mount)", {
+      storageKey: SCRIPTFLOW_SESSION_STORAGE_KEY,
+      rawPrimary,
+      restoredSessionId: id,
+    });
     if (id) {
       setRestoredLazySessionId(id);
       setProjectId(id);
@@ -330,6 +342,10 @@ export default function Home() {
   useEffect(() => {
     if (pipelinePhase === "done" && projectId.trim()) {
       writeLazySessionIdToStorage(projectId.trim());
+      console.log("[ScriptFlow] session persist (pipeline done)", {
+        storageKey: SCRIPTFLOW_SESSION_STORAGE_KEY,
+        projectId: projectId.trim(),
+      });
     }
   }, [pipelinePhase, projectId]);
 
