@@ -15,6 +15,14 @@ import { readApiJson } from "@/lib/fetch-json";
 import { prepareImageForUpload } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
 
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+
+function isJpgPngWebpFile(file: File): boolean {
+  const t = (file.type || "").toLowerCase();
+  if (ALLOWED_IMAGE_TYPES.has(t)) return true;
+  return /\.(jpe?g|png|webp)$/i.test(file.name);
+}
+
 function storageObjectFileName(originalName: string, contentType: string) {
   const stem = originalName
     .replace(/\.[a-zA-Z0-9]+$/, "")
@@ -42,8 +50,12 @@ export default function CharacterTemplatesPage() {
   const [klingPromptBase, setKlingPromptBase] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formFileInputRef = useRef<HTMLInputElement>(null);
+  /** UUID folder required by Storage RLS; used before a template row exists */
+  const draftUploadFolderIdRef = useRef<string | null>(null);
   const [uploadForId, setUploadForId] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [uploadingFormImage, setUploadingFormImage] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +84,12 @@ export default function CharacterTemplatesPage() {
     const templateId = uploadForId;
     e.target.value = "";
     if (!file || !templateId) return;
+
+    if (!isJpgPngWebpFile(file)) {
+      setError("仅支持 JPG、PNG、WebP 格式");
+      setUploadForId(null);
+      return;
+    }
 
     setUploadingId(templateId);
     try {
@@ -117,6 +135,48 @@ export default function CharacterTemplatesPage() {
     }
   }
 
+  async function handleFormReferenceImageSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!isJpgPngWebpFile(file)) {
+      setFormError("仅支持 JPG、PNG、WebP 格式");
+      return;
+    }
+
+    setFormError(null);
+    setUploadingFormImage(true);
+    try {
+      const { blob, contentType } = await prepareImageForUpload(file);
+      if (!draftUploadFolderIdRef.current) {
+        draftUploadFolderIdRef.current = crypto.randomUUID();
+      }
+      const folderId = draftUploadFolderIdRef.current;
+      const supabase = createClient();
+      const objectName = `${Date.now()}_${storageObjectFileName(file.name, contentType)}`;
+      const objectPath = `${folderId}/${objectName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("character-images")
+        .upload(objectPath, blob, {
+          contentType,
+          upsert: true,
+        });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
+      const url = pub.publicUrl;
+      if (!url) throw new Error("无法获取图片公开 URL");
+
+      setReferenceImageUrl(url);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploadingFormImage(false);
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -146,6 +206,7 @@ export default function CharacterTemplatesPage() {
       setStyleTagsRaw("");
       setReferenceImageUrl("");
       setKlingPromptBase("");
+      draftUploadFolderIdRef.current = null;
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -175,7 +236,7 @@ export default function CharacterTemplatesPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
               className="hidden"
               onChange={handleTemplateImageSelected}
             />
@@ -266,15 +327,37 @@ export default function CharacterTemplatesPage() {
               />
             </div>
             <div className="grid gap-2 sm:col-span-2">
-              <label className="text-xs font-medium text-white/70">Reference image URL</label>
-              <input
-                value={referenceImageUrl}
-                onChange={(e) => setReferenceImageUrl(e.target.value)}
-                type="url"
-                placeholder="https://..."
-                className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
-                required
-              />
+              <label className="text-xs font-medium text-white/70">参考图 URL</label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <input
+                  ref={formFileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={handleFormReferenceImageSelected}
+                />
+                <input
+                  value={referenceImageUrl}
+                  onChange={(e) => setReferenceImageUrl(e.target.value)}
+                  type="url"
+                  placeholder="https://... 或点击上传"
+                  className="min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={uploadingFormImage}
+                  className="shrink-0 border-amber-500/40 text-amber-200 hover:bg-amber-500/10 sm:w-auto"
+                  onClick={() => {
+                    setFormError(null);
+                    requestAnimationFrame(() => formFileInputRef.current?.click());
+                  }}
+                >
+                  {uploadingFormImage ? "上传中…" : "上传图片"}
+                </Button>
+              </div>
+              <p className="text-[11px] text-white/40">支持 JPG / PNG / WebP；大于 2MB 时会自动压缩。</p>
             </div>
             <div className="grid gap-2 sm:col-span-2">
               <label className="text-xs font-medium text-white/70">Kling prompt base</label>
