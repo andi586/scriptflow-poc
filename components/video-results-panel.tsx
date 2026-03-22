@@ -473,7 +473,7 @@ export function VideoResultsPanel({
                         {playbackErrorByTaskId[rowKey]}
                       </p>
                     )}
-                    <div className="relative mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
+                    <div className="relative z-10 mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
                       <video
                         key={`${rowKey}-${playUrlByTaskId[rowKey] ?? "pending-url"}`}
                         ref={(el) => {
@@ -516,9 +516,16 @@ export function VideoResultsPanel({
                       {(!unlocked || !playUrlByTaskId[rowKey]) && (
                         <button
                           type="button"
-                          disabled={!!playbackResolving[rowKey]}
-                          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45 disabled:cursor-wait disabled:opacity-80"
-                          onClick={() => {
+                          aria-busy={!!playbackResolving[rowKey]}
+                          className={`absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45 ${
+                            playbackResolving[rowKey]
+                              ? "cursor-wait opacity-80"
+                              : ""
+                          }`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (playbackResolving[rowKey]) return;
                             void (async () => {
                               setPlaybackErrorByTaskId((prev) => {
                                 const next = { ...prev };
@@ -540,7 +547,7 @@ export function VideoResultsPanel({
                                     void v.play();
                                   }
                                 });
-                              } catch (e) {
+                              } catch (err) {
                                 console.warn("[VideoResultsPanel] play click resolve failed", {
                                   rowKey,
                                   beat_number: task.beat_number,
@@ -550,7 +557,7 @@ export function VideoResultsPanel({
                                 setPlaybackErrorByTaskId((prev) => ({
                                   ...prev,
                                   [rowKey]:
-                                    e instanceof Error ? e.message : String(e),
+                                    err instanceof Error ? err.message : String(err),
                                 }));
                               } finally {
                                 setPlaybackResolving((prev) => {
@@ -560,6 +567,9 @@ export function VideoResultsPanel({
                                 });
                               }
                             })();
+                          }}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
                           }}
                           aria-label={`Play scene ${task.beat_number}`}
                         >
@@ -587,8 +597,11 @@ export function VideoResultsPanel({
                     <div className="mt-2">
                       <button
                         type="button"
-                        disabled={downloadBusyTaskId === rowKey}
-                        onClick={() => {
+                        aria-busy={downloadBusyTaskId === rowKey}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (downloadBusyTaskId === rowKey) return;
                           void (async () => {
                             setPlaybackErrorByTaskId((prev) => {
                               const next = { ...prev };
@@ -609,7 +622,7 @@ export function VideoResultsPanel({
                               document.body.appendChild(a);
                               a.click();
                               a.remove();
-                            } catch (e) {
+                            } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
                                 rowKey,
                                 beat_number: task.beat_number,
@@ -619,14 +632,19 @@ export function VideoResultsPanel({
                               setPlaybackErrorByTaskId((prev) => ({
                                 ...prev,
                                 [rowKey]:
-                                  e instanceof Error ? e.message : String(e),
+                                  err instanceof Error ? err.message : String(err),
                               }));
                             } finally {
                               setDownloadBusyTaskId(null);
                             }
                           })();
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-wait disabled:opacity-60"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className={`inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 ${
+                          downloadBusyTaskId === rowKey
+                            ? "cursor-wait opacity-60"
+                            : ""
+                        }`}
                       >
                         {downloadBusyTaskId === rowKey ? (
                           <Loader2 className="size-3.5 animate-spin" aria-hidden />
