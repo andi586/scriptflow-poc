@@ -237,7 +237,11 @@ export default function Home() {
         setStoryboardShots(fr.data.shots);
       }
 
-      const ar = await analyzeScriptAction({ projectId: pid, scriptText: nelScript });
+      const ar = await analyzeScriptAction({
+        projectId: pid,
+        scriptText: nelScript,
+        nelProfile: "lazy",
+      });
       if (!ar.success) throw new Error(errMsg(ar.error));
       setNelSummary(ar.data.summary);
       setNelStoryMemoryId(ar.data.storyMemoryId);

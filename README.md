@@ -13,6 +13,13 @@ Single-file apply (advanced): `npm run db:migrate:file -- path/to/file.sql`
 4. Copy `.env.example` → `.env.local` and fill keys. For the **New project (demo)** button, set `SCRIPTFLOW_DEMO_USER_ID` to a real `auth.users.id` UUID in that Supabase project.
 5. Browse preset character templates at `/character-templates` (API: `GET/POST /api/character-templates`).
 
+### Vercel / NEL 超时
+
+- NEL 分析走 **Server Action** `analyzeScriptAction`（不是单独的 `/api/analyze-story`）。根布局 `app/layout.tsx` 已设 **`export const maxDuration = 300`**；`vercel.json` 里为 `app/**` 配置了 **`maxDuration: 300`** 作为补充。
+- **Hobby** 套餐对单函数时长有上限（常为 10s），若仍报 `Load failed` 需升级 **Pro** 或接受更长耗时。
+- **懒人一键** 使用 `nelProfile: "lazy"`：**精简 system 提示**、`max_tokens` 3072、默认模型 **`claude-3-5-haiku-20241022`**（可用 **`NEL_LAZY_MODEL`** 改为 Sonnet）。Pro 模式仍为完整 Sentinel + Sonnet。
+- 若 300s 仍不够：可再拆异步任务或 NEL streaming；当前未实现流式响应。
+
 **Supabase CLI (optional alternative):** after `supabase link`, `npx supabase db push` pushes the same migration files to the linked project.
 
 ## Getting Started

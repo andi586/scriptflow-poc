@@ -91,10 +91,18 @@ const piapiGetHeaders = (key: string) => ({ "x-api-key": key });
 export async function analyzeScriptAction(input: {
   projectId: string;
   scriptText: string;
+  /**
+   * `lazy`：精简 NEL 提示 + 更低 max_tokens + 默认 Haiku（`NEL_LAZY_MODEL` 可改），用于一键懒人模式降超时风险。
+   * `full`：原版 Sentinel + Sonnet（Pro 模式 / 默认）。
+   */
+  nelProfile?: "full" | "lazy";
 }): Promise<ActionResult<{ storyMemoryId: string; summary: StoryMemorySummary }>> {
   try {
     const projectId = requireProjectId(input.projectId);
-    const analysis = await parseScript(input.scriptText);
+    const nelProfile = input.nelProfile ?? "full";
+    const analysis = await parseScript(input.scriptText, {
+      profile: nelProfile,
+    });
     const supabase = createClient();
     const analysisObj = analysis as Record<string, unknown>;
 
@@ -126,7 +134,12 @@ export async function analyzeScriptAction(input: {
           prop_registry: getArray(analysisObj.prop_registry),
           causal_result_frames: getArray(analysisObj.causal_result_frames),
           raw_analysis: analysis,
-          model_used: "claude-sonnet-4-20250514",
+          model_used:
+            typeof analysisObj.model_used === "string" && analysisObj.model_used.trim()
+              ? analysisObj.model_used.trim()
+              : nelProfile === "lazy"
+                ? (process.env.NEL_LAZY_MODEL?.trim() || "claude-3-5-haiku-20241022")
+                : "claude-sonnet-4-20250514",
         },
         { onConflict: "project_id" },
       )

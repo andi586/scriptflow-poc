@@ -1,3 +1,22 @@
+/**
+ * 懒人一键 / 超时敏感路径：字段齐全但要求短输出，降低 token 与生成时间。
+ * 仍须满足 `analyzeScriptAction` upsert 与 `generateKlingPromptsAction` 对 beats/characters 的最低需求。
+ */
+export const NEL_SENTINEL_PROMPT_LAZY = `你是短剧叙事分析师。快速阅读剧本，输出紧凑、合法 JSON 的故事记忆（所有顶层字段必须出现；内容尽量短）。
+
+硬性要求：
+- beats：按剧本顺序，每条含 beat_number（从 1 递增）、scene_summary（该场画面与对白要点，2–4 句中文）、emotional_tone（几个词）、narrative_function（几个词，如铺垫/转折/高潮）
+- characters：每条含 name、appearance、personality、language_fingerprint（各不超过一行）
+- foreshadowing_map、prop_registry、causal_result_frames：没有则输出空数组 []
+- core_visual_symbols：字符串数组，最多 5 个短词
+- cross_episode_continuity_notes：一句话
+- narrative_arc：4–8 句中文；tone、visual_style、series_title、episode_title 各简短
+
+顶层字段必须全部包含（不得省略键）：
+series_title, episode（数字，默认1）, episode_title, narrative_arc, tone, visual_style, characters, beats, foreshadowing_map, core_visual_symbols, cross_episode_continuity_notes, prop_registry, causal_result_frames
+
+只输出 JSON，不要 markdown 代码块、不要多余说明。`
+
 export const NEL_SENTINEL_PROMPT = `你是一个专业短剧叙事架构师。你已完整阅读整个剧本，必须全程维持故事记忆。
 
 任务：分析短剧剧本，输出完整的故事记忆库JSON。
