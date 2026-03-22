@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -217,7 +218,13 @@ export default function CharacterTemplatesPage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <main className="mx-auto w-full max-w-5xl px-6 py-10">
-        <h1 className="text-2xl font-extrabold tracking-tight text-white">
+        <Link
+          href="/"
+          className="text-sm font-semibold text-amber-400/90 underline-offset-4 hover:text-amber-300 hover:underline"
+        >
+          ← ScriptFlow
+        </Link>
+        <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-white">
           Character <span className="text-amber-400">Templates</span>
         </h1>
         <p className="mt-2 text-sm text-white/60">
