@@ -18,7 +18,7 @@ import {
   listCharacterTemplatesAction,
   uploadCustomCharacterAction,
 } from "@/actions/character.actions";
-import { createDemoProjectAction } from "@/actions/project.actions";
+import { createNewProjectAction } from "@/actions/project.actions";
 import type { CharacterRole } from "@/types";
 
 type PromptCard = {
@@ -450,18 +450,26 @@ export default function Home() {
 
         <div className="mt-8 grid gap-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="grid gap-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-sm font-medium text-white/80">Project ID</label>
+            <label className="text-sm font-medium text-white/80" htmlFor="project-id-input">
+              Project ID
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+              <input
+                id="project-id-input"
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                placeholder="Paste a projects.id UUID, or click New Project"
+                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+              />
               <Button
                 type="button"
-                size="sm"
                 variant="outline"
-                className="h-8 text-xs"
                 disabled={projectCreating}
+                className="h-auto shrink-0 border-amber-500/40 px-4 text-amber-200 hover:bg-amber-500/10 sm:self-stretch"
                 onClick={async () => {
                   setProjectCreating(true);
                   setResult(null);
-                  const res = await createDemoProjectAction();
+                  const res = await createNewProjectAction();
                   if (res.success) {
                     setProjectId(res.data.projectId);
                     setResult(`OK: created project ${res.data.projectId}`);
@@ -477,15 +485,15 @@ export default function Home() {
                   setProjectCreating(false);
                 }}
               >
-                {projectCreating ? "Creating…" : "New project (demo)"}
+                {projectCreating ? "Creating…" : "New Project"}
               </Button>
             </div>
-            <input
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              placeholder="projects.id UUID — or click New project if SCRIPTFLOW_DEMO_USER_ID is set"
-              className="w-full rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
-            />
+            <p className="text-[11px] text-white/40">
+              New Project inserts into Supabase <code className="text-white/50">projects</code> and
+              fills this field with the new row&apos;s UUID (requires{" "}
+              <code className="text-white/50">SCRIPTFLOW_DEMO_USER_ID</code> or{" "}
+              <code className="text-white/50">SCRIPTFLOW_PROJECT_OWNER_USER_ID</code>).
+            </p>
           </div>
 
           <p className="text-xs text-white/45">
