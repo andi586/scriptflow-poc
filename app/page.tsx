@@ -14,6 +14,11 @@ import {
 import { VideoResultsPanel } from "@/components/video-results-panel";
 import { formatUnknownError } from "@/lib/format-error";
 import {
+  clearLazySessionFromStorage,
+  readLazySessionIdFromStorage,
+  writeLazySessionIdToStorage,
+} from "@/lib/lazy-session-storage";
+import {
   storyboardShotsToNelScriptText,
   type StoryboardShot,
 } from "@/lib/story-idea-format";
@@ -160,6 +165,20 @@ export default function Home() {
   /** Hidden entry: full manual pipeline (NEL / bind / prompts / submit / poll). */
   const [proMode, setProMode] = useState(false);
 
+  /** Set once on mount when localStorage has a saved lazy session (refresh recovery). */
+  const [restoredLazySessionId, setRestoredLazySessionId] = useState<string | null>(null);
+  const [lazyStorageChecked, setLazyStorageChecked] = useState(false);
+
+  const startNewLazySession = useCallback(() => {
+    clearLazySessionFromStorage();
+    setRestoredLazySessionId(null);
+    setProjectId("");
+    setPipelinePhase("idle");
+    setPipelineError(null);
+    setDramaTaskCards([]);
+    setPipelineRunning(false);
+  }, []);
+
   const lazyVideoTaskIds = useMemo(
     () => dramaTaskCards.map((t) => t.task_id).filter((id) => id.length > 0),
     [dramaTaskCards],
@@ -299,6 +318,21 @@ export default function Home() {
     });
   }, []);
 
+  useEffect(() => {
+    const id = readLazySessionIdFromStorage();
+    if (id) {
+      setRestoredLazySessionId(id);
+      setProjectId(id);
+    }
+    setLazyStorageChecked(true);
+  }, []);
+
+  useEffect(() => {
+    if (pipelinePhase === "done" && projectId.trim()) {
+      writeLazySessionIdToStorage(projectId.trim());
+    }
+  }, [pipelinePhase, projectId]);
+
   const showProgress = pipelinePhase !== "idle";
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
@@ -345,6 +379,36 @@ export default function Home() {
       <main className="mx-auto w-full max-w-4xl px-6 py-8 sm:py-12">
         <p className="text-sm text-white/60">从你的灵感，到你的短剧。</p>
 
+        {!lazyStorageChecked ? (
+          <p className="mt-10 text-center text-sm text-white/40">正在恢复会话…</p>
+        ) : restoredLazySessionId ? (
+          <>
+            <section className="mt-8 rounded-2xl border border-amber-500/35 bg-gradient-to-b from-amber-500/10 to-black/30 p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-400">已恢复上次生成</h2>
+                  <p className="mt-1 max-w-xl text-xs text-white/50">
+                    会话已保存在本机（痛点 #17）。将自动从 Supabase 拉取任务并轮询成片状态。
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 border-amber-500/45 text-amber-100 hover:bg-amber-500/15"
+                  onClick={startNewLazySession}
+                >
+                  开始新项目
+                </Button>
+              </div>
+            </section>
+            <VideoResultsPanel
+              sessionId={restoredLazySessionId}
+              taskIds={[]}
+              title="Your clips"
+            />
+          </>
+        ) : (
+          <>
         {/* —— Main lazy flow —— */}
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-sm font-semibold text-amber-400">Your story</h2>
@@ -480,6 +544,8 @@ export default function Home() {
             />
           )}
         </section>
+          </>
+        )}
 
         {/* —— Pro Mode: same server actions, full manual control (hidden until toggled) —— */}
         {proMode && (

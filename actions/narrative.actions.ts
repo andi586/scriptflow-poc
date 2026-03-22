@@ -904,6 +904,41 @@ async function fetchKlingTasksOrderedByTaskIds(
   });
 }
 
+/** All PiAPI task_ids for a project, one per scene_index (latest row), sorted by scene. */
+export async function listKlingTaskIdsForSessionAction(input: {
+  sessionId: string;
+}): Promise<ActionResult<{ taskIds: string[] }>> {
+  try {
+    const projectId = requireProjectId(input.sessionId);
+    const supabase = createClient();
+    const { data: rows, error } = await supabase
+      .from("kling_tasks")
+      .select("scene_index, task_id")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const byScene = new Map<number, string>();
+    for (const row of rows ?? []) {
+      const r = row as Record<string, unknown>;
+      const si = Number(r.scene_index);
+      const tid = typeof r.task_id === "string" ? r.task_id.trim() : "";
+      if (!Number.isFinite(si) || !tid) continue;
+      if (byScene.has(si)) continue;
+      byScene.set(si, tid);
+    }
+
+    const taskIds = [...byScene.keys()]
+      .sort((a, b) => a - b)
+      .map((s) => byScene.get(s)!);
+
+    return { success: true, data: { taskIds } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
+  }
+}
+
 /**
  * Poll PiAPI Kling video status for a fixed list of task_ids under a session (project).
  * pollErrors keys are task_id strings.

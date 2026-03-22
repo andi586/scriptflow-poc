@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Play } from "lucide-react";
 import {
+  listKlingTaskIdsForSessionAction,
   pollSessionKlingVideoStatusAction,
   pollSingleSessionKlingVideoTaskAction,
   type KlingTaskItem,
@@ -12,8 +13,11 @@ import {
 export type VideoResultsPanelProps = {
   /** Supabase `projects.id` — scopes `kling_tasks` rows. */
   sessionId: string;
-  /** PiAPI task ids to poll & display (order preserved for UI / scene fallback). */
-  taskIds: string[];
+  /**
+   * PiAPI task ids (order preserved). If omitted or empty, loads all `task_id` from
+   * `kling_tasks` for this session, then polls.
+   */
+  taskIds?: string[];
   /** Section heading */
   title?: string;
   /** Default: true */
@@ -35,7 +39,7 @@ function isClipProcessing(t: KlingTaskItem) {
 
 export function VideoResultsPanel({
   sessionId,
-  taskIds,
+  taskIds: taskIdsProp = [],
   title = "Your clips",
   autoPoll = true,
   pollIntervalMs = 30_000,
@@ -47,19 +51,64 @@ export function VideoResultsPanel({
   const [videoUnlocked, setVideoUnlocked] = useState<Record<string, boolean>>({});
   const [zipBusy, setZipBusy] = useState(false);
   const [autoPollActive, setAutoPollActive] = useState(false);
+  const [dbTaskIds, setDbTaskIds] = useState<string[] | undefined>(undefined);
+  const [dbLoadError, setDbLoadError] = useState<string | null>(null);
   const lazyPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const clipVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
-  const taskIdsRef = useRef<string[]>(taskIds);
-  const taskIdsKey = useMemo(
-    () => taskIds.map((t) => t.trim()).filter(Boolean).join("\0"),
-    [taskIds],
+  const taskIdsRef = useRef<string[]>([]);
+
+  const propTaskIdsKey = useMemo(
+    () => taskIdsProp.map((t) => t.trim()).filter(Boolean).join("\0"),
+    [taskIdsProp],
   );
 
-  useEffect(() => {
-    taskIdsRef.current = taskIds;
-  }, [taskIds]);
+  const effectiveIds = useMemo(() => {
+    const fromProp = taskIdsProp.map((t) => t.trim()).filter(Boolean);
+    if (fromProp.length > 0) return fromProp;
+    if (dbTaskIds !== undefined) return dbTaskIds;
+    return [];
+  }, [taskIdsProp, dbTaskIds]);
 
-  const estimatedMinutes = Math.max(2, Math.ceil((taskIds.length || 6) * 1.5));
+  const stillResolvingIds =
+    taskIdsProp.map((t) => t.trim()).filter(Boolean).length === 0 && dbTaskIds === undefined;
+
+  const effectiveKey = effectiveIds.join("\0");
+
+  useEffect(() => {
+    taskIdsRef.current = effectiveIds;
+  }, [effectiveKey]);
+
+  useEffect(() => {
+    if (!sessionId.trim()) {
+      setDbTaskIds(undefined);
+      setDbLoadError(null);
+      return;
+    }
+    const fromProp = taskIdsProp.map((t) => t.trim()).filter(Boolean);
+    if (fromProp.length > 0) {
+      setDbTaskIds(undefined);
+      setDbLoadError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDbLoadError(null);
+    (async () => {
+      const res = await listKlingTaskIdsForSessionAction({ sessionId });
+      if (cancelled) return;
+      if (res.success) {
+        setDbTaskIds(res.data.taskIds);
+      } else {
+        setDbTaskIds([]);
+        setDbLoadError(res.error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, propTaskIdsKey]);
+
+  const estimatedMinutes = Math.max(2, Math.ceil((effectiveIds.length || 6) * 1.5));
 
   const refreshSessionPoll = useCallback(async () => {
     const ids = taskIdsRef.current.map((t) => t.trim()).filter(Boolean);
@@ -160,8 +209,17 @@ export function VideoResultsPanel({
   }, [tasks]);
 
   useEffect(() => {
-    const ids = taskIdsKey ? taskIdsKey.split("\0") : [];
-    if (!sessionId.trim() || ids.length === 0) {
+    if (!sessionId.trim() || stillResolvingIds) {
+      if (lazyPollIntervalRef.current) {
+        clearInterval(lazyPollIntervalRef.current);
+        lazyPollIntervalRef.current = null;
+      }
+      setAutoPollActive(false);
+      if (!sessionId.trim()) setTasks([]);
+      return;
+    }
+
+    if (effectiveIds.length === 0) {
       if (lazyPollIntervalRef.current) {
         clearInterval(lazyPollIntervalRef.current);
         lazyPollIntervalRef.current = null;
@@ -189,10 +247,43 @@ export function VideoResultsPanel({
       }
       setAutoPollActive(false);
     };
-  }, [sessionId, taskIdsKey, autoPoll, pollIntervalMs, refreshSessionPoll]);
+  }, [
+    sessionId,
+    effectiveKey,
+    stillResolvingIds,
+    autoPoll,
+    pollIntervalMs,
+    refreshSessionPoll,
+    effectiveIds.length,
+  ]);
 
-  const ids = taskIds.map((t) => t.trim()).filter(Boolean);
-  if (!sessionId.trim() || ids.length === 0) return null;
+  if (!sessionId.trim()) return null;
+
+  if (stillResolvingIds) {
+    return (
+      <div className={className}>
+        <div className="mt-8 flex items-center gap-2 border-t border-white/10 pt-6 text-sm text-white/55">
+          <Loader2 className="size-4 shrink-0 animate-spin text-amber-400" aria-hidden />
+          正在从 Supabase 加载任务列表…
+        </div>
+      </div>
+    );
+  }
+
+  if (dbLoadError) {
+    return (
+      <div className={className}>
+        <div className="mt-8 space-y-2 border-t border-white/10 pt-6">
+          <p className="text-sm text-red-400" role="alert">
+            无法加载任务：{dbLoadError}
+          </p>
+          <p className="text-xs text-white/45">请使用「开始新项目」或检查 session 是否有效。</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (effectiveIds.length === 0) return null;
 
   return (
     <div className={className}>
