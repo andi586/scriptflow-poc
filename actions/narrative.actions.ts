@@ -858,6 +858,139 @@ async function fetchKlingTasksForProjectAggregated(
   return [...byScene.keys()].sort((a, b) => a - b).map((b) => byScene.get(b)!);
 }
 
+async function fetchKlingTasksOrderedByTaskIds(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string,
+  orderedTaskIds: string[],
+): Promise<KlingTaskItem[]> {
+  const ordered = orderedTaskIds.map((t) => t.trim()).filter(Boolean);
+  const ids = [...new Set(ordered)];
+  if (ids.length === 0) return [];
+
+  const { data: rows, error } = await supabase
+    .from("kling_tasks")
+    .select("scene_index, task_id, status, video_url, error_message")
+    .eq("project_id", projectId)
+    .in("task_id", ids);
+
+  if (error) throw error;
+
+  const map = new Map<string, KlingTaskItem>();
+  for (const row of rows ?? []) {
+    const r = row as Record<string, unknown>;
+    const tid = typeof r.task_id === "string" ? r.task_id : "";
+    if (!tid || map.has(tid)) continue;
+    const si = Number(r.scene_index);
+    map.set(tid, {
+      beat_number: Number.isFinite(si) ? si : 0,
+      task_id: tid,
+      status: typeof r.status === "string" ? r.status : "processing",
+      video_url: typeof r.video_url === "string" ? r.video_url : undefined,
+      error_message: typeof r.error_message === "string" ? r.error_message : undefined,
+    });
+  }
+
+  return ordered.map((tid, idx) => {
+    const t = map.get(tid);
+    if (t) {
+      const beat = t.beat_number > 0 ? t.beat_number : idx + 1;
+      return { ...t, beat_number: beat };
+    }
+    return {
+      beat_number: idx + 1,
+      task_id: tid,
+      status: "processing",
+    };
+  });
+}
+
+/**
+ * Poll PiAPI Kling video status for a fixed list of task_ids under a session (project).
+ * pollErrors keys are task_id strings.
+ */
+export async function pollSessionKlingVideoStatusAction(input: {
+  sessionId: string;
+  taskIds: string[];
+}): Promise<ActionResult<{ tasks: KlingTaskItem[]; pollErrors: Record<string, string> }>> {
+  try {
+    const projectId = requireProjectId(input.sessionId);
+    const ordered = [...new Set(input.taskIds.map((t) => t.trim()).filter(Boolean))];
+    if (ordered.length === 0) {
+      return { success: true, data: { tasks: [], pollErrors: {} } };
+    }
+
+    const supabase = createClient();
+    const { key } = getKlingConfig();
+
+    const snapshot = await fetchKlingTasksOrderedByTaskIds(supabase, projectId, ordered);
+    const pollErrors: Record<string, string> = {};
+
+    for (const t of snapshot) {
+      try {
+        const err = await pollOneKlingTaskFromVideoApi(
+          supabase,
+          projectId,
+          key,
+          t.beat_number,
+          t.task_id,
+          t.status,
+        );
+        if (err.pollError) pollErrors[t.task_id] = err.pollError;
+      } catch (e) {
+        pollErrors[t.task_id] = formatUnknownError(e);
+      }
+    }
+
+    const tasks = await fetchKlingTasksOrderedByTaskIds(supabase, projectId, ordered);
+    return { success: true, data: { tasks, pollErrors } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
+  }
+}
+
+export async function pollSingleSessionKlingVideoTaskAction(input: {
+  sessionId: string;
+  taskId: string;
+  taskIds: string[];
+}): Promise<ActionResult<{ tasks: KlingTaskItem[]; pollError?: string }>> {
+  try {
+    const projectId = requireProjectId(input.sessionId);
+    const taskId = input.taskId.trim();
+    const ordered = input.taskIds.map((t) => t.trim()).filter(Boolean);
+    if (!taskId || ordered.length === 0) {
+      return { success: true, data: { tasks: [] } };
+    }
+
+    const supabase = createClient();
+    const { key } = getKlingConfig();
+
+    const snapshot = await fetchKlingTasksOrderedByTaskIds(supabase, projectId, ordered);
+    const row = snapshot.find((t) => t.task_id === taskId);
+    let pollError: string | undefined;
+    if (row) {
+      try {
+        const err = await pollOneKlingTaskFromVideoApi(
+          supabase,
+          projectId,
+          key,
+          row.beat_number,
+          row.task_id,
+          row.status,
+          { includeFailed: true },
+        );
+        pollError = err.pollError;
+      } catch (e) {
+        pollError = formatUnknownError(e);
+      }
+    }
+
+    const tasks = await fetchKlingTasksOrderedByTaskIds(supabase, projectId, ordered);
+    return { success: true, data: { tasks, pollError } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
+  }
+}
+
 async function pollOneKlingTaskFromVideoApi(
   supabase: ReturnType<typeof createClient>,
   projectId: string,
