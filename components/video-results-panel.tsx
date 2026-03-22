@@ -50,6 +50,42 @@ function clipRowKey(task: KlingTaskItem): string {
   return tid ? `b${beat}|${tid}` : `b${beat}|notask`;
 }
 
+/** Wait for React to commit `src` to the `<video>` DOM node. */
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+function waitForVideoLoaded(video: HTMLVideoElement, timeoutMs: number): Promise<void> {
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const to = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("视频加载超时，请重试"));
+    }, timeoutMs);
+    const ok = () => {
+      cleanup();
+      resolve();
+    };
+    const bad = () => {
+      cleanup();
+      reject(new Error("视频无法加载，请重试"));
+    };
+    const cleanup = () => {
+      window.clearTimeout(to);
+      video.removeEventListener("loadeddata", ok);
+      video.removeEventListener("error", bad);
+    };
+    video.addEventListener("loadeddata", ok, { once: true });
+    video.addEventListener("error", bad, { once: true });
+  });
+}
+
 export function VideoResultsPanel({
   sessionId,
   taskIds: taskIdsProp = [],
@@ -73,6 +109,8 @@ export function VideoResultsPanel({
   const [dbLoadError, setDbLoadError] = useState<string | null>(null);
   const lazyPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const clipVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+  /** While true, ignore `<video onError>` so empty src / load races don’t show a false error before user intent. */
+  const intentionalPlaybackLoadRef = useRef<Set<string>>(new Set());
   const taskIdsRef = useRef<string[]>([]);
 
   const propTaskIdsKey = useMemo(
@@ -468,14 +506,14 @@ export function VideoResultsPanel({
 
                 {done && piTid && (
                   <>
-                    {playbackErrorByTaskId[rowKey] && (
+                    {playbackErrorByTaskId[rowKey] && !playbackResolving[rowKey] && (
                       <p className="mt-2 text-xs text-red-400" role="alert">
                         {playbackErrorByTaskId[rowKey]}
                       </p>
                     )}
                     <div className="relative z-10 mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
                       <video
-                        key={`${rowKey}-${playUrlByTaskId[rowKey] ?? "pending-url"}`}
+                        key={rowKey}
                         ref={(el) => {
                           clipVideoRefs.current[rowKey] = el;
                         }}
@@ -489,6 +527,9 @@ export function VideoResultsPanel({
                           setVideoUnlocked((u) => ({ ...u, [rowKey]: true }))
                         }
                         onError={() => {
+                          if (intentionalPlaybackLoadRef.current.has(rowKey)) {
+                            return;
+                          }
                           console.warn("[VideoResultsPanel] <video> error", {
                             rowKey,
                             beat_number: task.beat_number,
@@ -498,8 +539,7 @@ export function VideoResultsPanel({
                           });
                           setPlaybackErrorByTaskId((prev) => ({
                             ...prev,
-                            [rowKey]:
-                              "视频加载失败（链接可能已过期），请再点一次播放以从 PiAPI 拉取新地址。",
+                            [rowKey]: "播放中断，可再次点击播放获取新地址。",
                           }));
                           setPlayUrlByTaskId((prev) => {
                             const next = { ...prev };
@@ -516,6 +556,7 @@ export function VideoResultsPanel({
                       {(!unlocked || !playUrlByTaskId[rowKey]) && (
                         <button
                           type="button"
+                          disabled={!!playbackResolving[rowKey]}
                           aria-busy={!!playbackResolving[rowKey]}
                           className={`absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45 ${
                             playbackResolving[rowKey]
@@ -527,6 +568,7 @@ export function VideoResultsPanel({
                             e.stopPropagation();
                             if (playbackResolving[rowKey]) return;
                             void (async () => {
+                              intentionalPlaybackLoadRef.current.add(rowKey);
                               setPlaybackErrorByTaskId((prev) => {
                                 const next = { ...prev };
                                 delete next[rowKey];
@@ -539,16 +581,19 @@ export function VideoResultsPanel({
                                   clipRowKey: rowKey,
                                 });
                                 setPlayUrlByTaskId((prev) => ({ ...prev, [rowKey]: url }));
+                                await nextPaint();
+                                const v = clipVideoRefs.current[rowKey];
+                                if (!v) {
+                                  throw new Error("播放器未就绪，请重试");
+                                }
+                                v.src = url;
+                                v.load();
+                                await waitForVideoLoaded(v, 60_000);
+                                v.muted = false;
+                                await v.play();
                                 setVideoUnlocked((u) => ({ ...u, [rowKey]: true }));
-                                requestAnimationFrame(() => {
-                                  const v = clipVideoRefs.current[rowKey];
-                                  if (v) {
-                                    v.muted = false;
-                                    void v.play();
-                                  }
-                                });
                               } catch (err) {
-                                console.warn("[VideoResultsPanel] play click resolve failed", {
+                                console.warn("[VideoResultsPanel] play pipeline failed", {
                                   rowKey,
                                   beat_number: task.beat_number,
                                   task_id: task.task_id,
@@ -559,7 +604,18 @@ export function VideoResultsPanel({
                                   [rowKey]:
                                     err instanceof Error ? err.message : String(err),
                                 }));
+                                setPlayUrlByTaskId((prev) => {
+                                  const next = { ...prev };
+                                  delete next[rowKey];
+                                  return next;
+                                });
+                                setVideoUnlocked((u) => {
+                                  const next = { ...u };
+                                  delete next[rowKey];
+                                  return next;
+                                });
                               } finally {
+                                intentionalPlaybackLoadRef.current.delete(rowKey);
                                 setPlaybackResolving((prev) => {
                                   const next = { ...prev };
                                   delete next[rowKey];
