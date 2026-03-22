@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { formatUnknownError } from "@/lib/format-error";
+import { PROJECT_CAST_TABLE } from "@/lib/project-cast-table";
 import { requireProjectId } from "@/lib/project-id";
 import {
   CHARACTER_TEMPLATES,
@@ -57,8 +58,9 @@ export async function listCharacterTemplatesAction(): Promise<
   try {
     const supabase = createClient();
     const { data, error } = await supabase
-      .from("character_templates")
+      .from(PROJECT_CAST_TABLE)
       .select("id,name,archetype,reference_image_url,kling_prompt_base")
+      .is("project_id", null)
       .order("created_at", { ascending: true });
 
     if (error) throw error;
@@ -88,24 +90,28 @@ export async function bindTemplateCharactersAction(input: {
     const dbIds = input.templateIds.filter((id) => UUID_RE.test(id));
     const legacyIds = input.templateIds.filter((id) => !UUID_RE.test(id));
 
-    type Row = {
+    type CastInsertRow = {
       project_id: string;
       name: string;
+      archetype: string;
+      style_tags: string[];
+      reference_image_url: string;
+      kling_prompt_base: string;
       role: CharacterRole;
       appearance: string;
       personality: string;
       language_fingerprint: string;
-      reference_image_url: string;
       reference_image_path: string;
       appears_in_beats: number[];
     };
 
-    const rows: Row[] = [];
+    const rows: CastInsertRow[] = [];
 
     if (dbIds.length > 0) {
       const { data: dbTemplates, error: qErr } = await supabase
-        .from("character_templates")
-        .select("id,name,archetype,reference_image_url,kling_prompt_base")
+        .from(PROJECT_CAST_TABLE)
+        .select("id,name,archetype,style_tags,reference_image_url,kling_prompt_base")
+        .is("project_id", null)
         .in("id", dbIds);
       if (qErr) throw qErr;
       for (const row of dbTemplates ?? []) {
@@ -113,18 +119,24 @@ export async function bindTemplateCharactersAction(input: {
           id: string;
           name: string;
           archetype: string;
+          style_tags: string[] | null;
           reference_image_url: string;
           kling_prompt_base: string | null;
         };
+        const tags = Array.isArray(r.style_tags) ? r.style_tags : [];
+        const appearanceLine =
+          r.kling_prompt_base?.trim() || `${r.name} — appearance from reference image.`;
         rows.push({
           project_id: projectId,
           name: r.name,
+          archetype: r.archetype,
+          style_tags: tags,
+          reference_image_url: r.reference_image_url,
+          kling_prompt_base: appearanceLine,
           role: inferRoleFromArchetype(r.name, r.archetype),
-          appearance:
-            r.kling_prompt_base?.trim() || `${r.name} — appearance from reference image.`,
+          appearance: appearanceLine,
           personality: "From template library.",
           language_fingerprint: "Follow script dialogue fingerprint.",
-          reference_image_url: r.reference_image_url,
           reference_image_path: `character_templates/${r.id}`,
           appears_in_beats: [],
         });
@@ -136,11 +148,14 @@ export async function bindTemplateCharactersAction(input: {
       rows.push({
         project_id: projectId,
         name: item.name,
+        archetype: item.label,
+        style_tags: [],
+        reference_image_url: item.reference_image_url,
+        kling_prompt_base: item.appearance,
         role: item.role,
         appearance: item.appearance,
         personality: item.personality,
         language_fingerprint: item.language_fingerprint,
-        reference_image_url: item.reference_image_url,
         reference_image_path: `templates/${item.id}`,
         appears_in_beats: [],
       });
@@ -154,9 +169,9 @@ export async function bindTemplateCharactersAction(input: {
       };
     }
 
-    await supabase.from("characters").delete().eq("project_id", projectId);
+    await supabase.from(PROJECT_CAST_TABLE).delete().eq("project_id", projectId);
     if (rows.length > 0) {
-      const { error } = await supabase.from("characters").insert(rows);
+      const { error } = await supabase.from(PROJECT_CAST_TABLE).insert(rows);
       if (error) throw error;
     }
 
@@ -192,14 +207,18 @@ export async function uploadCustomCharacterAction(input: {
     const { data } = supabase.storage.from("character-references").getPublicUrl(path);
     const referenceImageUrl = data.publicUrl;
 
-    const { error: insertError } = await supabase.from("characters").insert({
+    const appearanceLine = `${input.name} appearance locked by uploaded reference image.`;
+    const { error: insertError } = await supabase.from(PROJECT_CAST_TABLE).insert({
       project_id: projectId,
       name: input.name,
+      archetype: "custom",
+      style_tags: [] as string[],
+      reference_image_url: referenceImageUrl,
+      kling_prompt_base: appearanceLine,
       role: input.role,
-      appearance: `${input.name} appearance locked by uploaded reference image.`,
+      appearance: appearanceLine,
       personality: "Use script-defined personality.",
       language_fingerprint: "Follow script dialogue fingerprint.",
-      reference_image_url: referenceImageUrl,
       reference_image_path: path,
       appears_in_beats: [],
     });
@@ -218,21 +237,28 @@ export async function upsertProjectCharactersAction(input: {
   try {
     const projectId = requireProjectId(input.projectId);
     const supabase = createClient();
-    const rows = input.characters.map((c) => ({
-      project_id: projectId,
-      name: c.name.trim(),
-      role: c.role,
-      appearance: c.appearance?.trim() || `${c.name} appearance locked by reference image.`,
-      personality: c.personality?.trim() || "Follow script-defined personality.",
-      language_fingerprint:
-        c.language_fingerprint?.trim() || "Follow script-defined language fingerprint.",
-      reference_image_url: c.reference_image_url,
-      reference_image_path: c.reference_image_url,
-      appears_in_beats: [],
-    }));
-    await supabase.from("characters").delete().eq("project_id", projectId);
+    const rows = input.characters.map((c) => {
+      const appearanceLine =
+        c.appearance?.trim() || `${c.name} appearance locked by reference image.`;
+      return {
+        project_id: projectId,
+        name: c.name.trim(),
+        archetype: "imported",
+        style_tags: [] as string[],
+        reference_image_url: c.reference_image_url,
+        kling_prompt_base: appearanceLine,
+        role: c.role,
+        appearance: appearanceLine,
+        personality: c.personality?.trim() || "Follow script-defined personality.",
+        language_fingerprint:
+          c.language_fingerprint?.trim() || "Follow script-defined language fingerprint.",
+        reference_image_path: c.reference_image_url,
+        appears_in_beats: [],
+      };
+    });
+    await supabase.from(PROJECT_CAST_TABLE).delete().eq("project_id", projectId);
     if (rows.length > 0) {
-      const { error } = await supabase.from("characters").insert(rows);
+      const { error } = await supabase.from(PROJECT_CAST_TABLE).insert(rows);
       if (error) throw error;
     }
     return { success: true, data: { count: rows.length } };

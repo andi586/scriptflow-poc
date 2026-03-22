@@ -13,6 +13,7 @@ import {
 } from "@/lib/kling-video";
 import { buildKlingVideoGenerationInput } from "@/lib/kling-piapi-payload";
 import { formatUnknownError } from "@/lib/format-error";
+import { PROJECT_CAST_TABLE } from "@/lib/project-cast-table";
 import { requireProjectId } from "@/lib/project-id";
 
 export type StoryMemorySummary = {
@@ -550,7 +551,7 @@ export async function submitKlingTasksAction(input: {
     const supabase = createClient();
     const sceneIndices = input.prompts.map((p) => p.beat_number);
     const { data: projectCharacters } = await supabase
-      .from("characters")
+      .from(PROJECT_CAST_TABLE)
       .select("name, appearance, reference_image_url")
       .eq("project_id", projectId);
     const characterRows = Array.isArray(projectCharacters)
