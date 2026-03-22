@@ -2,9 +2,18 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## ScriptFlow pipeline (prod)
 
-1. Apply all SQL files under `supabase/migrations/` to your Supabase project (including `20260321000003_kling_tasks_project_id.sql`, which adds `project_id` to `kling_tasks` so tasks don’t collide across projects, `20260322120000_character_templates.sql` for the **character template library**, and `20260322140000_storage_character_images_bucket.sql` + `20260322150000_storage_character_images_anon_upload.sql` for the public **`character-images`** bucket and **browser-direct uploads**). With `DATABASE_URL` set in `.env.local` (Database → Connection string URI), run: `npm run db:migrate:kling-project-id`.
-2. Copy `.env.example` → `.env.local` and fill keys. For the **New project (demo)** button, set `SCRIPTFLOW_DEMO_USER_ID` to a real `auth.users.id` UUID in that Supabase project.
-3. Browse preset character templates at `/character-templates` (API: `GET/POST /api/character-templates`).
+### Database migrations (no manual SQL in Dashboard)
+
+1. Add **`DATABASE_URL`** to `.env.local` — Supabase → **Project Settings → Database → Connection string** (URI; use **Session mode** pooler or direct; password URL-encoded if needed).
+2. Run **`npm run db:migrate`**. This applies any **pending** files in `supabase/migrations/` in order, records them in `_scriptflow_migrations`, and runs **`NOTIFY pgrst, 'reload schema'`** when something new was applied (refreshes PostgREST cache).
+3. **CI:** On push to `main`, `.github/workflows/supabase-migrations.yml` runs the same command. Add repository secret **`DATABASE_URL`** (same URI) so migrations apply automatically — no copy-paste in SQL Editor.
+
+Single-file apply (advanced): `npm run db:migrate:file -- path/to/file.sql`
+
+4. Copy `.env.example` → `.env.local` and fill keys. For the **New project (demo)** button, set `SCRIPTFLOW_DEMO_USER_ID` to a real `auth.users.id` UUID in that Supabase project.
+5. Browse preset character templates at `/character-templates` (API: `GET/POST /api/character-templates`).
+
+**Supabase CLI (optional alternative):** after `supabase link`, `npx supabase db push` pushes the same migration files to the linked project.
 
 ## Getting Started
 

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:migrate": "node scripts/apply-all-migrations.cjs",
+    "db:migrate:file": "node scripts/apply-sql-migration.cjs",
     "db:migrate:kling-project-id": "node scripts/apply-sql-migration.cjs supabase/migrations/20260321000003_kling_tasks_project_id.sql"
   },
   "dependencies": {
