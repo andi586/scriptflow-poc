@@ -11,7 +11,7 @@ export type NelParseProfile = "full" | "lazy";
 const DEFAULT_SONNET = "claude-sonnet-4-20250514";
 /** 懒人 NEL 默认用 Haiku 降延迟；可在 Vercel 设为 sonnet：NEL_LAZY_MODEL=claude-sonnet-4-20250514 */
 const DEFAULT_LAZY_MODEL =
-  process.env.NEL_LAZY_MODEL?.trim() || "claude-3-5-haiku-20241022";
+  process.env.NEL_LAZY_MODEL?.trim() || "claude-haiku-4-5-20251001";
 
 export async function parseScript(
   scriptText: string,

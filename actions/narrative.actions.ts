@@ -138,7 +138,7 @@ export async function analyzeScriptAction(input: {
             typeof analysisObj.model_used === "string" && analysisObj.model_used.trim()
               ? analysisObj.model_used.trim()
               : nelProfile === "lazy"
-                ? (process.env.NEL_LAZY_MODEL?.trim() || "claude-3-5-haiku-20241022")
+                ? (process.env.NEL_LAZY_MODEL?.trim() || "claude-haiku-4-5-20251001")
                 : "claude-sonnet-4-20250514",
         },
         { onConflict: "project_id" },
