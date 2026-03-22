@@ -39,6 +39,17 @@ function isClipProcessing(t: KlingTaskItem) {
   return !isClipDone(t) && !isClipFailed(t);
 }
 
+/**
+ * Stable per-row React/state key: beat + PiAPI task_id so duplicate task_ids or empty ids never share state.
+ * PiAPI calls still use `task.task_id.trim()` only.
+ */
+function clipRowKey(task: KlingTaskItem): string {
+  const tid = typeof task.task_id === "string" ? task.task_id.trim() : "";
+  const b = Number(task.beat_number);
+  const beat = Number.isFinite(b) ? b : 0;
+  return tid ? `b${beat}|${tid}` : `b${beat}|notask`;
+}
+
 export function VideoResultsPanel({
   sessionId,
   taskIds: taskIdsProp = [],
@@ -141,14 +152,28 @@ export function VideoResultsPanel({
   }, [sessionId]);
 
   const fetchFreshPlaybackUrl = useCallback(
-    async (taskId: string): Promise<string> => {
+    async (
+      taskId: string,
+      debug?: { beat_number: number; clipRowKey: string },
+    ): Promise<string> => {
       const tid = taskId.trim();
-      if (!tid) throw new Error("Missing task id");
+      if (!tid) {
+        console.warn("[VideoResultsPanel] fetchFreshPlaybackUrl: empty task_id", debug);
+        throw new Error("Missing task id");
+      }
       const res = await resolveKlingVideoPlaybackUrlAction({
         sessionId,
         taskId: tid,
       });
-      if (!res.success) throw new Error(res.error);
+      if (!res.success) {
+        console.warn("[VideoResultsPanel] resolveKlingVideoPlaybackUrl failed", {
+          ...debug,
+          task_id: taskId,
+          task_id_trimmed: tid,
+          error: res.error,
+        });
+        throw new Error(res.error);
+      }
       return res.data.videoUrl;
     },
     [sessionId],
@@ -194,7 +219,10 @@ export function VideoResultsPanel({
       for (const t of clips) {
         let url: string;
         try {
-          url = await fetchFreshPlaybackUrl(t.task_id);
+          url = await fetchFreshPlaybackUrl(t.task_id, {
+            beat_number: t.beat_number,
+            clipRowKey: clipRowKey(t),
+          });
         } catch {
           continue;
         }
@@ -220,7 +248,10 @@ export function VideoResultsPanel({
       for (const t of clips) {
         let url: string;
         try {
-          url = await fetchFreshPlaybackUrl(t.task_id);
+          url = await fetchFreshPlaybackUrl(t.task_id, {
+            beat_number: t.beat_number,
+            clipRowKey: clipRowKey(t),
+          });
         } catch {
           continue;
         }
@@ -373,12 +404,13 @@ export function VideoResultsPanel({
             const done = isClipDone(task);
             const failed = isClipFailed(task);
             const processing = isClipProcessing(task);
-            const pollErr = clipPollErrors[task.task_id];
-            const unlocked = !!videoUnlocked[task.task_id];
-            const vk = task.task_id || `scene-${task.beat_number}`;
+            const rowKey = clipRowKey(task);
+            const piTid = typeof task.task_id === "string" ? task.task_id.trim() : "";
+            const pollErr = clipPollErrors[piTid] ?? clipPollErrors[task.task_id];
+            const unlocked = !!videoUnlocked[rowKey];
             return (
               <div
-                key={vk}
+                key={rowKey}
                 className="rounded-xl border border-white/10 bg-zinc-950/70 p-4"
               >
                 <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -413,7 +445,7 @@ export function VideoResultsPanel({
                       size="sm"
                       variant="outline"
                       className="h-7 border-amber-500/40 text-xs text-amber-200"
-                      onClick={() => void retryClipPoll(task.task_id)}
+                      onClick={() => void retryClipPoll(piTid || task.task_id)}
                     >
                       重试
                     </Button>
@@ -427,88 +459,103 @@ export function VideoResultsPanel({
                       size="sm"
                       variant="outline"
                       className="h-7 border-amber-500/40 text-xs text-amber-200"
-                      onClick={() => void retryClipPoll(task.task_id)}
+                      onClick={() => void retryClipPoll(piTid || task.task_id)}
                     >
                       重试
                     </Button>
                   </div>
                 )}
 
-                {done && task.task_id && (
+                {done && piTid && (
                   <>
-                    {playbackErrorByTaskId[task.task_id] && (
+                    {playbackErrorByTaskId[rowKey] && (
                       <p className="mt-2 text-xs text-red-400" role="alert">
-                        {playbackErrorByTaskId[task.task_id]}
+                        {playbackErrorByTaskId[rowKey]}
                       </p>
                     )}
                     <div className="relative mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
                       <video
-                        key={playUrlByTaskId[task.task_id] ?? "pending-url"}
+                        key={`${rowKey}-${playUrlByTaskId[rowKey] ?? "pending-url"}`}
                         ref={(el) => {
-                          clipVideoRefs.current[vk] = el;
+                          clipVideoRefs.current[rowKey] = el;
                         }}
-                        src={playUrlByTaskId[task.task_id] || undefined}
+                        src={playUrlByTaskId[rowKey] || undefined}
                         className="max-h-64 w-full object-cover"
                         playsInline
                         preload="metadata"
-                        controls={unlocked && !!playUrlByTaskId[task.task_id]}
+                        controls={unlocked && !!playUrlByTaskId[rowKey]}
                         muted={!unlocked}
                         onPlay={() =>
-                          setVideoUnlocked((u) => ({ ...u, [task.task_id]: true }))
+                          setVideoUnlocked((u) => ({ ...u, [rowKey]: true }))
                         }
                         onError={() => {
-                          const tid = task.task_id;
+                          console.warn("[VideoResultsPanel] <video> error", {
+                            rowKey,
+                            beat_number: task.beat_number,
+                            task_id: task.task_id,
+                            piTid,
+                            srcSample: (playUrlByTaskId[rowKey] ?? "").slice(0, 80),
+                          });
                           setPlaybackErrorByTaskId((prev) => ({
                             ...prev,
-                            [tid]: "视频加载失败（链接可能已过期），请再点一次播放以从 PiAPI 拉取新地址。",
+                            [rowKey]:
+                              "视频加载失败（链接可能已过期），请再点一次播放以从 PiAPI 拉取新地址。",
                           }));
                           setPlayUrlByTaskId((prev) => {
                             const next = { ...prev };
-                            delete next[tid];
+                            delete next[rowKey];
                             return next;
                           });
                           setVideoUnlocked((u) => {
                             const next = { ...u };
-                            delete next[tid];
+                            delete next[rowKey];
                             return next;
                           });
                         }}
                       />
-                      {(!unlocked || !playUrlByTaskId[task.task_id]) && (
+                      {(!unlocked || !playUrlByTaskId[rowKey]) && (
                         <button
                           type="button"
-                          disabled={!!playbackResolving[task.task_id]}
+                          disabled={!!playbackResolving[rowKey]}
                           className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45 disabled:cursor-wait disabled:opacity-80"
                           onClick={() => {
                             void (async () => {
-                              const tid = task.task_id;
                               setPlaybackErrorByTaskId((prev) => {
                                 const next = { ...prev };
-                                delete next[tid];
+                                delete next[rowKey];
                                 return next;
                               });
-                              setPlaybackResolving((prev) => ({ ...prev, [tid]: true }));
+                              setPlaybackResolving((prev) => ({ ...prev, [rowKey]: true }));
                               try {
-                                const url = await fetchFreshPlaybackUrl(tid);
-                                setPlayUrlByTaskId((prev) => ({ ...prev, [tid]: url }));
-                                setVideoUnlocked((u) => ({ ...u, [tid]: true }));
+                                const url = await fetchFreshPlaybackUrl(piTid, {
+                                  beat_number: task.beat_number,
+                                  clipRowKey: rowKey,
+                                });
+                                setPlayUrlByTaskId((prev) => ({ ...prev, [rowKey]: url }));
+                                setVideoUnlocked((u) => ({ ...u, [rowKey]: true }));
                                 requestAnimationFrame(() => {
-                                  const v = clipVideoRefs.current[vk];
+                                  const v = clipVideoRefs.current[rowKey];
                                   if (v) {
                                     v.muted = false;
                                     void v.play();
                                   }
                                 });
                               } catch (e) {
+                                console.warn("[VideoResultsPanel] play click resolve failed", {
+                                  rowKey,
+                                  beat_number: task.beat_number,
+                                  task_id: task.task_id,
+                                  piTid,
+                                });
                                 setPlaybackErrorByTaskId((prev) => ({
                                   ...prev,
-                                  [tid]:
+                                  [rowKey]:
                                     e instanceof Error ? e.message : String(e),
                                 }));
                               } finally {
                                 setPlaybackResolving((prev) => {
                                   const next = { ...prev };
-                                  delete next[tid];
+                                  delete next[rowKey];
                                   return next;
                                 });
                               }
@@ -516,7 +563,7 @@ export function VideoResultsPanel({
                           }}
                           aria-label={`Play scene ${task.beat_number}`}
                         >
-                          {playbackResolving[task.task_id] ? (
+                          {playbackResolving[rowKey] ? (
                             <Loader2
                               className="size-14 animate-spin text-amber-400"
                               aria-hidden
@@ -529,7 +576,7 @@ export function VideoResultsPanel({
                             />
                           )}
                           <span className="text-xs font-medium text-white/90">
-                            {playbackResolving[task.task_id]
+                            {playbackResolving[rowKey]
                               ? "正在从 PiAPI 获取播放地址…"
                               : "点击播放"}
                           </span>
@@ -540,18 +587,20 @@ export function VideoResultsPanel({
                     <div className="mt-2">
                       <button
                         type="button"
-                        disabled={downloadBusyTaskId === task.task_id}
+                        disabled={downloadBusyTaskId === rowKey}
                         onClick={() => {
                           void (async () => {
-                            const tid = task.task_id;
                             setPlaybackErrorByTaskId((prev) => {
                               const next = { ...prev };
-                              delete next[tid];
+                              delete next[rowKey];
                               return next;
                             });
-                            setDownloadBusyTaskId(tid);
+                            setDownloadBusyTaskId(rowKey);
                             try {
-                              const url = await fetchFreshPlaybackUrl(tid);
+                              const url = await fetchFreshPlaybackUrl(piTid, {
+                                beat_number: task.beat_number,
+                                clipRowKey: rowKey,
+                              });
                               const a = document.createElement("a");
                               a.href = url;
                               a.download = `scene_${task.beat_number}.mp4`;
@@ -561,9 +610,15 @@ export function VideoResultsPanel({
                               a.click();
                               a.remove();
                             } catch (e) {
+                              console.warn("[VideoResultsPanel] download resolve failed", {
+                                rowKey,
+                                beat_number: task.beat_number,
+                                task_id: task.task_id,
+                                piTid,
+                              });
                               setPlaybackErrorByTaskId((prev) => ({
                                 ...prev,
-                                [tid]:
+                                [rowKey]:
                                   e instanceof Error ? e.message : String(e),
                               }));
                             } finally {
@@ -573,7 +628,7 @@ export function VideoResultsPanel({
                         }}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-wait disabled:opacity-60"
                       >
-                        {downloadBusyTaskId === task.task_id ? (
+                        {downloadBusyTaskId === rowKey ? (
                           <Loader2 className="size-3.5 animate-spin" aria-hidden />
                         ) : (
                           <Download className="size-3.5" aria-hidden />
