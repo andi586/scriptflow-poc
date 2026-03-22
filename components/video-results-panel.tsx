@@ -40,14 +40,15 @@ function isClipProcessing(t: KlingTaskItem) {
 }
 
 /**
- * Stable per-row React/state key: beat + PiAPI task_id so duplicate task_ids or empty ids never share state.
+ * Stable per-row React/state key: list index + beat + PiAPI task_id.
+ * Index disambiguates duplicate beat_number / task_id rows so even/odd scenes never share playback state.
  * PiAPI calls still use `task.task_id.trim()` only.
  */
-function clipRowKey(task: KlingTaskItem): string {
+function clipRowKey(rowIndex: number, task: KlingTaskItem): string {
   const tid = typeof task.task_id === "string" ? task.task_id.trim() : "";
   const b = Number(task.beat_number);
   const beat = Number.isFinite(b) ? b : 0;
-  return tid ? `b${beat}|${tid}` : `b${beat}|notask`;
+  return `${rowIndex}|b${beat}|${tid || "notask"}`;
 }
 
 /** Wait for React to commit `src` to the `<video>` DOM node. */
@@ -133,6 +134,19 @@ export function VideoResultsPanel({
   useEffect(() => {
     taskIdsRef.current = effectiveIds;
   }, [effectiveKey]);
+
+  useEffect(() => {
+    if (tasks.length === 0) return;
+    const rows = tasks.map((t, i) => ({
+      listIndex: i,
+      beat_number: t.beat_number,
+      task_id: t.task_id,
+      task_id_trimmed: typeof t.task_id === "string" ? t.task_id.trim() : "",
+      rowKey: clipRowKey(i, t),
+      missingTaskId: !t.task_id || !String(t.task_id).trim(),
+    }));
+    console.log("[VideoResultsPanel] scene ↔ task_id / rowKey", rows);
+  }, [tasks]);
 
   useEffect(() => {
     if (!sessionId.trim()) {
@@ -247,7 +261,9 @@ export function VideoResultsPanel({
   );
 
   const downloadAllAsZip = useCallback(async () => {
-    const clips = tasks.filter((t) => t.status === "success" && t.task_id.trim());
+    const clips = tasks.filter(
+      (t) => t.status === "success" && !!t.task_id?.trim(),
+    );
     if (clips.length === 0) return;
     setZipBusy(true);
     try {
@@ -255,11 +271,13 @@ export function VideoResultsPanel({
       const zip = new JSZip();
       let added = 0;
       for (const t of clips) {
+        const clipRowIdx = tasks.indexOf(t);
+        const rk = clipRowKey(clipRowIdx >= 0 ? clipRowIdx : 0, t);
         let url: string;
         try {
           url = await fetchFreshPlaybackUrl(t.task_id, {
             beat_number: t.beat_number,
-            clipRowKey: clipRowKey(t),
+            clipRowKey: rk,
           });
         } catch {
           continue;
@@ -284,11 +302,13 @@ export function VideoResultsPanel({
         return;
       }
       for (const t of clips) {
+        const clipRowIdx = tasks.indexOf(t);
+        const rk = clipRowKey(clipRowIdx >= 0 ? clipRowIdx : 0, t);
         let url: string;
         try {
           url = await fetchFreshPlaybackUrl(t.task_id, {
             beat_number: t.beat_number,
-            clipRowKey: clipRowKey(t),
+            clipRowKey: rk,
           });
         } catch {
           continue;
@@ -438,11 +458,11 @@ export function VideoResultsPanel({
           )}
         </p>
         <div className="grid gap-4">
-          {tasks.map((task) => {
+          {tasks.map((task, rowIndex) => {
             const done = isClipDone(task);
             const failed = isClipFailed(task);
             const processing = isClipProcessing(task);
-            const rowKey = clipRowKey(task);
+            const rowKey = clipRowKey(rowIndex, task);
             const piTid = typeof task.task_id === "string" ? task.task_id.trim() : "";
             const pollErr = clipPollErrors[piTid] ?? clipPollErrors[task.task_id];
             const unlocked = !!videoUnlocked[rowKey];

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
   analyzeScriptAction,
@@ -170,6 +171,10 @@ export default function Home() {
   const [restoredLazySessionId, setRestoredLazySessionId] = useState<string | null>(null);
   const [lazyStorageChecked, setLazyStorageChecked] = useState(false);
 
+  /** Read live DOM before pipeline — fixes first-click no-op when controlled state lags (IME / autofill / paste). */
+  const storyIdeaTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const scriptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const startNewLazySession = useCallback(() => {
     clearLazySessionFromStorage();
     setRestoredLazySessionId(null);
@@ -204,6 +209,31 @@ export default function Home() {
   }, [entryMode, scriptText, storyIdea, storyboardShots]);
 
   const runDramaPipeline = useCallback(async () => {
+    const latestIdea =
+      storyIdeaTextareaRef.current?.value ?? storyIdea;
+    const latestScript =
+      scriptTextareaRef.current?.value ?? scriptText;
+    if (entryMode === "inspiration" && latestIdea !== storyIdea) {
+      setStoryIdea(latestIdea);
+    }
+    if (entryMode === "script" && latestScript !== scriptText) {
+      setScriptText(latestScript);
+    }
+
+    const canActuallyRun =
+      entryMode === "script"
+        ? latestScript.trim().length >= 50
+        : latestIdea.trim().length >= 8 ||
+          (storyboardShots !== null && storyboardShots.length > 0);
+    if (!canActuallyRun) {
+      setPipelineError(
+        entryMode === "script"
+          ? "Script needs at least 50 characters."
+          : "Story idea needs at least 8 characters (or open Pro Mode → preview 9 shots first).",
+      );
+      return;
+    }
+
     setPipelineError(null);
     setDramaTaskCards([]);
     setPipelineRunning(true);
@@ -224,14 +254,14 @@ export default function Home() {
       setPipelinePhase("analyzing_story");
       let nelScript: string;
       if (entryMode === "script") {
-        nelScript = scriptText.trim();
+        nelScript = latestScript.trim();
         if (nelScript.length < 50) {
           throw new Error("Script is too short for analysis (need at least 50 characters).");
         }
       } else if (storyboardShots && storyboardShots.length > 0) {
         nelScript = storyboardShotsToNelScriptText(storyboardShots);
       } else {
-        const fr = await formatStoryIdeaAction({ idea: storyIdea });
+        const fr = await formatStoryIdeaAction({ idea: latestIdea.trim() });
         if (!fr.success) throw new Error(errMsg(fr.error));
         nelScript = storyboardShotsToNelScriptText(fr.data.shots);
         setStoryboardShots(fr.data.shots);
@@ -295,13 +325,7 @@ export default function Home() {
     } finally {
       setPipelineRunning(false);
     }
-  }, [
-    entryMode,
-    scriptText,
-    storyIdea,
-    storyboardShots,
-    selectedTemplateIds,
-  ]);
+  }, [entryMode, scriptText, storyIdea, storyboardShots, selectedTemplateIds]);
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -440,6 +464,7 @@ export default function Home() {
             <div className="mt-4 space-y-4">
               <label className="text-sm font-medium text-white/80">Inspiration</label>
               <textarea
+                ref={storyIdeaTextareaRef}
                 value={storyIdea}
                 onChange={(e) => setStoryIdea(e.target.value)}
                 rows={5}
@@ -463,6 +488,7 @@ export default function Home() {
             <div className="mt-4 space-y-4">
               <label className="text-sm font-medium text-white/80">Script</label>
               <textarea
+                ref={scriptTextareaRef}
                 value={scriptText}
                 onChange={(e) => setScriptText(e.target.value)}
                 rows={12}
@@ -516,8 +542,21 @@ export default function Home() {
         <section className="mt-6 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-black/40 p-6">
           <Button
             type="button"
-            disabled={pipelineRunning || !canRunDrama()}
+            disabled={pipelineRunning}
             className="h-12 w-full bg-amber-500 text-base font-semibold text-black hover:bg-amber-400 disabled:opacity-40"
+            onPointerDown={() => {
+              if (entryMode === "inspiration") {
+                const el = storyIdeaTextareaRef.current;
+                if (el && el.value !== storyIdea) {
+                  flushSync(() => setStoryIdea(el.value));
+                }
+              } else {
+                const el = scriptTextareaRef.current;
+                if (el && el.value !== scriptText) {
+                  flushSync(() => setScriptText(el.value));
+                }
+              }
+            }}
             onClick={() => void runDramaPipeline()}
           >
             {pipelineRunning ? "Working on it…" : "Generate My Drama"}
