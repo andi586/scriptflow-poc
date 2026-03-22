@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +19,7 @@ import {
   submitKlingTasksAction,
   type StoryMemorySummary,
 } from "@/actions/narrative.actions";
+import { InspirationFollowUpCards } from "@/components/inspiration-follow-up-cards";
 import { VideoResultsPanel } from "@/components/video-results-panel";
 import { formatUnknownError } from "@/lib/format-error";
 import {
@@ -30,6 +38,12 @@ import {
   uploadCustomCharacterAction,
 } from "@/actions/character.actions";
 import { createNewProjectAction } from "@/actions/project.actions";
+import {
+  detectInspirationGaps,
+  inspirationReadyForGenerate,
+  shouldShowInspirationFollowUps,
+} from "@/lib/inspiration-follow-up";
+import { cn } from "@/lib/utils";
 import type { CharacterRole } from "@/types";
 
 type PromptCard = {
@@ -208,13 +222,46 @@ export default function Home() {
     );
   }, [entryMode, scriptText, storyIdea, storyboardShots]);
 
-  const runDramaPipeline = useCallback(async () => {
-    console.log("[runDramaPipeline] enter (closure phase may lag one render)", {
-      pipelinePhase,
-      pipelineRunning,
-      entryMode,
-    });
+  const inspirationGaps = useMemo(
+    () => detectInspirationGaps(storyIdea),
+    [storyIdea],
+  );
+  const showInspirationFollowUps = useMemo(
+    () =>
+      shouldShowInspirationFollowUps(
+        storyIdea,
+        !!(storyboardShots && storyboardShots.length > 0),
+      ),
+    [storyIdea, storyboardShots],
+  );
+  const inspirationGenerateReady = useMemo(() => {
+    if (entryMode !== "inspiration") return false;
+    if (storyboardShots && storyboardShots.length > 0) return true;
+    return inspirationReadyForGenerate(storyIdea);
+  }, [entryMode, storyIdea, storyboardShots]);
 
+  const adjustStoryIdeaTextareaHeight = useCallback(() => {
+    const el = storyIdeaTextareaRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.max(120, el.scrollHeight)}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (entryMode === "inspiration") {
+      adjustStoryIdeaTextareaHeight();
+    }
+  }, [storyIdea, entryMode, adjustStoryIdeaTextareaHeight]);
+
+  const mergeIntoStoryIdea = useCallback(
+    (snippet: string) => {
+      setStoryIdea((prev) => `${prev.trimEnd()}${snippet}`);
+      requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+    },
+    [adjustStoryIdeaTextareaHeight],
+  );
+
+  const runDramaPipeline = useCallback(async () => {
     const latestIdea =
       storyIdeaTextareaRef.current?.value ?? storyIdea;
     const latestScript =
@@ -232,12 +279,6 @@ export default function Home() {
         : latestIdea.trim().length >= 8 ||
           (storyboardShots !== null && storyboardShots.length > 0);
     if (!canActuallyRun) {
-      console.log("[runDramaPipeline] early return — input validation failed", {
-        entryMode,
-        latestIdeaLen: latestIdea.trim().length,
-        latestScriptLen: latestScript.trim().length,
-        hasStoryboardShots: !!(storyboardShots && storyboardShots.length > 0),
-      });
       setPipelineError(
         entryMode === "script"
           ? "Script needs at least 50 characters."
@@ -337,15 +378,7 @@ export default function Home() {
     } finally {
       setPipelineRunning(false);
     }
-  }, [
-    entryMode,
-    scriptText,
-    storyIdea,
-    storyboardShots,
-    selectedTemplateIds,
-    pipelinePhase,
-    pipelineRunning,
-  ]);
+  }, [entryMode, scriptText, storyIdea, storyboardShots, selectedTemplateIds]);
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -486,13 +519,22 @@ export default function Home() {
               <textarea
                 ref={storyIdeaTextareaRef}
                 value={storyIdea}
-                onChange={(e) => setStoryIdea(e.target.value)}
-                rows={5}
+                onChange={(e) => {
+                  setStoryIdea(e.target.value);
+                  requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+                }}
+                rows={1}
                 placeholder={
                   "Tell me your story idea...\n(e.g. 'A werewolf CEO falls for a human girl,\nbut his old enemy arrives')"
                 }
-                className="w-full resize-y rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
+                className="min-h-[120px] w-full resize-none overflow-hidden rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
               />
+              {showInspirationFollowUps && (
+                <InspirationFollowUpCards
+                  gaps={inspirationGaps}
+                  onMerge={mergeIntoStoryIdea}
+                />
+              )}
               <button
                 type="button"
                 className="text-left text-sm text-amber-300/90 underline decoration-amber-500/40 underline-offset-4 hover:text-amber-200"
@@ -563,7 +605,12 @@ export default function Home() {
           <Button
             type="button"
             disabled={pipelineRunning}
-            className="h-12 w-full bg-amber-500 text-base font-semibold text-black hover:bg-amber-400 disabled:opacity-40"
+            className={cn(
+              "h-12 w-full bg-amber-500 text-base font-semibold text-black transition-all hover:bg-amber-400 disabled:opacity-40",
+              inspirationGenerateReady &&
+                !pipelineRunning &&
+                "ring-2 ring-amber-200 ring-offset-2 ring-offset-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400",
+            )}
             onPointerDown={() => {
               if (entryMode === "inspiration") {
                 const el = storyIdeaTextareaRef.current;
@@ -577,15 +624,7 @@ export default function Home() {
                 }
               }
             }}
-            onClick={() => {
-              console.log(
-                "Generate clicked, pipelinePhase:",
-                pipelinePhase,
-                "pipelineRunning:",
-                pipelineRunning,
-              );
-              void runDramaPipeline();
-            }}
+            onClick={() => void runDramaPipeline()}
           >
             {pipelineRunning ? "Working on it…" : "Generate My Drama"}
           </Button>
@@ -594,6 +633,18 @@ export default function Home() {
               {entryMode === "script"
                 ? "Paste a script with at least 50 characters."
                 : "Enter a story idea (8+ characters), or open Pro Mode → preview 9 shots to refine first."}
+            </p>
+          )}
+          {entryMode === "inspiration" && canRunDrama() && !pipelineRunning && (
+            <p
+              className={cn(
+                "mt-2 text-center text-xs",
+                inspirationGenerateReady ? "text-amber-200/90" : "text-white/35",
+              )}
+            >
+              {inspirationGenerateReady
+                ? "灵感已够丰富 — Generate 已高亮，可一键开拍。"
+                : "达到约 50 字并包含主角、矛盾与结局线索后，追问卡片会消失且按钮高亮。"}
             </p>
           )}
 
