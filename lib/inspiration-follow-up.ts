@@ -1,8 +1,20 @@
 /**
- * Lazy-mode Inspiration: when idea is short or missing “who / conflict / ending” signals,
- * show 1–3 follow-up cards. When rich enough, hide cards and allow highlighted Generate.
+ * Lazy-mode Inspiration: textarea = user core idea only; follow-up Q&A in separate state.
+ * Backend receives `composeInspirationForNel(raw, answers)`.
  */
 export const INSPIRATION_RICH_MIN_CHARS = 50;
+
+export type InspirationFollowUpDimension = "character" | "conflict" | "ending";
+
+export type InspirationFollowUpAnswer = {
+  question: string;
+  answer: string;
+};
+
+/** At most one answer per dimension — prevents repeat prompts. */
+export type InspirationFollowUpAnswers = Partial<
+  Record<InspirationFollowUpDimension, InspirationFollowUpAnswer>
+>;
 
 const CHARACTER_RE =
   /主角|主人公|男主|女主|人物|谁|他|她|女孩|男孩|总裁|狼人|人类|CEO|girl|boy|she|he|character|protagonist|love|falls?\s+for|meet/i;
@@ -17,6 +29,7 @@ export type InspirationGaps = {
   needsEnding: boolean;
 };
 
+/** Gaps from the raw textarea only (not merged answers). */
 export function detectInspirationGaps(text: string): InspirationGaps {
   const t = text.trim();
   return {
@@ -26,18 +39,40 @@ export function detectInspirationGaps(text: string): InspirationGaps {
   };
 }
 
-/** Enough length + all three narrative cues present → hide follow-ups & highlight Generate (inspiration mode). */
-export function inspirationReadyForGenerate(text: string): boolean {
-  const t = text.trim();
+/** Merge raw inspiration + structured follow-up answers for NEL / formatStoryIdea. */
+export function composeInspirationForNel(
+  rawIdea: string,
+  answers: InspirationFollowUpAnswers,
+): string {
+  const parts: string[] = [];
+  const core = rawIdea.trim();
+  if (core) parts.push(core);
+  const order: InspirationFollowUpDimension[] = ["character", "conflict", "ending"];
+  for (const d of order) {
+    const a = answers[d];
+    if (a?.answer?.trim()) {
+      parts.push(`[${a.question}]\n${a.answer.trim()}`);
+    }
+  }
+  return parts.join("\n\n");
+}
+
+/** Enough length + all three narrative cues (on composed text) → hide follow-up UI & highlight Generate. */
+export function inspirationReadyForGenerate(composed: string): boolean {
+  const t = composed.trim();
   if (t.length < INSPIRATION_RICH_MIN_CHARS) return false;
   const g = detectInspirationGaps(t);
   return !g.needsCharacter && !g.needsConflict && !g.needsEnding;
 }
 
 export function shouldShowInspirationFollowUps(
-  text: string,
+  composedIdea: string,
   hasStoryboardShots: boolean,
 ): boolean {
   if (hasStoryboardShots) return false;
-  return !inspirationReadyForGenerate(text.trim());
+  return !inspirationReadyForGenerate(composedIdea.trim());
+}
+
+export function inspirationNeedsMoreLength(rawIdea: string): boolean {
+  return rawIdea.trim().length < INSPIRATION_RICH_MIN_CHARS;
 }

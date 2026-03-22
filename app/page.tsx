@@ -39,9 +39,10 @@ import {
 } from "@/actions/character.actions";
 import { createNewProjectAction } from "@/actions/project.actions";
 import {
-  detectInspirationGaps,
+  composeInspirationForNel,
   inspirationReadyForGenerate,
   shouldShowInspirationFollowUps,
+  type InspirationFollowUpAnswers,
 } from "@/lib/inspiration-follow-up";
 import { cn } from "@/lib/utils";
 import type { CharacterRole } from "@/types";
@@ -173,6 +174,9 @@ export default function Home() {
   const [storyboardShots, setStoryboardShots] = useState<StoryboardShot[] | null>(null);
   const [inspirationAnalyzing, setInspirationAnalyzing] = useState(false);
   const [inspirationError, setInspirationError] = useState<string | null>(null);
+  /** Follow-up Q&A per dimension; not merged into textarea — merged only when calling backend. */
+  const [inspirationFollowUpAnswers, setInspirationFollowUpAnswers] =
+    useState<InspirationFollowUpAnswers>({});
 
   const [pipelinePhase, setPipelinePhase] = useState<PipelinePhase>("idle");
   const [pipelineError, setPipelineError] = useState<string | null>(null);
@@ -197,6 +201,7 @@ export default function Home() {
     setPipelineError(null);
     setDramaTaskCards([]);
     setPipelineRunning(false);
+    setInspirationFollowUpAnswers({});
   }, []);
 
   const lazyVideoTaskIds = useMemo(
@@ -214,31 +219,32 @@ export default function Home() {
     );
   }
 
+  const composedInspiration = useMemo(
+    () => composeInspirationForNel(storyIdea, inspirationFollowUpAnswers),
+    [storyIdea, inspirationFollowUpAnswers],
+  );
+
   const canRunDrama = useCallback(() => {
     if (entryMode === "script") return scriptText.trim().length >= 50;
     return (
-      storyIdea.trim().length >= 8 ||
+      composedInspiration.trim().length >= 8 ||
       (storyboardShots !== null && storyboardShots.length > 0)
     );
-  }, [entryMode, scriptText, storyIdea, storyboardShots]);
+  }, [entryMode, scriptText, composedInspiration, storyboardShots]);
 
-  const inspirationGaps = useMemo(
-    () => detectInspirationGaps(storyIdea),
-    [storyIdea],
-  );
   const showInspirationFollowUps = useMemo(
     () =>
       shouldShowInspirationFollowUps(
-        storyIdea,
+        composedInspiration,
         !!(storyboardShots && storyboardShots.length > 0),
       ),
-    [storyIdea, storyboardShots],
+    [composedInspiration, storyboardShots],
   );
   const inspirationGenerateReady = useMemo(() => {
     if (entryMode !== "inspiration") return false;
     if (storyboardShots && storyboardShots.length > 0) return true;
-    return inspirationReadyForGenerate(storyIdea);
-  }, [entryMode, storyIdea, storyboardShots]);
+    return inspirationReadyForGenerate(composedInspiration);
+  }, [entryMode, composedInspiration, storyboardShots]);
 
   const adjustStoryIdeaTextareaHeight = useCallback(() => {
     const el = storyIdeaTextareaRef.current;
@@ -253,13 +259,21 @@ export default function Home() {
     }
   }, [storyIdea, entryMode, adjustStoryIdeaTextareaHeight]);
 
-  const mergeIntoStoryIdea = useCallback(
-    (snippet: string) => {
-      setStoryIdea((prev) => `${prev.trimEnd()}${snippet}`);
-      requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+  const setInspirationFollowUpAnswer = useCallback(
+    (dimension: keyof InspirationFollowUpAnswers, question: string, answer: string) => {
+      setInspirationFollowUpAnswers((prev) => ({
+        ...prev,
+        [dimension]: { question, answer },
+      }));
     },
-    [adjustStoryIdeaTextareaHeight],
+    [],
   );
+
+  useEffect(() => {
+    if (storyIdea.trim().length === 0) {
+      setInspirationFollowUpAnswers({});
+    }
+  }, [storyIdea]);
 
   const runDramaPipeline = useCallback(async () => {
     const latestIdea =
@@ -273,10 +287,14 @@ export default function Home() {
       setScriptText(latestScript);
     }
 
+    const composedForRun = composeInspirationForNel(
+      latestIdea,
+      inspirationFollowUpAnswers,
+    );
     const canActuallyRun =
       entryMode === "script"
         ? latestScript.trim().length >= 50
-        : latestIdea.trim().length >= 8 ||
+        : composedForRun.trim().length >= 8 ||
           (storyboardShots !== null && storyboardShots.length > 0);
     if (!canActuallyRun) {
       setPipelineError(
@@ -314,7 +332,9 @@ export default function Home() {
       } else if (storyboardShots && storyboardShots.length > 0) {
         nelScript = storyboardShotsToNelScriptText(storyboardShots);
       } else {
-        const fr = await formatStoryIdeaAction({ idea: latestIdea.trim() });
+        const fr = await formatStoryIdeaAction({
+          idea: composedForRun.trim(),
+        });
         if (!fr.success) throw new Error(errMsg(fr.error));
         nelScript = storyboardShotsToNelScriptText(fr.data.shots);
         setStoryboardShots(fr.data.shots);
@@ -378,7 +398,14 @@ export default function Home() {
     } finally {
       setPipelineRunning(false);
     }
-  }, [entryMode, scriptText, storyIdea, storyboardShots, selectedTemplateIds]);
+  }, [
+    entryMode,
+    scriptText,
+    storyIdea,
+    storyboardShots,
+    selectedTemplateIds,
+    inspirationFollowUpAnswers,
+  ]);
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -531,8 +558,9 @@ export default function Home() {
               />
               {showInspirationFollowUps && (
                 <InspirationFollowUpCards
-                  gaps={inspirationGaps}
-                  onMerge={mergeIntoStoryIdea}
+                  storyIdeaRaw={storyIdea}
+                  answers={inspirationFollowUpAnswers}
+                  onSetAnswer={setInspirationFollowUpAnswer}
                 />
               )}
               <button
@@ -541,6 +569,7 @@ export default function Home() {
                 onClick={() => {
                   setEntryMode("script");
                   setInspirationError(null);
+                  setInspirationFollowUpAnswers({});
                 }}
               >
                 Already have a script? Switch to Script Mode
@@ -724,7 +753,12 @@ export default function Home() {
                   onClick={async () => {
                     setInspirationError(null);
                     setInspirationAnalyzing(true);
-                    const res = await formatStoryIdeaAction({ idea: storyIdea });
+                    const res = await formatStoryIdeaAction({
+                      idea: composeInspirationForNel(
+                        storyIdea,
+                        inspirationFollowUpAnswers,
+                      ).trim(),
+                    });
                     if (res.success) setStoryboardShots(res.data.shots);
                     else {
                       setStoryboardShots(null);
