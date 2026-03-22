@@ -23,6 +23,7 @@ import {
   clearLazySessionFromStorage,
   readLazySessionIdFromStorage,
   SCRIPTFLOW_SESSION_STORAGE_KEY,
+  writeKlingTaskSnapshotToStorage,
   writeLazySessionIdToStorage,
 } from "@/lib/lazy-session-storage";
 import { storyboardShotsToNelScriptText } from "@/lib/story-idea-format";
@@ -42,14 +43,6 @@ import type { CharacterRole } from "@/types";
 
 /** Pasted scripts at least this long skip idea→9-shot formatting and go straight to NEL. */
 const DIRECT_SCRIPT_MIN_CHARS = 50;
-
-type TaskCard = {
-  beat_number: number;
-  task_id: string;
-  status: string;
-  video_url?: string;
-  error_message?: string;
-};
 
 type HealthPayload = {
   anthropic: "ok" | "error";
@@ -150,8 +143,9 @@ export default function Home() {
 
   const [pipelinePhase, setPipelinePhase] = useState<PipelinePhase>("idle");
   const [pipelineError, setPipelineError] = useState<string | null>(null);
-  const [dramaTaskCards, setDramaTaskCards] = useState<TaskCard[]>([]);
   const [pipelineRunning, setPipelineRunning] = useState(false);
+  /** Bumps when Kling submit finishes so VideoResultsPanel reloads task_ids from Supabase. */
+  const [clipsRefreshNonce, setClipsRefreshNonce] = useState(0);
 
   /** Set once on mount when localStorage has a saved lazy session (refresh recovery). */
   const [restoredLazySessionId, setRestoredLazySessionId] = useState<string | null>(null);
@@ -166,15 +160,11 @@ export default function Home() {
     setProjectId("");
     setPipelinePhase("idle");
     setPipelineError(null);
-    setDramaTaskCards([]);
     setPipelineRunning(false);
+    setClipsRefreshNonce(0);
     setInspirationFollowUpAnswers({});
   }, []);
 
-  const lazyVideoTaskIds = useMemo(
-    () => dramaTaskCards.map((t) => t.task_id).filter((id) => id.length > 0),
-    [dramaTaskCards],
-  );
   const composedInspiration = useMemo(
     () => composeInspirationForNel(storyIdea, inspirationFollowUpAnswers),
     [storyIdea, inspirationFollowUpAnswers],
@@ -244,7 +234,6 @@ export default function Home() {
     }
 
     setPipelineError(null);
-    setDramaTaskCards([]);
     setPipelineRunning(true);
     /** Tracks which phase we were in when a thrown error (e.g. network timeout) happens */
     let activePhase: PipelinePhase = "creating_project";
@@ -258,6 +247,7 @@ export default function Home() {
       }
       const pid = cr.data.projectId;
       setProjectId(pid);
+      writeLazySessionIdToStorage(pid);
 
       activePhase = "analyzing_story";
       setPipelinePhase("analyzing_story");
@@ -301,7 +291,11 @@ export default function Home() {
         prompts: gr.data.prompts,
       });
       if (!sr.success) throw new Error(errMsg(sr.error));
-      setDramaTaskCards(sr.data.tasks);
+      const submittedIds = sr.data.tasks
+        .map((t) => t.task_id.trim())
+        .filter((id) => id.length > 0);
+      writeKlingTaskSnapshotToStorage(pid, submittedIds);
+      setClipsRefreshNonce((n) => n + 1);
 
       setPipelinePhase("done");
     } catch (e) {
@@ -436,6 +430,7 @@ export default function Home() {
             <VideoResultsPanel
               sessionId={restoredLazySessionId}
               taskIds={[]}
+              refreshNonce={clipsRefreshNonce}
               title="Your clips"
             />
           </>
@@ -572,7 +567,8 @@ export default function Home() {
           {pipelinePhase === "done" && (
             <VideoResultsPanel
               sessionId={projectId}
-              taskIds={lazyVideoTaskIds}
+              taskIds={[]}
+              refreshNonce={clipsRefreshNonce}
               title="Your clips"
             />
           )}

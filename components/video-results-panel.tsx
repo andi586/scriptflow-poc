@@ -10,6 +10,7 @@ import {
   resolveKlingVideoPlaybackUrlAction,
   type KlingTaskItem,
 } from "@/actions/narrative.actions";
+import { readKlingTaskSnapshotFromStorage } from "@/lib/lazy-session-storage";
 
 export type VideoResultsPanelProps = {
   /** Supabase `projects.id` — scopes `kling_tasks` rows. */
@@ -25,6 +26,8 @@ export type VideoResultsPanelProps = {
   autoPoll?: boolean;
   /** Default: 30_000 */
   pollIntervalMs?: number;
+  /** Bump after a new Kling submit so task_ids are reloaded from Supabase. */
+  refreshNonce?: number;
   className?: string;
 };
 
@@ -93,6 +96,7 @@ export function VideoResultsPanel({
   title = "Your clips",
   autoPoll = true,
   pollIntervalMs = 30_000,
+  refreshNonce = 0,
   className = "",
 }: VideoResultsPanelProps) {
   const [tasks, setTasks] = useState<KlingTaskItem[]>([]);
@@ -167,16 +171,38 @@ export function VideoResultsPanel({
       const res = await listKlingTaskIdsForSessionAction({ sessionId });
       if (cancelled) return;
       if (res.success) {
-        setDbTaskIds(res.data.taskIds);
+        let ids = res.data.taskIds;
+        if (ids.length === 0) {
+          const snap = readKlingTaskSnapshotFromStorage();
+          if (
+            snap &&
+            snap.projectId === sessionId.trim() &&
+            snap.taskIds.length > 0
+          ) {
+            ids = snap.taskIds;
+          }
+        }
+        setDbTaskIds(ids);
+        setDbLoadError(null);
       } else {
-        setDbTaskIds([]);
-        setDbLoadError(res.error);
+        const snap = readKlingTaskSnapshotFromStorage();
+        if (
+          snap &&
+          snap.projectId === sessionId.trim() &&
+          snap.taskIds.length > 0
+        ) {
+          setDbTaskIds(snap.taskIds);
+          setDbLoadError(null);
+        } else {
+          setDbTaskIds([]);
+          setDbLoadError(res.error);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [sessionId, propTaskIdsKey]);
+  }, [sessionId, propTaskIdsKey, refreshNonce]);
 
   const estimatedMinutes = Math.max(2, Math.ceil((effectiveIds.length || 6) * 1.5));
 

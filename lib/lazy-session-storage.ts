@@ -10,9 +10,23 @@ export const SCRIPTFLOW_SESSION_STORAGE_KEY = "scriptflow_session_id";
 /** @deprecated use SCRIPTFLOW_SESSION_STORAGE_KEY */
 export const SCRIPTFLOW_LAZY_SESSION_STORAGE_KEY = "scriptflow_lazy_session_id";
 
+/**
+ * Backup of PiAPI task_ids per scene after submit (Supabase is source of truth;
+ * used when DB list is briefly empty after refresh).
+ */
+export const SCRIPTFLOW_KLING_SNAPSHOT_KEY = "scriptflow_kling_task_snapshot";
+
+export type KlingTaskSnapshotV1 = {
+  v: 1;
+  projectId: string;
+  taskIds: string[];
+  updatedAt: number;
+};
+
 const STORAGE_KEYS_TO_CLEAR = [
   SCRIPTFLOW_SESSION_STORAGE_KEY,
   SCRIPTFLOW_LAZY_SESSION_STORAGE_KEY,
+  SCRIPTFLOW_KLING_SNAPSHOT_KEY,
 ] as const;
 
 const UUID_LIKE =
@@ -61,5 +75,48 @@ export function clearLazySessionFromStorage(): void {
     }
   } catch {
     /* ignore */
+  }
+}
+
+/** Persist scene task_ids after Kling submit (backup alongside kling_tasks rows). */
+export function writeKlingTaskSnapshotToStorage(
+  projectId: string,
+  taskIds: string[],
+): void {
+  if (typeof window === "undefined") return;
+  const pid = projectId.trim();
+  if (!UUID_LIKE.test(pid)) return;
+  const ids = taskIds.map((t) => String(t).trim()).filter(Boolean);
+  try {
+    const payload: KlingTaskSnapshotV1 = {
+      v: 1,
+      projectId: pid,
+      taskIds: ids,
+      updatedAt: Date.now(),
+    };
+    window.localStorage.setItem(SCRIPTFLOW_KLING_SNAPSHOT_KEY, JSON.stringify(payload));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+export function readKlingTaskSnapshotFromStorage(): KlingTaskSnapshotV1 | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SCRIPTFLOW_KLING_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    const o = parsed as Record<string, unknown>;
+    if (o.v !== 1) return null;
+    const projectId = typeof o.projectId === "string" ? o.projectId.trim() : "";
+    if (!UUID_LIKE.test(projectId)) return null;
+    const taskIds = Array.isArray(o.taskIds)
+      ? o.taskIds.map((t) => String(t).trim()).filter(Boolean)
+      : [];
+    const updatedAt = typeof o.updatedAt === "number" ? o.updatedAt : 0;
+    return { v: 1, projectId, taskIds, updatedAt };
+  } catch {
+    return null;
   }
 }

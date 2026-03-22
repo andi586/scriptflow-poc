@@ -616,7 +616,7 @@ export async function submitKlingTasksAction(input: {
         continue;
       }
 
-      // 3) Immediately persist task_id to kling_tasks.
+      // 3) Persist each PiAPI task_id to kling_tasks (source of truth for refresh / polling).
       const { error: insertError } = await supabase.from("kling_tasks").insert({
         project_id: projectId,
         task_id: taskId,
