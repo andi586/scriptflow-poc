@@ -209,6 +209,12 @@ export default function Home() {
   }, [entryMode, scriptText, storyIdea, storyboardShots]);
 
   const runDramaPipeline = useCallback(async () => {
+    console.log("[runDramaPipeline] enter (closure phase may lag one render)", {
+      pipelinePhase,
+      pipelineRunning,
+      entryMode,
+    });
+
     const latestIdea =
       storyIdeaTextareaRef.current?.value ?? storyIdea;
     const latestScript =
@@ -226,6 +232,12 @@ export default function Home() {
         : latestIdea.trim().length >= 8 ||
           (storyboardShots !== null && storyboardShots.length > 0);
     if (!canActuallyRun) {
+      console.log("[runDramaPipeline] early return — input validation failed", {
+        entryMode,
+        latestIdeaLen: latestIdea.trim().length,
+        latestScriptLen: latestScript.trim().length,
+        hasStoryboardShots: !!(storyboardShots && storyboardShots.length > 0),
+      });
       setPipelineError(
         entryMode === "script"
           ? "Script needs at least 50 characters."
@@ -325,7 +337,15 @@ export default function Home() {
     } finally {
       setPipelineRunning(false);
     }
-  }, [entryMode, scriptText, storyIdea, storyboardShots, selectedTemplateIds]);
+  }, [
+    entryMode,
+    scriptText,
+    storyIdea,
+    storyboardShots,
+    selectedTemplateIds,
+    pipelinePhase,
+    pipelineRunning,
+  ]);
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -557,7 +577,15 @@ export default function Home() {
                 }
               }
             }}
-            onClick={() => void runDramaPipeline()}
+            onClick={() => {
+              console.log(
+                "Generate clicked, pipelinePhase:",
+                pipelinePhase,
+                "pipelineRunning:",
+                pipelineRunning,
+              );
+              void runDramaPipeline();
+            }}
           >
             {pipelineRunning ? "Working on it…" : "Generate My Drama"}
           </Button>
