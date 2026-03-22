@@ -14,9 +14,8 @@ const fs = require("fs");
 const path = require("path");
 const { Client } = require("pg");
 
-function loadEnvLocal(root) {
+function loadEnvFromFile(envPath) {
   try {
-    const envPath = path.join(root, ".env.local");
     const content = fs.readFileSync(envPath, "utf8");
     for (const line of content.split("\n")) {
       const t = line.trim();
@@ -39,7 +38,8 @@ function loadEnvLocal(root) {
 }
 
 const root = path.resolve(__dirname, "..");
-loadEnvLocal(root);
+loadEnvFromFile(path.join(root, ".env.local"));
+loadEnvFromFile(path.join(root, ".env"));
 
 const migrationsDir = path.join(root, "supabase", "migrations");
 
