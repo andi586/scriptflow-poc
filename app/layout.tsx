@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ScriptflowNav } from "@/components/scriptflow-nav";
 import "./globals.css";
 
+/** Server Actions (Claude + PiAPI) can exceed default 10s; avoids client "Load failed" on timeout. */
+export const maxDuration = 300;
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

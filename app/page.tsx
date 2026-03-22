@@ -177,9 +177,12 @@ export default function Home() {
     setPipelineError(null);
     setDramaTaskCards([]);
     setPipelineRunning(true);
+    /** Tracks which phase we were in when a thrown error (e.g. network timeout) happens */
+    let activePhase: PipelinePhase = "creating_project";
     setPipelinePhase("creating_project");
 
     try {
+      activePhase = "creating_project";
       const cr = await createNewProjectAction();
       if (!cr.success) {
         throw new Error(errMsg(cr.error));
@@ -187,6 +190,7 @@ export default function Home() {
       const pid = cr.data.projectId;
       setProjectId(pid);
 
+      activePhase = "analyzing_story";
       setPipelinePhase("analyzing_story");
       let nelScript: string;
       if (entryMode === "script") {
@@ -209,6 +213,7 @@ export default function Home() {
       setNelStoryMemoryId(ar.data.storyMemoryId);
       setScriptText(nelScript);
 
+      activePhase = "locking_characters";
       setPipelinePhase("locking_characters");
       if (selectedTemplateIds.length > 0) {
         const br = await bindTemplateCharactersAction({
@@ -218,11 +223,13 @@ export default function Home() {
         if (!br.success) throw new Error(errMsg(br.error));
       }
 
+      activePhase = "generating_prompts";
       setPipelinePhase("generating_prompts");
       const gr = await generateKlingPromptsAction({ projectId: pid });
       if (!gr.success) throw new Error(errMsg(gr.error));
       setPromptCards(gr.data.prompts);
 
+      activePhase = "submitting_kling";
       setPipelinePhase("submitting_kling");
       const sr = await submitKlingTasksAction({
         projectId: pid,
@@ -235,7 +242,22 @@ export default function Home() {
       setPipelinePhase("done");
     } catch (e) {
       setPipelinePhase("error");
-      setPipelineError(e instanceof Error ? e.message : errMsg(e));
+      const raw = e instanceof Error ? e.message : errMsg(e);
+      const stepLabel: Record<string, string> = {
+        creating_project: "Creating project",
+        analyzing_story: "Analyzing story (NEL)",
+        locking_characters: "Locking characters",
+        generating_prompts: "Generating Kling prompts",
+        submitting_kling: "Submitting to Kling",
+      };
+      const where = stepLabel[activePhase] ?? activePhase;
+      const isNet =
+        /load failed|failed to fetch|networkerror|aborted|timeout/i.test(raw) ||
+        raw === "Load failed";
+      const netHint = isNet
+        ? ` Often caused by Vercel serverless timeout while calling Claude or PiAPI. We increased maxDuration to 300s and trimmed prompt payload — redeploy and retry. Failed during: ${where}.`
+        : "";
+      setPipelineError(`${where}: ${raw}${netHint}`);
     } finally {
       setPipelineRunning(false);
     }

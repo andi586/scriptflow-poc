@@ -387,6 +387,28 @@ function injectBeatLocks(
   return `${prompt.trim()}\n\n${suffix.join("\n")}`.trim();
 }
 
+/**
+ * Shrink nested JSON sent to Claude for Kling prompt generation — large raw_analysis
+ * increases latency and can push Vercel functions past their time limit.
+ */
+function compactForClaudePayload(value: unknown, maxStr = 1400, maxArrayLen = 64): unknown {
+  if (typeof value === "string") {
+    return value.length > maxStr ? `${value.slice(0, maxStr)}…[truncated]` : value;
+  }
+  if (Array.isArray(value)) {
+    const slice = value.length > maxArrayLen ? value.slice(0, maxArrayLen) : value;
+    return slice.map((x) => compactForClaudePayload(x, maxStr, maxArrayLen));
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = compactForClaudePayload(v, maxStr, maxArrayLen);
+    }
+    return out;
+  }
+  return value;
+}
+
 function injectCharacterReferenceLocks(prompt: string, characters: Record<string, unknown>[]) {
   if (characters.length === 0) return prompt;
   const lines = characters
@@ -432,9 +454,14 @@ export async function generateKlingPromptsAction(input: {
     const propRegistry = normalizePropRegistry(rawAnalysis);
     const causalResultFrames = normalizeCausalResultFrames(rawAnalysis);
 
+    const beatsPayload = compactForClaudePayload(beats) as unknown;
+    const charactersPayload = compactForClaudePayload(characters) as unknown;
+    const propsPayload = compactForClaudePayload(propRegistry) as unknown;
+    const causalPayload = compactForClaudePayload(causalResultFrames) as unknown;
+
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: NARRATIVE_TRANSLATOR_PROMPT,
       messages: [
         {
@@ -458,10 +485,10 @@ export async function generateKlingPromptsAction(input: {
             `Tone: ${String(storyMemory.tone ?? "")}`,
             `Visual style: ${String(storyMemory.visual_style ?? "")}`,
             "",
-            `Characters JSON: ${JSON.stringify(characters)}`,
-            `Prop registry JSON: ${JSON.stringify(propRegistry)}`,
-            `Causal result frames JSON: ${JSON.stringify(causalResultFrames)}`,
-            `Beats JSON: ${JSON.stringify(beats)}`,
+            `Characters JSON: ${JSON.stringify(charactersPayload)}`,
+            `Prop registry JSON: ${JSON.stringify(propsPayload)}`,
+            `Causal result frames JSON: ${JSON.stringify(causalPayload)}`,
+            `Beats JSON: ${JSON.stringify(beatsPayload)}`,
           ].join("\n"),
         },
       ],
@@ -498,7 +525,7 @@ export async function generateKlingPromptsAction(input: {
 
     return { success: true, data: { prompts } };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : JSON.stringify(e) };
+    return { success: false, error: formatUnknownError(e) };
   }
 }
 
