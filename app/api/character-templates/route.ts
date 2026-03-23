@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnonClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
+import { seedCharacters, SEEDED_CHARACTER_NAMES } from "@/lib/seed-characters";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,6 +35,15 @@ function buildCharacterImagesPublicUrl(path: string): string {
 export async function GET() {
   try {
     const supabase = createAnonClient();
+    const { count, error: countError } = await supabase
+      .from("character_templates")
+      .select("id", { count: "exact", head: true })
+      .in("name", [...SEEDED_CHARACTER_NAMES]);
+    if (countError) throw countError;
+    if ((count ?? 0) === 0) {
+      await seedCharacters();
+    }
+
     const { data, error } = await supabase
       .from("character_templates")
       .select("*")
