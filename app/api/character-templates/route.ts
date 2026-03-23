@@ -5,6 +5,7 @@ import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
+const PROTECTED_REFERENCE_NAMES = new Set(["Wolf King Caius", "Sweet Girl Next Door", "Marcus"]);
 
 function extractCharacterImagesObjectPath(rawUrl: string): string | null {
   const url = rawUrl.trim();
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
     const supabase = createAnonClient();
     const { data: existingRows, error: existingError } = await supabase
       .from("character_templates")
-      .select("id, created_at")
+      .select("id, name, reference_image_url, created_at")
       .ilike("name", name)
       .ilike("archetype", archetype)
       .order("created_at", { ascending: false })
@@ -87,6 +88,14 @@ export async function POST(request: Request) {
     let error: { message?: string } | null = null;
     const existingId = existingRows?.[0]?.id;
     if (existingId) {
+      const existingName = existingRows?.[0]?.name ?? "";
+      const existingReference = (existingRows?.[0]?.reference_image_url ?? "").trim();
+      if (PROTECTED_REFERENCE_NAMES.has(existingName) && reference_image_url !== existingReference) {
+        return NextResponse.json(
+          { error: "reference_image_url is protected for this template" },
+          { status: 403 },
+        );
+      }
       const updated = await supabase
         .from("character_templates")
         .update({

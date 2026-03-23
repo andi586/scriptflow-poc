@@ -6,6 +6,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+const PROTECTED_REFERENCE_NAMES = new Set(["Wolf King Caius", "Sweet Girl Next Door", "Marcus"]);
+
 type RouteCtx = { params: Promise<{ id: string }> };
 
 function isValidTemplateId(id: string) {
@@ -40,6 +42,24 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     }
 
     const supabase = createAnonClient();
+    const { data: existing, error: existingErr } = await supabase
+      .from("character_templates")
+      .select("id,name,reference_image_url")
+      .eq("id", templateId)
+      .maybeSingle();
+    if (existingErr) {
+      return jsonError(existingErr.message || "Failed to load template", 500);
+    }
+    if (!existing) {
+      return jsonError("Template not found", 404);
+    }
+    if (
+      PROTECTED_REFERENCE_NAMES.has(existing.name) &&
+      reference_image_url !== (existing.reference_image_url ?? "").trim()
+    ) {
+      return jsonError("reference_image_url is protected for this template", 403);
+    }
+
     const { data, error } = await supabase
       .from("character_templates")
       .update({ reference_image_url })
