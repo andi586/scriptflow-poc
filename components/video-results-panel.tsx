@@ -42,16 +42,8 @@ function isClipProcessing(t: KlingTaskItem) {
   return !isClipDone(t) && !isClipFailed(t);
 }
 
-/**
- * Stable per-row React/state key: list index + beat + PiAPI task_id.
- * Index disambiguates duplicate beat_number / task_id rows so even/odd scenes never share playback state.
- * PiAPI calls still use `task.task_id.trim()` only.
- */
-function clipRowKey(rowIndex: number, task: KlingTaskItem): string {
-  const tid = typeof task.task_id === "string" ? task.task_id.trim() : "";
-  const b = Number(task.beat_number);
-  const beat = Number.isFinite(b) ? b : 0;
-  return `${rowIndex}|b${beat}|${tid || "notask"}`;
+function getTaskIdKey(task: KlingTaskItem): string {
+  return typeof task.task_id === "string" ? task.task_id.trim() : "";
 }
 
 /** Wait for React to commit `src` to the `<video>` DOM node. */
@@ -141,15 +133,13 @@ export function VideoResultsPanel({
 
   useEffect(() => {
     if (tasks.length === 0) return;
-    const rows = tasks.map((t, i) => ({
-      listIndex: i,
+    const rows = tasks.map((t) => ({
       beat_number: t.beat_number,
       task_id: t.task_id,
-      task_id_trimmed: typeof t.task_id === "string" ? t.task_id.trim() : "",
-      rowKey: clipRowKey(i, t),
+      task_id_trimmed: getTaskIdKey(t),
       missingTaskId: !t.task_id || !String(t.task_id).trim(),
     }));
-    console.log("[VideoResultsPanel] scene ↔ task_id / rowKey", rows);
+    console.log("[VideoResultsPanel] scene ↔ task_id", rows);
   }, [tasks]);
 
   useEffect(() => {
@@ -232,7 +222,7 @@ export function VideoResultsPanel({
   const fetchFreshPlaybackUrl = useCallback(
     async (
       taskId: string,
-      debug?: { beat_number: number; clipRowKey: string },
+      debug?: { beat_number: number; taskIdKey: string },
     ): Promise<string> => {
       const tid = taskId.trim();
       if (!tid) {
@@ -297,13 +287,13 @@ export function VideoResultsPanel({
       const zip = new JSZip();
       let added = 0;
       for (const t of clips) {
-        const clipRowIdx = tasks.indexOf(t);
-        const rk = clipRowKey(clipRowIdx >= 0 ? clipRowIdx : 0, t);
+        const tid = getTaskIdKey(t);
+        if (!tid) continue;
         let url: string;
         try {
-          url = await fetchFreshPlaybackUrl(t.task_id, {
+          url = await fetchFreshPlaybackUrl(tid, {
             beat_number: t.beat_number,
-            clipRowKey: rk,
+            taskIdKey: tid,
           });
         } catch {
           continue;
@@ -328,13 +318,13 @@ export function VideoResultsPanel({
         return;
       }
       for (const t of clips) {
-        const clipRowIdx = tasks.indexOf(t);
-        const rk = clipRowKey(clipRowIdx >= 0 ? clipRowIdx : 0, t);
+        const tid = getTaskIdKey(t);
+        if (!tid) continue;
         let url: string;
         try {
-          url = await fetchFreshPlaybackUrl(t.task_id, {
+          url = await fetchFreshPlaybackUrl(tid, {
             beat_number: t.beat_number,
-            clipRowKey: rk,
+            taskIdKey: tid,
           });
         } catch {
           continue;
@@ -484,17 +474,17 @@ export function VideoResultsPanel({
           )}
         </p>
         <div className="grid gap-4">
-          {tasks.map((task, rowIndex) => {
+          {tasks.map((task) => {
             const done = isClipDone(task);
             const failed = isClipFailed(task);
             const processing = isClipProcessing(task);
-            const rowKey = clipRowKey(rowIndex, task);
-            const piTid = typeof task.task_id === "string" ? task.task_id.trim() : "";
+            const piTid = getTaskIdKey(task);
+            if (!piTid) return null;
             const pollErr = clipPollErrors[piTid] ?? clipPollErrors[task.task_id];
-            const unlocked = !!videoUnlocked[rowKey];
+            const unlocked = !!videoUnlocked[piTid];
             return (
               <div
-                key={rowKey}
+                key={piTid}
                 className="rounded-xl border border-white/10 bg-zinc-950/70 p-4"
               >
                 <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -552,83 +542,83 @@ export function VideoResultsPanel({
 
                 {done && piTid && (
                   <>
-                    {playbackErrorByTaskId[rowKey] && !playbackResolving[rowKey] && (
+                    {playbackErrorByTaskId[piTid] && !playbackResolving[piTid] && (
                       <p className="mt-2 text-xs text-red-400" role="alert">
-                        {playbackErrorByTaskId[rowKey]}
+                        {playbackErrorByTaskId[piTid]}
                       </p>
                     )}
                     <div className="relative z-10 mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
                       <video
-                        key={rowKey}
+                        key={piTid}
                         ref={(el) => {
-                          clipVideoRefs.current[rowKey] = el;
+                          clipVideoRefs.current[piTid] = el;
                         }}
-                        src={playUrlByTaskId[rowKey] || undefined}
+                        src={playUrlByTaskId[piTid] || undefined}
                         className="max-h-64 w-full object-cover"
                         playsInline
                         preload="metadata"
-                        controls={unlocked && !!playUrlByTaskId[rowKey]}
+                        controls={unlocked && !!playUrlByTaskId[piTid]}
                         muted={!unlocked}
                         onPlay={() =>
-                          setVideoUnlocked((u) => ({ ...u, [rowKey]: true }))
+                          setVideoUnlocked((u) => ({ ...u, [piTid]: true }))
                         }
                         onError={() => {
-                          if (intentionalPlaybackLoadRef.current.has(rowKey)) {
+                          if (intentionalPlaybackLoadRef.current.has(piTid)) {
                             return;
                           }
                           console.warn("[VideoResultsPanel] <video> error", {
-                            rowKey,
+                            task_id_key: piTid,
                             beat_number: task.beat_number,
                             task_id: task.task_id,
                             piTid,
-                            srcSample: (playUrlByTaskId[rowKey] ?? "").slice(0, 80),
+                            srcSample: (playUrlByTaskId[piTid] ?? "").slice(0, 80),
                           });
                           setPlaybackErrorByTaskId((prev) => ({
                             ...prev,
-                            [rowKey]: "播放中断，可再次点击播放获取新地址。",
+                            [piTid]: "播放中断，可再次点击播放获取新地址。",
                           }));
                           setPlayUrlByTaskId((prev) => {
                             const next = { ...prev };
-                            delete next[rowKey];
+                            delete next[piTid];
                             return next;
                           });
                           setVideoUnlocked((u) => {
                             const next = { ...u };
-                            delete next[rowKey];
+                            delete next[piTid];
                             return next;
                           });
                         }}
                       />
-                      {(!unlocked || !playUrlByTaskId[rowKey]) && (
+                      {(!unlocked || !playUrlByTaskId[piTid]) && (
                         <button
                           type="button"
-                          disabled={!!playbackResolving[rowKey]}
-                          aria-busy={!!playbackResolving[rowKey]}
+                          disabled={!!playbackResolving[piTid]}
+                          aria-busy={!!playbackResolving[piTid]}
                           className={`absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/55 transition hover:bg-black/45 ${
-                            playbackResolving[rowKey]
+                            playbackResolving[piTid]
                               ? "cursor-wait opacity-80"
                               : ""
                           }`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (playbackResolving[rowKey]) return;
+                            if (playbackResolving[piTid]) return;
                             void (async () => {
-                              intentionalPlaybackLoadRef.current.add(rowKey);
+                              intentionalPlaybackLoadRef.current.add(piTid);
                               setPlaybackErrorByTaskId((prev) => {
                                 const next = { ...prev };
-                                delete next[rowKey];
+                                delete next[piTid];
                                 return next;
                               });
-                              setPlaybackResolving((prev) => ({ ...prev, [rowKey]: true }));
+                              setPlaybackResolving((prev) => ({ ...prev, [piTid]: true }));
                               try {
                                 const url = await fetchFreshPlaybackUrl(piTid, {
                                   beat_number: task.beat_number,
-                                  clipRowKey: rowKey,
+                                  taskIdKey: piTid,
                                 });
-                                setPlayUrlByTaskId((prev) => ({ ...prev, [rowKey]: url }));
+                                setPlayUrlByTaskId((prev) => ({ ...prev, [piTid]: url }));
                                 await nextPaint();
-                                const v = clipVideoRefs.current[rowKey];
+                                const v = clipVideoRefs.current[piTid];
                                 if (!v) {
                                   throw new Error("播放器未就绪，请重试");
                                 }
@@ -637,34 +627,34 @@ export function VideoResultsPanel({
                                 await waitForVideoLoaded(v, 60_000);
                                 v.muted = false;
                                 await v.play();
-                                setVideoUnlocked((u) => ({ ...u, [rowKey]: true }));
+                                setVideoUnlocked((u) => ({ ...u, [piTid]: true }));
                               } catch (err) {
                                 console.warn("[VideoResultsPanel] play pipeline failed", {
-                                  rowKey,
+                                  task_id_key: piTid,
                                   beat_number: task.beat_number,
                                   task_id: task.task_id,
                                   piTid,
                                 });
                                 setPlaybackErrorByTaskId((prev) => ({
                                   ...prev,
-                                  [rowKey]:
+                                  [piTid]:
                                     err instanceof Error ? err.message : String(err),
                                 }));
                                 setPlayUrlByTaskId((prev) => {
                                   const next = { ...prev };
-                                  delete next[rowKey];
+                                  delete next[piTid];
                                   return next;
                                 });
                                 setVideoUnlocked((u) => {
                                   const next = { ...u };
-                                  delete next[rowKey];
+                                  delete next[piTid];
                                   return next;
                                 });
                               } finally {
-                                intentionalPlaybackLoadRef.current.delete(rowKey);
+                                intentionalPlaybackLoadRef.current.delete(piTid);
                                 setPlaybackResolving((prev) => {
                                   const next = { ...prev };
-                                  delete next[rowKey];
+                                  delete next[piTid];
                                   return next;
                                 });
                               }
@@ -675,7 +665,7 @@ export function VideoResultsPanel({
                           }}
                           aria-label={`Play scene ${task.beat_number}`}
                         >
-                          {playbackResolving[rowKey] ? (
+                          {playbackResolving[piTid] ? (
                             <Loader2
                               className="size-14 animate-spin text-amber-400"
                               aria-hidden
@@ -688,7 +678,7 @@ export function VideoResultsPanel({
                             />
                           )}
                           <span className="text-xs font-medium text-white/90">
-                            {playbackResolving[rowKey]
+                            {playbackResolving[piTid]
                               ? "正在从 PiAPI 获取播放地址…"
                               : "点击播放"}
                           </span>
@@ -699,22 +689,22 @@ export function VideoResultsPanel({
                     <div className="mt-2">
                       <button
                         type="button"
-                        aria-busy={downloadBusyTaskId === rowKey}
+                        aria-busy={downloadBusyTaskId === piTid}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (downloadBusyTaskId === rowKey) return;
+                          if (downloadBusyTaskId === piTid) return;
                           void (async () => {
                             setPlaybackErrorByTaskId((prev) => {
                               const next = { ...prev };
-                              delete next[rowKey];
+                              delete next[piTid];
                               return next;
                             });
-                            setDownloadBusyTaskId(rowKey);
+                            setDownloadBusyTaskId(piTid);
                             try {
                               const url = await fetchFreshPlaybackUrl(piTid, {
                                 beat_number: task.beat_number,
-                                clipRowKey: rowKey,
+                                taskIdKey: piTid,
                               });
                               const a = document.createElement("a");
                               a.href = url;
@@ -726,14 +716,14 @@ export function VideoResultsPanel({
                               a.remove();
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
-                                rowKey,
+                                task_id_key: piTid,
                                 beat_number: task.beat_number,
                                 task_id: task.task_id,
                                 piTid,
                               });
                               setPlaybackErrorByTaskId((prev) => ({
                                 ...prev,
-                                [rowKey]:
+                                [piTid]:
                                   err instanceof Error ? err.message : String(err),
                               }));
                             } finally {
@@ -743,12 +733,12 @@ export function VideoResultsPanel({
                         }}
                         onPointerDown={(e) => e.stopPropagation()}
                         className={`inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 ${
-                          downloadBusyTaskId === rowKey
+                          downloadBusyTaskId === piTid
                             ? "cursor-wait opacity-60"
                             : ""
                         }`}
                       >
-                        {downloadBusyTaskId === rowKey ? (
+                        {downloadBusyTaskId === piTid ? (
                           <Loader2 className="size-3.5 animate-spin" aria-hidden />
                         ) : (
                           <Download className="size-3.5" aria-hidden />
