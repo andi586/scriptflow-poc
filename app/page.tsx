@@ -663,7 +663,6 @@ export default function Home() {
                             }}
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             className="sr-only"
                             onClick={(e) => {
                               // Keeps change event firing when user picks the same image again.

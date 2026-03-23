@@ -410,6 +410,10 @@ function appendKlingElementsReferenceInstructions(
   return `${prompt.trim()}\n\n${lines.join("\n")}`.trim();
 }
 
+function appendPromptSafetyAndStyleLock(prompt: string) {
+  return `${prompt.trim()}\n\nNo text, no subtitles, no watermarks, no captions. Photorealistic style only. No animation, no cartoon. Both characters must appear as real humans.`.trim();
+}
+
 export async function generateKlingPromptsAction(input: {
   projectId: string;
 }): Promise<ActionResult<{ prompts: KlingPromptItem[] }>> {
@@ -600,8 +604,9 @@ export async function submitKlingTasksAction(input: {
         injectCharacterReferenceLocks(stripHardcodedAspectRatioFromPrompt(item.prompt), characterRows),
         characterRefs,
       );
+      const sanitizedPrompt = appendPromptSafetyAndStyleLock(finalPrompt);
 
-      const useVeo3 = shouldUseVeo3ForScenePrompt(finalPrompt);
+      const useVeo3 = shouldUseVeo3ForScenePrompt(sanitizedPrompt);
       const modelUsed = useVeo3 ? "veo3" : "kling";
 
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
@@ -611,7 +616,7 @@ export async function submitKlingTasksAction(input: {
             model: "veo3",
             task_type: "veo3-video-fast",
             input: {
-              prompt: finalPrompt,
+              prompt: sanitizedPrompt,
               aspect_ratio: "9:16",
               duration: 8,
               resolution: "720p",
@@ -621,7 +626,7 @@ export async function submitKlingTasksAction(input: {
             model: "kling",
             task_type: "video_generation",
             input: buildKlingVideoGenerationInput({
-              prompt: finalPrompt,
+              prompt: sanitizedPrompt,
               aspectRatio: KLING_VIDEO_ASPECT_RATIO,
               duration: 5,
               referenceImageUrls,

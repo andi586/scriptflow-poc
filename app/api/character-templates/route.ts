@@ -1,10 +1,27 @@
 import { NextResponse } from "next/server";
-import { createAnonClient } from "@/lib/supabase/server";
+import { createAnonClient, createClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+function extractCharacterImagesObjectPath(rawUrl: string): string | null {
+  const url = rawUrl.trim();
+  if (!url) return null;
+  if (!/^https?:\/\//i.test(url)) return url.replace(/^\/+/, "");
+  try {
+    const parsed = new URL(url);
+    const publicMarker = "/storage/v1/object/public/character-images/";
+    const signMarker = "/storage/v1/object/sign/character-images/";
+    const marker = parsed.pathname.includes(signMarker) ? signMarker : publicMarker;
+    const idx = parsed.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(parsed.pathname.slice(idx + marker.length)).replace(/^\/+/, "");
+  } catch {
+    return null;
+  }
+}
 
 export async function GET() {
   try {
@@ -15,8 +32,21 @@ export async function GET() {
       .order("created_at", { ascending: true });
 
     if (error) throw error;
+    const templates = (data ?? []) as CharacterTemplateRow[];
+    const signer = createClient();
+    const signed = await Promise.all(
+      templates.map(async (tpl) => {
+        const path = extractCharacterImagesObjectPath(tpl.reference_image_url ?? "");
+        if (!path) return tpl;
+        const { data: signedData, error: signedErr } = await signer.storage
+          .from("character-images")
+          .createSignedUrl(path, 3600);
+        if (signedErr || !signedData?.signedUrl) return tpl;
+        return { ...tpl, reference_image_url: signedData.signedUrl };
+      }),
+    );
 
-    return NextResponse.json({ templates: (data ?? []) as CharacterTemplateRow[] });
+    return NextResponse.json({ templates: signed });
   } catch (e) {
     const message = e instanceof Error ? e.message : JSON.stringify(e);
     return NextResponse.json({ error: message }, { status: 500 });
