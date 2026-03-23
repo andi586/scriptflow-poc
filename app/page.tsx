@@ -177,6 +177,10 @@ export default function Home() {
   const storyIdeaTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   /** Scroll results into view after pipeline completes (single-page flow; no separate /results route). */
   const clipsResultsSectionRef = useRef<HTMLElement | null>(null);
+  /** Same pattern as /character-templates: one hidden input + rAF click (reliable file picker). */
+  const castHomeFileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Which cast row is picking a file (mirrors uploadForId on character-templates page). */
+  const [castUploadForTemplateId, setCastUploadForTemplateId] = useState<string | null>(null);
   /** Object URLs for “upload my own photo” previews (revoked on replace / unmount). */
   const [castUploadPreviewByTemplateId, setCastUploadPreviewByTemplateId] = useState<
     Record<string, string>
@@ -195,6 +199,7 @@ export default function Home() {
       Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
       return {};
     });
+    setCastUploadForTemplateId(null);
     setInspirationFollowUpAnswers({});
   }, []);
 
@@ -284,6 +289,12 @@ export default function Home() {
       }
       return next;
     });
+  }, [selectedTemplateIds]);
+
+  useEffect(() => {
+    setCastUploadForTemplateId((prev) =>
+      prev && !selectedTemplateIds.includes(prev) ? null : prev,
+    );
   }, [selectedTemplateIds]);
 
   useEffect(() => {
@@ -685,6 +696,34 @@ export default function Home() {
           </div>
           {selectedTemplates.length > 0 && (
             <div className="mt-5 space-y-3">
+              <input
+                ref={castHomeFileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp,image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  const templateId = castUploadForTemplateId;
+                  e.target.value = "";
+                  setCastUploadForTemplateId(null);
+                  if (!file || !templateId) return;
+
+                  setUploadingCastId(templateId);
+                  try {
+                    setCastUploadPreviewByTemplateId((prev) => {
+                      const old = prev[templateId];
+                      if (old) URL.revokeObjectURL(old);
+                      return { ...prev, [templateId]: URL.createObjectURL(file) };
+                    });
+                    setCastConfirmations((prev) => ({
+                      ...prev,
+                      [templateId]: { choice: "upload", file },
+                    }));
+                  } finally {
+                    setUploadingCastId((prev) => (prev === templateId ? null : prev));
+                  }
+                }}
+              />
               <p className="text-xs text-amber-200/90">
                 Confirm each selected role: choose template look or upload your own photo.
               </p>
@@ -696,7 +735,6 @@ export default function Home() {
                   c?.choice === "upload" && uploadPreviewUrl
                     ? uploadPreviewUrl
                     : resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL);
-                const castFileInputId = `cast-upload-file-${tpl.id}`;
                 return (
                   <div
                     key={`confirm-${tpl.id}`}
@@ -750,54 +788,32 @@ export default function Home() {
                           >
                             Use this look
                           </button>
-                          <label
-                            htmlFor={castFileInputId}
-                            onMouseDown={(e) => {
-                              if (e.button !== 0) return;
-                              if (pipelineRunning || uploadingCastId === tpl.id) {
-                                e.preventDefault();
-                                return;
-                              }
-                              const el = document.getElementById(castFileInputId) as HTMLInputElement | null;
-                              if (el) el.value = "";
-                            }}
+                          <button
+                            type="button"
+                            disabled={
+                              pipelineRunning ||
+                              !!uploadingCastId ||
+                              castUploadForTemplateId === tpl.id
+                            }
                             className={cn(
-                              "inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-medium",
+                              "rounded-lg border px-3 py-1.5 text-xs font-medium",
                               c?.choice === "upload"
                                 ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
                                 : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
-                              (pipelineRunning || uploadingCastId === tpl.id) &&
-                                "cursor-not-allowed opacity-50 pointer-events-none",
+                              (pipelineRunning ||
+                                !!uploadingCastId ||
+                                castUploadForTemplateId === tpl.id) &&
+                                "cursor-not-allowed opacity-50",
                             )}
+                            onClick={() => {
+                              if (pipelineRunning || uploadingCastId) return;
+                              if (castUploadForTemplateId === tpl.id) return;
+                              setCastUploadForTemplateId(tpl.id);
+                              requestAnimationFrame(() => castHomeFileInputRef.current?.click());
+                            }}
                           >
                             Upload my own photo
-                          </label>
-                          <input
-                            id={castFileInputId}
-                            type="file"
-                            accept="image/*"
-                            className="sr-only"
-                            disabled={pipelineRunning || uploadingCastId === tpl.id}
-                            onChange={(e) => {
-                              setUploadingCastId(tpl.id);
-                              const file = e.target.files?.[0];
-                              try {
-                                if (!file) return;
-                                setCastUploadPreviewByTemplateId((prev) => {
-                                  const old = prev[tpl.id];
-                                  if (old) URL.revokeObjectURL(old);
-                                  return { ...prev, [tpl.id]: URL.createObjectURL(file) };
-                                });
-                                setCastConfirmations((prev) => ({
-                                  ...prev,
-                                  [tpl.id]: { choice: "upload", file },
-                                }));
-                              } finally {
-                                e.currentTarget.value = "";
-                                setUploadingCastId((prev) => (prev === tpl.id ? null : prev));
-                              }
-                            }}
-                          />
+                          </button>
                         </div>
                         {c?.choice === "upload" && (
                           <p className="mt-2 text-xs text-white/55">
