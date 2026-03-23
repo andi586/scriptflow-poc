@@ -56,8 +56,8 @@ export async function parseScript(
     lazy ? NEL_SENTINEL_PROMPT_LAZY : NEL_SENTINEL_PROMPT
   }`;
   const userBase = lazy
-    ? `Analyze the short drama script below and return compact valid JSON:\n\n${scriptText}`
-    : `Analyze the short drama script below:\n\n${scriptText}\n\nReturn complete story-memory JSON.`;
+    ? `Important: All field values must be in English only.\nAnalyze the short drama script below and return compact valid JSON:\n\n${scriptText}`
+    : `Important: All field values must be in English only.\nAnalyze the short drama script below:\n\n${scriptText}\n\nReturn complete story-memory JSON.`;
   const { system, user } = buildBoundedNelPayload(systemBase, userBase);
   const model = lazy ? DEFAULT_LAZY_MODEL : DEFAULT_SONNET;
   const max_tokens = lazy ? 3072 : 4096;
