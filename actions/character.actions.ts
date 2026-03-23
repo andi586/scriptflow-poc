@@ -27,8 +27,19 @@ function mapDbRowToTemplate(row: {
   name: string;
   archetype: string;
   reference_image_url: string;
+  reference_image_path?: string | null;
   kling_prompt_base: string | null;
 }): CharacterTemplate {
+  const rawUrl = row.reference_image_url?.trim() || "";
+  const pathLike = row.reference_image_path?.trim() || "";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
+  const fromPath =
+    supabaseUrl && pathLike
+      ? `${supabaseUrl}/storage/v1/object/public/character-images/${pathLike.replace(/^\/+/, "")}`
+      : "";
+  const normalizedReferenceImageUrl =
+    /^https?:\/\//i.test(rawUrl) ? rawUrl : fromPath || "https://placehold.co/400x600?text=No+Image";
+
   return {
     id: row.id,
     label: `${row.name}（${row.archetype}）`,
@@ -39,7 +50,7 @@ function mapDbRowToTemplate(row: {
       "Appearance locked by reference image; use kling prompt from template when generating.",
     personality: "From ScriptFlow character template library.",
     language_fingerprint: "Follow script dialogue and emotional beats.",
-    reference_image_url: row.reference_image_url,
+    reference_image_url: normalizedReferenceImageUrl,
   };
 }
 
@@ -59,7 +70,7 @@ export async function listCharacterTemplatesAction(): Promise<
     const supabase = createClient();
     const { data, error } = await supabase
       .from(PROJECT_CAST_TABLE)
-      .select("id,name,archetype,reference_image_url,kling_prompt_base")
+      .select("id,name,archetype,reference_image_url,reference_image_path,kling_prompt_base")
       .is("project_id", null)
       .order("created_at", { ascending: true });
 

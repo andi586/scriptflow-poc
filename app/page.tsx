@@ -144,6 +144,7 @@ export default function Home() {
   const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [castConfirmations, setCastConfirmations] = useState<Record<string, CastConfirmation>>({});
+  const [uploadingCastId, setUploadingCastId] = useState<string | null>(null);
 
   const [storyIdea, setStoryIdea] = useState("");
   /** Follow-up Q&A per dimension; not merged into textarea — merged only when calling backend. */
@@ -604,6 +605,12 @@ export default function Home() {
                         src={tpl.reference_image_url}
                         alt={tpl.label}
                         className="h-28 w-24 rounded-lg border border-white/10 object-cover"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.dataset.fallbackApplied === "1") return;
+                          img.dataset.fallbackApplied = "1";
+                          img.src = "https://placehold.co/240x320?text=Image+Unavailable";
+                        }}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-white">{tpl.label}</p>
@@ -630,13 +637,17 @@ export default function Home() {
                           </button>
                           <button
                             type="button"
+                            disabled={pipelineRunning || uploadingCastId === tpl.id}
                             className={cn(
-                              "cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium",
+                              "rounded-lg border px-3 py-1.5 text-xs font-medium",
                               c?.choice === "upload"
                                 ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
                                 : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
+                              (pipelineRunning || uploadingCastId === tpl.id) &&
+                                "cursor-not-allowed opacity-50",
                             )}
                             onClick={() => {
+                              if (pipelineRunning || uploadingCastId === tpl.id) return;
                               const input = castUploadInputRefs.current[tpl.id];
                               if (!input) return;
                               // Reset so selecting the same file still triggers onChange on iOS/desktop.
@@ -659,13 +670,18 @@ export default function Home() {
                               e.currentTarget.value = "";
                             }}
                             onChange={(e) => {
+                              setUploadingCastId(tpl.id);
                               const file = e.target.files?.[0];
-                              if (!file) return;
-                              setCastConfirmations((prev) => ({
-                                ...prev,
-                                [tpl.id]: { choice: "upload", file },
-                              }));
-                              e.currentTarget.value = "";
+                              try {
+                                if (!file) return;
+                                setCastConfirmations((prev) => ({
+                                  ...prev,
+                                  [tpl.id]: { choice: "upload", file },
+                                }));
+                              } finally {
+                                e.currentTarget.value = "";
+                                setUploadingCastId((prev) => (prev === tpl.id ? null : prev));
+                              }
                             }}
                           />
                         </div>
