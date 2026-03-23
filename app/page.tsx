@@ -189,9 +189,10 @@ export default function Home() {
     () => templates.filter((tpl) => selectedTemplateIds.includes(tpl.id)),
     [templates, selectedTemplateIds],
   );
+  const hasSelectedCast = selectedTemplates.length > 0;
 
   const allSelectedCastConfirmed = useMemo(() => {
-    if (selectedTemplates.length === 0) return true;
+    if (selectedTemplates.length === 0) return false;
     return selectedTemplates.every((tpl) => {
       const c = castConfirmations[tpl.id];
       if (!c) return false;
@@ -265,6 +266,10 @@ export default function Home() {
       setPipelineError(
         "Add a bit more detail (8+ characters), or paste a full script (50+ characters).",
       );
+      return;
+    }
+    if (!hasSelectedCast) {
+      setPipelineError("Select at least one cast role before generating.");
       return;
     }
     if (!allSelectedCastConfirmed) {
@@ -395,6 +400,7 @@ export default function Home() {
     storyIdea,
     selectedTemplateIds,
     inspirationFollowUpAnswers,
+    hasSelectedCast,
     allSelectedCastConfirmed,
     selectedTemplates,
     castConfirmations,
@@ -453,7 +459,7 @@ export default function Home() {
   const showProgress = pipelinePhase !== "idle";
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
-  const canGenerate = canRunDrama() && allSelectedCastConfirmed;
+  const canGenerate = canRunDrama() && hasSelectedCast && allSelectedCastConfirmed;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -688,6 +694,11 @@ export default function Home() {
             <p className="mt-2 text-center text-xs text-white/40">
               Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
               characters skips formatting and goes straight to analysis.
+            </p>
+          )}
+          {canRunDrama() && !hasSelectedCast && !pipelineRunning && (
+            <p className="mt-2 text-center text-xs text-amber-200/90">
+              Select at least one cast role before generating.
             </p>
           )}
           {canRunDrama() && !allSelectedCastConfirmed && !pipelineRunning && (
