@@ -487,7 +487,6 @@ export default function Home() {
   const showProgress = pipelinePhase !== "idle";
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
-  const canGenerate = canRunDramaLive && allSelectedCastConfirmed;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -737,9 +736,8 @@ export default function Home() {
         <section className="mt-6 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-black/40 p-6">
           <Button
             type="button"
-            disabled={pipelineRunning || !canGenerate}
             className={cn(
-              "h-12 w-full bg-amber-500 text-base font-semibold text-black transition-all hover:bg-amber-400 disabled:opacity-40",
+              "h-12 w-full bg-amber-500 text-base font-semibold text-black transition-all hover:bg-amber-400",
               inspirationGenerateReady &&
                 !pipelineRunning &&
                 "ring-2 ring-amber-200 ring-offset-2 ring-offset-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400",
@@ -750,7 +748,10 @@ export default function Home() {
                 flushSync(() => setStoryIdea(el.value));
               }
             }}
-            onClick={() => void runDramaPipeline()}
+            onClick={() => {
+              alert("button clicked");
+              void runDramaPipeline();
+            }}
           >
             {pipelineRunning ? "Working on it…" : "Generate My Drama"}
           </Button>
