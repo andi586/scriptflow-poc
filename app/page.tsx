@@ -192,7 +192,7 @@ export default function Home() {
   const hasSelectedCast = selectedTemplates.length > 0;
 
   const allSelectedCastConfirmed = useMemo(() => {
-    if (selectedTemplates.length === 0) return false;
+    if (selectedTemplates.length === 0) return true;
     return selectedTemplates.every((tpl) => {
       const c = castConfirmations[tpl.id];
       if (!c) return false;
@@ -268,12 +268,8 @@ export default function Home() {
       );
       return;
     }
-    if (!hasSelectedCast) {
-      setPipelineError("Select at least one cast role before generating.");
-      return;
-    }
     if (!allSelectedCastConfirmed) {
-      setPipelineError("Please confirm every selected cast look before generating.");
+      setPipelineError("Please confirm your cast first");
       return;
     }
 
@@ -400,7 +396,6 @@ export default function Home() {
     storyIdea,
     selectedTemplateIds,
     inspirationFollowUpAnswers,
-    hasSelectedCast,
     allSelectedCastConfirmed,
     selectedTemplates,
     castConfirmations,
@@ -459,7 +454,7 @@ export default function Home() {
   const showProgress = pipelinePhase !== "idle";
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
-  const canGenerate = canRunDrama() && hasSelectedCast && allSelectedCastConfirmed;
+  const canGenerate = canRunDrama() && allSelectedCastConfirmed;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -696,14 +691,9 @@ export default function Home() {
               characters skips formatting and goes straight to analysis.
             </p>
           )}
-          {canRunDrama() && !hasSelectedCast && !pipelineRunning && (
+          {canRunDrama() && hasSelectedCast && !allSelectedCastConfirmed && !pipelineRunning && (
             <p className="mt-2 text-center text-xs text-amber-200/90">
-              Select at least one cast role before generating.
-            </p>
-          )}
-          {canRunDrama() && !allSelectedCastConfirmed && !pipelineRunning && (
-            <p className="mt-2 text-center text-xs text-amber-200/90">
-              Confirm every selected cast role before generating.
+              Please confirm your cast first
             </p>
           )}
           {canRunDrama() && !pipelineRunning && (
