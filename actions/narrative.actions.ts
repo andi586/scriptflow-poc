@@ -21,6 +21,8 @@ import { getKlingVideoStatusPollUrl } from "@/lib/kling-video-poll";
 import { PROJECT_CAST_TABLE } from "@/lib/project-cast-table";
 import { requireProjectId } from "@/lib/project-id";
 
+/** Vercel timeout is configured via `app/layout.tsx` and `vercel.json` (300s). */
+
 export type StoryMemorySummary = {
   seriesTitle: string;
   episodeTitle: string;
