@@ -378,6 +378,25 @@ function injectCharacterReferenceLocks(prompt: string, characters: Record<string
   return `${prompt.trim()}\n\nCharacter appearance locks:\n${lines.join("\n")}`.trim();
 }
 
+function appendKlingElementsReferenceInstructions(
+  prompt: string,
+  characterRefs: Array<{ name: string; url: string }>,
+) {
+  if (characterRefs.length === 0) return prompt.trim();
+  const lines: string[] = [];
+  // Keep the exact requested sentence for single-image mode.
+  lines.push("The character appearance should match @image_1.");
+  if (characterRefs.length > 1) {
+    for (let i = 0; i < characterRefs.length; i += 1) {
+      const ref = characterRefs[i];
+      const idx = i + 1;
+      const namePart = ref.name ? `${ref.name} ` : "";
+      lines.push(`${namePart}should match @image_${idx}.`);
+    }
+  }
+  return `${prompt.trim()}\n\n${lines.join("\n")}`.trim();
+}
+
 export async function generateKlingPromptsAction(input: {
   projectId: string;
 }): Promise<ActionResult<{ prompts: KlingPromptItem[] }>> {
@@ -511,11 +530,14 @@ export async function submitKlingTasksAction(input: {
       ? (projectCharacters as Record<string, unknown>[])
       : [];
 
-    const referenceImageUrls = characterRows
-      .map((c) =>
-        typeof c.reference_image_url === "string" ? c.reference_image_url.trim() : "",
-      )
-      .filter((u) => /^https:\/\//i.test(u));
+    const characterRefs = characterRows
+      .map((c) => ({
+        name: typeof c.name === "string" ? c.name.trim() : "",
+        url: typeof c.reference_image_url === "string" ? c.reference_image_url.trim() : "",
+      }))
+      .filter((x) => /^https:\/\//i.test(x.url))
+      .slice(0, 4);
+    const referenceImageUrls = characterRefs.map((x) => x.url);
 
     // 1) Check DB first: if this project+scene already has processing/success, reuse it.
     const { data: existingRows, error: existingError } = await supabase
@@ -561,9 +583,9 @@ export async function submitKlingTasksAction(input: {
     for (const item of input.prompts) {
       if (existingMap.has(item.beat_number)) continue;
 
-      const finalPrompt = injectCharacterReferenceLocks(
-        stripHardcodedAspectRatioFromPrompt(item.prompt),
-        characterRows,
+      const finalPrompt = appendKlingElementsReferenceInstructions(
+        injectCharacterReferenceLocks(stripHardcodedAspectRatioFromPrompt(item.prompt), characterRows),
+        characterRefs,
       );
 
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
@@ -574,9 +596,7 @@ export async function submitKlingTasksAction(input: {
         duration: 5,
         referenceImageUrls,
       });
-      // TODO(piapi-research): keep pure text-driven mode for now.
-      // Re-introduce explicit character-consistency image params only after
-      // confirming PiAPI's canonical fields for this task type/version.
+      // Kling Elements uses `elements: [{ image_url }]`.
 
       const payload = {
         model: "kling",
