@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- Browser-direct uploads to character-images (anon + authenticated), path must start with a UUID folder (template id)
 
 drop policy if exists "character_images_anon_authenticated_insert" on storage.objects;

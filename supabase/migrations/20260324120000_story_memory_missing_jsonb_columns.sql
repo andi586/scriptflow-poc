@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- Fix PGRST204: missing columns on story_memory (older / hand-created DBs)
 -- Run in Supabase SQL Editor if migrations were not applied.
 

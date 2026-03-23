@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- Update Wolf King Caius template description text.
 
 update character_templates

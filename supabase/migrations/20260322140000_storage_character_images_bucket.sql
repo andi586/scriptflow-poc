@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- Public bucket for character template reference images (F63/F64 uploads)
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

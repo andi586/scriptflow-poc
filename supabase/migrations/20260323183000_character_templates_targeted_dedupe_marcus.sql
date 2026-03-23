@@ -1,5 +1,6 @@
--- Targeted cleanup: keep only the newest row for specific templates that had
--- duplicated reference_image uploads.
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
+-- Protected records: Wolf King Caius / Sweet Girl Next Door / Marcus are protected and must never be deduped/deleted automatically.
+-- This migration is intentionally a no-op now to prevent accidental data loss.
 
 with ranked as (
   select
@@ -10,7 +11,7 @@ with ranked as (
       order by created_at desc, id desc
     ) as rn
   from character_templates
-  where name in ('Marcus', 'Wolf King Caius', 'Sweet Girl Next Door')
+  where 1 = 0
 )
 delete from character_templates t
 using ranked r

@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- Restore required custom templates when missing.
 -- Keeps existing rows untouched; inserts only absent names.
 

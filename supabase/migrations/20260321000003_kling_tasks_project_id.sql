@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- Scope Kling tasks per project (avoid cross-project scene_index collisions)
 
 alter table kling_tasks

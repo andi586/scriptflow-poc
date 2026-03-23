@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- Per-project cast lives in character_templates: library rows keep project_id NULL.
 
 alter table public.character_templates

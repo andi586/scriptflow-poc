@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- F63/F64: Character template library (DB-backed)
 
 create extension if not exists "pgcrypto";

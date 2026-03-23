@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- kling_tasks: persist PiAPI task_id per scene to avoid duplicates
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";

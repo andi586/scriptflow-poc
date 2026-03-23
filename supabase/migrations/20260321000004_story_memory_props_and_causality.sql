@@ -1,3 +1,4 @@
+-- Protected template names: Wolf King Caius / Sweet Girl Next Door / Marcus (never delete/clear URLs).
 -- F67 + F66: persist prop lock profile and physical causality static-result map
 
 alter table story_memory

@@ -10,6 +10,9 @@ type SeedRow = {
   kling_prompt_base: string;
 };
 
+// Protected template records: never delete or clear reference_image_url for these names.
+const PROTECTED_TEMPLATE_NAMES = ["Wolf King Caius", "Sweet Girl Next Door", "Marcus"] as const;
+
 function loadEnvFromFile(envPath: string) {
   try {
     const content = fs.readFileSync(envPath, "utf8");
@@ -117,6 +120,7 @@ async function main() {
     "[rows]",
     (afterRows ?? []).map((r) => `${r.name} (${r.archetype})`).join(", "),
   );
+  console.log("[protected_names]", PROTECTED_TEMPLATE_NAMES.join(", "));
 }
 
 main().catch((e) => {
