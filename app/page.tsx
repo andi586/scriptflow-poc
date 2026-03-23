@@ -166,6 +166,8 @@ export default function Home() {
   const [pipelineRunning, setPipelineRunning] = useState(false);
   /** Bumps when Kling submit finishes so VideoResultsPanel reloads task_ids from Supabase. */
   const [clipsRefreshNonce, setClipsRefreshNonce] = useState(0);
+  /** PiAPI task ids from the last successful submit — keeps results panel visible before DB list catches up. */
+  const [lastSubmittedClipTaskIds, setLastSubmittedClipTaskIds] = useState<string[]>([]);
 
   /** Set once on mount when localStorage has a saved lazy session (refresh recovery). */
   const [restoredLazySessionId, setRestoredLazySessionId] = useState<string | null>(null);
@@ -173,8 +175,12 @@ export default function Home() {
 
   /** Read live DOM before pipeline — fixes first-click no-op when controlled state lags (IME / autofill / paste). */
   const storyIdeaTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  /** Per-template hidden file inputs; explicit click() is more reliable on mobile Safari. */
-  const castUploadInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  /** Scroll results into view after pipeline completes (single-page flow; no separate /results route). */
+  const clipsResultsSectionRef = useRef<HTMLElement | null>(null);
+  /** Object URLs for “upload my own photo” previews (revoked on replace / unmount). */
+  const [castUploadPreviewByTemplateId, setCastUploadPreviewByTemplateId] = useState<
+    Record<string, string>
+  >({});
 
   const startNewLazySession = useCallback(() => {
     clearLazySessionFromStorage();
@@ -184,6 +190,11 @@ export default function Home() {
     setPipelineError(null);
     setPipelineRunning(false);
     setClipsRefreshNonce(0);
+    setLastSubmittedClipTaskIds([]);
+    setCastUploadPreviewByTemplateId((prev) => {
+      Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
+      return {};
+    });
     setInspirationFollowUpAnswers({});
   }, []);
 
@@ -275,6 +286,30 @@ export default function Home() {
     });
   }, [selectedTemplateIds]);
 
+  useEffect(() => {
+    const allowed = new Set(selectedTemplateIds);
+    setCastUploadPreviewByTemplateId((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const id of Object.keys(next)) {
+        if (!allowed.has(id)) {
+          URL.revokeObjectURL(next[id]);
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [selectedTemplateIds]);
+
+  const castUploadPreviewRef = useRef(castUploadPreviewByTemplateId);
+  castUploadPreviewRef.current = castUploadPreviewByTemplateId;
+  useEffect(() => {
+    return () => {
+      Object.values(castUploadPreviewRef.current).forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, []);
+
   const runDramaPipeline = useCallback(async () => {
     console.log("[ScriptFlow] runDramaPipeline invoked", {
       pipelineRunning,
@@ -308,6 +343,7 @@ export default function Home() {
 
     setPipelineError(null);
     setPipelineRunning(true);
+    setLastSubmittedClipTaskIds([]);
     /** Tracks which phase we were in when a thrown error (e.g. network timeout) happens */
     let activePhase: PipelinePhase = "creating_project";
     setPipelinePhase("creating_project");
@@ -401,6 +437,7 @@ export default function Home() {
         .map((t) => t.task_id.trim())
         .filter((id) => id.length > 0);
       writeKlingTaskSnapshotToStorage(pid, submittedIds);
+      setLastSubmittedClipTaskIds(submittedIds);
       setClipsRefreshNonce((n) => n + 1);
 
       setPipelinePhase("done");
@@ -484,6 +521,14 @@ export default function Home() {
     }
   }, [pipelinePhase, projectId]);
 
+  useEffect(() => {
+    if (pipelinePhase !== "done" || !projectId.trim()) return;
+    const id = window.setTimeout(() => {
+      clipsResultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => window.clearTimeout(id);
+  }, [pipelinePhase, projectId]);
+
   const showProgress = pipelinePhase !== "idle";
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
@@ -549,6 +594,27 @@ export default function Home() {
           </>
         ) : (
           <>
+        {pipelinePhase === "done" && projectId.trim() && (
+          <section
+            ref={clipsResultsSectionRef}
+            className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
+            aria-labelledby="clips-results-heading"
+          >
+            <h2 id="clips-results-heading" className="text-base font-semibold text-emerald-300">
+              Your clips
+            </h2>
+            <p className="mt-1 text-xs text-white/50">
+              Tasks were submitted — status and video links update below as PiAPI finishes.
+            </p>
+            <VideoResultsPanel
+              sessionId={projectId}
+              taskIds={lastSubmittedClipTaskIds}
+              refreshNonce={clipsRefreshNonce}
+              title="Scenes"
+            />
+          </section>
+        )}
+
         {/* —— Main lazy flow —— */}
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-sm font-semibold text-amber-400">Your story</h2>
@@ -625,6 +691,12 @@ export default function Home() {
               {selectedTemplates.map((tpl) => {
                 const c = castConfirmations[tpl.id];
                 const confirmed = !!c && (c.choice === "template" || (c.choice === "upload" && !!c.file));
+                const uploadPreviewUrl = castUploadPreviewByTemplateId[tpl.id];
+                const cardImageSrc =
+                  c?.choice === "upload" && uploadPreviewUrl
+                    ? uploadPreviewUrl
+                    : resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL);
+                const castFileInputId = `cast-upload-file-${tpl.id}`;
                 return (
                   <div
                     key={`confirm-${tpl.id}`}
@@ -636,7 +708,7 @@ export default function Home() {
                     <div className="flex flex-col gap-3 sm:flex-row">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL)}
+                        src={cardImageSrc}
                         alt={tpl.label}
                         className="h-28 w-24 rounded-lg border border-white/10 object-cover"
                         referrerPolicy="no-referrer"
@@ -661,53 +733,61 @@ export default function Home() {
                                 ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-200"
                                 : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
                             )}
-                            onClick={() =>
+                            onClick={() => {
+                              setCastUploadPreviewByTemplateId((prev) => {
+                                const old = prev[tpl.id];
+                                if (!old) return prev;
+                                const next = { ...prev };
+                                delete next[tpl.id];
+                                URL.revokeObjectURL(old);
+                                return next;
+                              });
                               setCastConfirmations((prev) => ({
                                 ...prev,
                                 [tpl.id]: { choice: "template" },
-                              }))
-                            }
+                              }));
+                            }}
                           >
                             Use this look
                           </button>
-                          <button
-                            type="button"
-                            disabled={pipelineRunning || uploadingCastId === tpl.id}
+                          <label
+                            htmlFor={castFileInputId}
+                            onMouseDown={(e) => {
+                              if (e.button !== 0) return;
+                              if (pipelineRunning || uploadingCastId === tpl.id) {
+                                e.preventDefault();
+                                return;
+                              }
+                              const el = document.getElementById(castFileInputId) as HTMLInputElement | null;
+                              if (el) el.value = "";
+                            }}
                             className={cn(
-                              "rounded-lg border px-3 py-1.5 text-xs font-medium",
+                              "inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-medium",
                               c?.choice === "upload"
                                 ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
                                 : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
                               (pipelineRunning || uploadingCastId === tpl.id) &&
-                                "cursor-not-allowed opacity-50",
+                                "cursor-not-allowed opacity-50 pointer-events-none",
                             )}
-                            onClick={() => {
-                              if (pipelineRunning || uploadingCastId === tpl.id) return;
-                              const input = castUploadInputRefs.current[tpl.id];
-                              if (!input) return;
-                              // Reset so selecting the same file still triggers onChange on iOS/desktop.
-                              input.value = "";
-                              input.click();
-                            }}
                           >
                             Upload my own photo
-                          </button>
+                          </label>
                           <input
-                            ref={(el) => {
-                              castUploadInputRefs.current[tpl.id] = el;
-                            }}
+                            id={castFileInputId}
                             type="file"
                             accept="image/*"
                             className="sr-only"
-                            onClick={(e) => {
-                              // Keeps change event firing when user picks the same image again.
-                              e.currentTarget.value = "";
-                            }}
+                            disabled={pipelineRunning || uploadingCastId === tpl.id}
                             onChange={(e) => {
                               setUploadingCastId(tpl.id);
                               const file = e.target.files?.[0];
                               try {
                                 if (!file) return;
+                                setCastUploadPreviewByTemplateId((prev) => {
+                                  const old = prev[tpl.id];
+                                  if (old) URL.revokeObjectURL(old);
+                                  return { ...prev, [tpl.id]: URL.createObjectURL(file) };
+                                });
                                 setCastConfirmations((prev) => ({
                                   ...prev,
                                   [tpl.id]: { choice: "upload", file },
@@ -748,10 +828,7 @@ export default function Home() {
                 flushSync(() => setStoryIdea(el.value));
               }
             }}
-            onClick={() => {
-              alert("button clicked");
-              void runDramaPipeline();
-            }}
+            onClick={() => void runDramaPipeline()}
           >
             {pipelineRunning ? "Working on it…" : "Generate My Drama"}
           </Button>
@@ -805,14 +882,6 @@ export default function Home() {
             </p>
           )}
 
-          {pipelinePhase === "done" && (
-            <VideoResultsPanel
-              sessionId={projectId}
-              taskIds={[]}
-              refreshNonce={clipsRefreshNonce}
-              title="Your clips"
-            />
-          )}
         </section>
           </>
         )}

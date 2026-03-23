@@ -13,6 +13,21 @@ import type { ActionResult, CharacterRole } from "@/types";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Full error text for client + logs (Supabase PostgrestError + stacks). */
+function lockingCharactersErrorDetail(e: unknown): string {
+  const base = formatUnknownError(e);
+  const parts: string[] = [base];
+  if (e instanceof Error && e.stack) parts.push(e.stack);
+  if (e !== null && typeof e === "object" && !(e instanceof Error)) {
+    try {
+      parts.push(`raw: ${JSON.stringify(e)}`);
+    } catch {
+      /* ignore */
+    }
+  }
+  return parts.join("\n");
+}
+
 function inferRoleFromArchetype(name: string, archetype: string): CharacterRole {
   const s = `${name} ${archetype}`.toLowerCase();
   if ((/女主|甜女|甜美女|sweet girl|female lead/.test(s) || /女/.test(archetype)) && !/男主/.test(s))
@@ -119,38 +134,47 @@ export async function bindTemplateCharactersAction(input: {
     const rows: CastInsertRow[] = [];
 
     if (dbIds.length > 0) {
-      const { data: dbTemplates, error: qErr } = await supabase
-        .from(PROJECT_CAST_TABLE)
-        .select("id,name,archetype,style_tags,reference_image_url,kling_prompt_base")
-        .is("project_id", null)
-        .in("id", dbIds);
-      if (qErr) throw qErr;
-      for (const row of dbTemplates ?? []) {
-        const r = row as {
-          id: string;
-          name: string;
-          archetype: string;
-          style_tags: string[] | null;
-          reference_image_url: string;
-          kling_prompt_base: string | null;
-        };
-        const tags = Array.isArray(r.style_tags) ? r.style_tags : [];
-        const appearanceLine =
-          r.kling_prompt_base?.trim() || `${r.name} — appearance from reference image.`;
-        rows.push({
-          project_id: projectId,
-          name: r.name,
-          archetype: r.archetype,
-          style_tags: tags,
-          reference_image_url: r.reference_image_url,
-          kling_prompt_base: appearanceLine,
-          role: inferRoleFromArchetype(r.name, r.archetype),
-          appearance: appearanceLine,
-          personality: "From template library.",
-          language_fingerprint: "Follow script dialogue fingerprint.",
-          reference_image_path: `character_templates/${r.id}`,
-          appears_in_beats: [],
-        });
+      try {
+        const { data: dbTemplates, error: qErr } = await supabase
+          .from(PROJECT_CAST_TABLE)
+          .select("id,name,archetype,style_tags,reference_image_url,kling_prompt_base")
+          .is("project_id", null)
+          .in("id", dbIds);
+        if (qErr) throw qErr;
+        for (const row of dbTemplates ?? []) {
+          const r = row as {
+            id: string;
+            name: string;
+            archetype: string;
+            style_tags: string[] | null;
+            reference_image_url: string;
+            kling_prompt_base: string | null;
+          };
+          const tags = Array.isArray(r.style_tags) ? r.style_tags : [];
+          const appearanceLine =
+            r.kling_prompt_base?.trim() || `${r.name} — appearance from reference image.`;
+          rows.push({
+            project_id: projectId,
+            name: r.name,
+            archetype: r.archetype,
+            style_tags: tags,
+            reference_image_url: r.reference_image_url,
+            kling_prompt_base: appearanceLine,
+            role: inferRoleFromArchetype(r.name, r.archetype),
+            appearance: appearanceLine,
+            personality: "From template library.",
+            language_fingerprint: "Follow script dialogue fingerprint.",
+            reference_image_path: `character_templates/${r.id}`,
+            appears_in_beats: [],
+          });
+        }
+      } catch (e) {
+        console.error(
+          "[ScriptFlow] bindTemplateCharactersAction [step=select_library_templates]",
+          lockingCharactersErrorDetail(e),
+          e,
+        );
+        throw e;
       }
     }
 
@@ -180,15 +204,31 @@ export async function bindTemplateCharactersAction(input: {
       };
     }
 
-    await supabase.from(PROJECT_CAST_TABLE).delete().eq("project_id", projectId);
-    if (rows.length > 0) {
-      const { error } = await supabase.from(PROJECT_CAST_TABLE).insert(rows);
-      if (error) throw error;
+    try {
+      await supabase.from(PROJECT_CAST_TABLE).delete().eq("project_id", projectId);
+      if (rows.length > 0) {
+        const { error } = await supabase.from(PROJECT_CAST_TABLE).insert(rows);
+        if (error) throw error;
+      }
+    } catch (e) {
+      console.error(
+        "[ScriptFlow] bindTemplateCharactersAction [step=delete_or_insert_project_cast]",
+        lockingCharactersErrorDetail(e),
+        e,
+      );
+      throw e;
     }
 
     return { success: true, data: { count: rows.length } };
   } catch (e) {
-    return { success: false, error: formatUnknownError(e) };
+    const detail = lockingCharactersErrorDetail(e);
+    console.error("[ScriptFlow] bindTemplateCharactersAction: locking characters failed", {
+      detail,
+      projectId: input?.projectId,
+      templateIdsLength: input?.templateIds?.length,
+      err: e,
+    });
+    return { success: false, error: detail };
   }
 }
 
