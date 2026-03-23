@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnonClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
-import { seedCharacters, SEEDED_CHARACTER_NAMES } from "@/lib/seed-characters";
+import { seedCharacters } from "@/lib/seed-characters";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,7 +38,7 @@ export async function GET() {
     const { count, error: countError } = await supabase
       .from("character_templates")
       .select("id", { count: "exact", head: true })
-      .in("name", [...SEEDED_CHARACTER_NAMES]);
+      .is("project_id", null);
     if (countError) throw countError;
     if ((count ?? 0) === 0) {
       await seedCharacters();

@@ -38,13 +38,43 @@ const SEEDED_CHARACTERS: SeedCharacterRow[] = [
   },
 ];
 
-export const SEEDED_CHARACTER_NAMES = ["Caius", "Luna", "Marcus"] as const;
-
 export async function seedCharacters() {
   const supabase = createClient();
 
   const { error } = await supabase.from("character_templates").upsert(SEEDED_CHARACTERS, {
     onConflict: "name",
   });
-  if (error) throw error;
+
+  if (!error) return;
+
+  const msg = error.message ?? "";
+  const noConflictTarget =
+    msg.includes("no unique") || msg.includes("ON CONFLICT specification");
+  if (!noConflictTarget) throw error;
+
+  for (const character of SEEDED_CHARACTERS) {
+    const { data: existing, error: findError } = await supabase
+      .from("character_templates")
+      .select("id")
+      .eq("name", character.name)
+      .is("project_id", null)
+      .maybeSingle();
+    if (findError) throw findError;
+
+    if (existing?.id) {
+      const { error: updateError } = await supabase
+        .from("character_templates")
+        .update({
+          archetype: character.archetype,
+          style_tags: character.style_tags,
+          reference_image_url: character.reference_image_url,
+          kling_prompt_base: character.kling_prompt_base,
+        })
+        .eq("id", existing.id);
+      if (updateError) throw updateError;
+    } else {
+      const { error: insertError } = await supabase.from("character_templates").insert(character);
+      if (insertError) throw insertError;
+    }
+  }
 }
