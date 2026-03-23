@@ -79,9 +79,19 @@ type PipelinePhase =
   | "submitting_kling"
   | "done"
   | "error";
+const CAST_IMAGE_PLACEHOLDER_URL = "https://placehold.co/240x320?text=No+Image";
 
 function errMsg(e: unknown): string {
   return formatUnknownError(e);
+}
+
+function resolveRenderableImageSrc(rawUrl: string | null | undefined, fallback: string) {
+  const value = (rawUrl ?? "").trim();
+  if (!value) return fallback;
+  const lowered = value.toLowerCase();
+  if (lowered === "null" || lowered === "undefined") return fallback;
+  if (/^https?:\/\//i.test(value) || value.startsWith("/")) return value;
+  return fallback;
 }
 
 const PHASE_LABEL: Record<Exclude<PipelinePhase, "idle" | "error">, string> = {
@@ -602,7 +612,7 @@ export default function Home() {
                     <div className="flex flex-col gap-3 sm:flex-row">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={tpl.reference_image_url || "https://placehold.co/240x320?text=No+Image"}
+                        src={resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL)}
                         alt={tpl.label}
                         className="h-28 w-24 rounded-lg border border-white/10 object-cover"
                         referrerPolicy="no-referrer"

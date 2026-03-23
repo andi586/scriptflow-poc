@@ -47,6 +47,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("character_templates")
       .select("*")
+      .is("project_id", null)
       .order("created_at", { ascending: true });
 
     if (error) throw error;

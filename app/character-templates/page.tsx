@@ -17,6 +17,7 @@ import { prepareImageForUpload } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const IMAGE_PLACEHOLDER_URL = "https://placehold.co/400x600?text=No+Image";
 
 function isJpgPngWebpFile(file: File): boolean {
   const t = (file.type || "").toLowerCase();
@@ -35,6 +36,15 @@ function storageObjectFileName(originalName: string, contentType: string) {
       ? "webp"
       : "jpg";
   return `${stem || "image"}.${ext}`;
+}
+
+function resolveRenderableImageSrc(rawUrl: string | null | undefined, fallback: string) {
+  const value = (rawUrl ?? "").trim();
+  if (!value) return fallback;
+  const lowered = value.toLowerCase();
+  if (lowered === "null" || lowered === "undefined") return fallback;
+  if (/^https?:\/\//i.test(value) || value.startsWith("/")) return value;
+  return fallback;
 }
 
 export default function CharacterTemplatesPage() {
@@ -256,7 +266,7 @@ export default function CharacterTemplatesPage() {
                   <div className="aspect-[2/3] w-full overflow-hidden bg-zinc-900">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={tpl.reference_image_url || "https://placehold.co/400x600?text=No+Image"}
+                      src={resolveRenderableImageSrc(tpl.reference_image_url, IMAGE_PLACEHOLDER_URL)}
                       alt={tpl.name}
                       className="h-full w-full object-cover"
                       loading="lazy"
