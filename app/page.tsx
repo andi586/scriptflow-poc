@@ -192,11 +192,25 @@ export default function Home() {
     [storyIdea, inspirationFollowUpAnswers],
   );
 
-  const canRunDrama = useCallback(() => {
-    const raw = storyIdea.trim();
-    const composed = composedInspiration.trim();
-    return raw.length >= DIRECT_SCRIPT_MIN_CHARS || composed.length >= 8;
-  }, [storyIdea, composedInspiration]);
+  /** Bumps on textarea input/composition so gate reads live DOM (fixes disabled button when state lags IME/paste). */
+  const [storyFieldTick, setStoryFieldTick] = useState(0);
+
+  const liveStoryForGate = useMemo(() => {
+    void storyFieldTick;
+    return storyIdeaTextareaRef.current?.value ?? storyIdea;
+  }, [storyIdea, storyFieldTick]);
+
+  const composedForGate = useMemo(
+    () => composeInspirationForNel(liveStoryForGate, inspirationFollowUpAnswers),
+    [liveStoryForGate, inspirationFollowUpAnswers],
+  );
+
+  const canRunDramaLive = useMemo(
+    () =>
+      liveStoryForGate.trim().length >= DIRECT_SCRIPT_MIN_CHARS ||
+      composedForGate.trim().length >= 8,
+    [liveStoryForGate, composedForGate],
+  );
 
   const selectedTemplates = useMemo(
     () => templates.filter((tpl) => selectedTemplateIds.includes(tpl.id)),
@@ -262,6 +276,12 @@ export default function Home() {
   }, [selectedTemplateIds]);
 
   const runDramaPipeline = useCallback(async () => {
+    console.log("[ScriptFlow] runDramaPipeline invoked", {
+      pipelineRunning,
+      allSelectedCastConfirmed,
+      selectedTemplateCount: selectedTemplates.length,
+    });
+
     const latestIdea = storyIdeaTextareaRef.current?.value ?? storyIdea;
     if (latestIdea !== storyIdea) {
       setStoryIdea(latestIdea);
@@ -467,7 +487,7 @@ export default function Home() {
   const showProgress = pipelinePhase !== "idle";
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
-  const canGenerate = canRunDrama() && allSelectedCastConfirmed;
+  const canGenerate = canRunDramaLive && allSelectedCastConfirmed;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -548,6 +568,11 @@ export default function Home() {
               onChange={(e) => {
                 setStoryIdea(e.target.value);
                 requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+              }}
+              onInput={() => setStoryFieldTick((n) => n + 1)}
+              onCompositionEnd={(e) => {
+                setStoryIdea(e.currentTarget.value);
+                setStoryFieldTick((n) => n + 1);
               }}
               rows={1}
               placeholder="Describe your story, or paste your full script — any length works."
@@ -729,18 +754,18 @@ export default function Home() {
           >
             {pipelineRunning ? "Working on it…" : "Generate My Drama"}
           </Button>
-          {!canRunDrama() && !pipelineRunning && (
+          {!canRunDramaLive && !pipelineRunning && (
             <p className="mt-2 text-center text-xs text-white/40">
               Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
               characters skips formatting and goes straight to analysis.
             </p>
           )}
-          {canRunDrama() && hasSelectedCast && !allSelectedCastConfirmed && !pipelineRunning && (
+          {canRunDramaLive && hasSelectedCast && !allSelectedCastConfirmed && !pipelineRunning && (
             <p className="mt-2 text-center text-xs text-amber-200/90">
               Please confirm your cast first
             </p>
           )}
-          {canRunDrama() && !pipelineRunning && (
+          {canRunDramaLive && !pipelineRunning && (
             <p
               className={cn(
                 "mt-2 text-center text-xs",
