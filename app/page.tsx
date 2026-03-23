@@ -30,6 +30,7 @@ import { storyboardShotsToNelScriptText } from "@/lib/story-idea-format";
 import {
   bindTemplateCharactersAction,
   listCharacterTemplatesAction,
+  uploadCustomCharacterAction,
 } from "@/actions/character.actions";
 import { createNewProjectAction } from "@/actions/project.actions";
 import {
@@ -60,6 +61,13 @@ type CharacterTemplate = {
   personality: string;
   language_fingerprint: string;
   reference_image_url: string;
+};
+
+type CastConfirmChoice = "template" | "upload";
+
+type CastConfirmation = {
+  choice: CastConfirmChoice;
+  file?: File;
 };
 
 type PipelinePhase =
@@ -135,6 +143,7 @@ export default function Home() {
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [templates, setTemplates] = useState<CharacterTemplate[]>([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  const [castConfirmations, setCastConfirmations] = useState<Record<string, CastConfirmation>>({});
 
   const [storyIdea, setStoryIdea] = useState("");
   /** Follow-up Q&A per dimension; not merged into textarea — merged only when calling backend. */
@@ -176,6 +185,21 @@ export default function Home() {
     return raw.length >= DIRECT_SCRIPT_MIN_CHARS || composed.length >= 8;
   }, [storyIdea, composedInspiration]);
 
+  const selectedTemplates = useMemo(
+    () => templates.filter((tpl) => selectedTemplateIds.includes(tpl.id)),
+    [templates, selectedTemplateIds],
+  );
+
+  const allSelectedCastConfirmed = useMemo(() => {
+    if (selectedTemplates.length === 0) return true;
+    return selectedTemplates.every((tpl) => {
+      const c = castConfirmations[tpl.id];
+      if (!c) return false;
+      if (c.choice === "template") return true;
+      return !!c.file;
+    });
+  }, [selectedTemplates, castConfirmations]);
+
   const showInspirationFollowUps = useMemo(
     () => shouldShowInspirationFollowUps(composedInspiration, false),
     [composedInspiration],
@@ -212,6 +236,17 @@ export default function Home() {
     }
   }, [storyIdea]);
 
+  useEffect(() => {
+    setCastConfirmations((prev) => {
+      const selected = new Set(selectedTemplateIds);
+      const next: Record<string, CastConfirmation> = {};
+      for (const [id, value] of Object.entries(prev)) {
+        if (selected.has(id)) next[id] = value;
+      }
+      return next;
+    });
+  }, [selectedTemplateIds]);
+
   const runDramaPipeline = useCallback(async () => {
     const latestIdea = storyIdeaTextareaRef.current?.value ?? storyIdea;
     if (latestIdea !== storyIdea) {
@@ -230,6 +265,10 @@ export default function Home() {
       setPipelineError(
         "Add a bit more detail (8+ characters), or paste a full script (50+ characters).",
       );
+      return;
+    }
+    if (!allSelectedCastConfirmed) {
+      setPipelineError("Please confirm every selected cast look before generating.");
       return;
     }
 
@@ -271,12 +310,45 @@ export default function Home() {
 
       activePhase = "locking_characters";
       setPipelinePhase("locking_characters");
-      if (selectedTemplateIds.length > 0) {
+      const templateIdsToBind = selectedTemplates
+        .filter((tpl) => {
+          const c = castConfirmations[tpl.id];
+          return c?.choice === "template";
+        })
+        .map((tpl) => tpl.id);
+
+      if (templateIdsToBind.length > 0) {
         const br = await bindTemplateCharactersAction({
           projectId: pid,
-          templateIds: selectedTemplateIds,
+          templateIds: templateIdsToBind,
         });
         if (!br.success) throw new Error(errMsg(br.error));
+      }
+
+      const toBase64 = async (file: File): Promise<string> => {
+        const buf = await file.arrayBuffer();
+        let binary = "";
+        const bytes = new Uint8Array(buf);
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        return btoa(binary);
+      };
+
+      for (const tpl of selectedTemplates) {
+        const c = castConfirmations[tpl.id];
+        if (c?.choice !== "upload" || !c.file) continue;
+        const base64Data = await toBase64(c.file);
+        const ur = await uploadCustomCharacterAction({
+          projectId: pid,
+          name: tpl.name,
+          role: tpl.role,
+          fileName: c.file.name || `${tpl.name}.jpg`,
+          mimeType: c.file.type || "image/jpeg",
+          base64Data,
+        });
+        if (!ur.success) throw new Error(errMsg(ur.error));
       }
 
       activePhase = "generating_prompts";
@@ -319,7 +391,14 @@ export default function Home() {
     } finally {
       setPipelineRunning(false);
     }
-  }, [storyIdea, selectedTemplateIds, inspirationFollowUpAnswers]);
+  }, [
+    storyIdea,
+    selectedTemplateIds,
+    inspirationFollowUpAnswers,
+    allSelectedCastConfirmed,
+    selectedTemplates,
+    castConfirmations,
+  ]);
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -374,6 +453,7 @@ export default function Home() {
   const showProgress = pipelinePhase !== "idle";
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
+  const canGenerate = canRunDrama() && allSelectedCastConfirmed;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -471,7 +551,9 @@ export default function Home() {
 
         <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-sm font-semibold text-amber-400">Cast (optional)</h2>
-          <p className="mt-1 text-xs text-white/45">Choose look templates to lock into your drama.</p>
+          <p className="mt-1 text-xs text-white/45">
+            Choose look templates, then confirm each selected role before generating.
+          </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {templates.map((tpl) => {
               const checked = selectedTemplateIds.includes(tpl.id);
@@ -497,12 +579,95 @@ export default function Home() {
               );
             })}
           </div>
+          {selectedTemplates.length > 0 && (
+            <div className="mt-5 space-y-3">
+              <p className="text-xs text-amber-200/90">
+                Confirm each selected role: choose template look or upload your own photo.
+              </p>
+              {selectedTemplates.map((tpl) => {
+                const c = castConfirmations[tpl.id];
+                const confirmed = !!c && (c.choice === "template" || (c.choice === "upload" && !!c.file));
+                return (
+                  <div
+                    key={`confirm-${tpl.id}`}
+                    className={cn(
+                      "rounded-xl border bg-zinc-950/70 p-3",
+                      confirmed ? "border-emerald-500/40" : "border-amber-500/40",
+                    )}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={tpl.reference_image_url}
+                        alt={tpl.label}
+                        className="h-28 w-24 rounded-lg border border-white/10 object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-white">{tpl.label}</p>
+                        <p className="mt-1 text-xs text-white/50">
+                          {confirmed ? "Confirmed" : "Pending confirmation"}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className={cn(
+                              "rounded-lg border px-3 py-1.5 text-xs font-medium",
+                              c?.choice === "template"
+                                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-200"
+                                : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
+                            )}
+                            onClick={() =>
+                              setCastConfirmations((prev) => ({
+                                ...prev,
+                                [tpl.id]: { choice: "template" },
+                              }))
+                            }
+                          >
+                            Use this look
+                          </button>
+                          <label
+                            className={cn(
+                              "cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium",
+                              c?.choice === "upload"
+                                ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
+                                : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
+                            )}
+                          >
+                            Upload my own photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setCastConfirmations((prev) => ({
+                                  ...prev,
+                                  [tpl.id]: { choice: "upload", file },
+                                }));
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {c?.choice === "upload" && (
+                          <p className="mt-2 text-xs text-white/55">
+                            {c.file ? `Uploaded: ${c.file.name}` : "Please upload a photo to confirm."}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section className="mt-6 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-black/40 p-6">
           <Button
             type="button"
-            disabled={pipelineRunning}
+            disabled={pipelineRunning || !canGenerate}
             className={cn(
               "h-12 w-full bg-amber-500 text-base font-semibold text-black transition-all hover:bg-amber-400 disabled:opacity-40",
               inspirationGenerateReady &&
@@ -523,6 +688,11 @@ export default function Home() {
             <p className="mt-2 text-center text-xs text-white/40">
               Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
               characters skips formatting and goes straight to analysis.
+            </p>
+          )}
+          {canRunDrama() && !allSelectedCastConfirmed && !pipelineRunning && (
+            <p className="mt-2 text-center text-xs text-amber-200/90">
+              Confirm every selected cast role before generating.
             </p>
           )}
           {canRunDrama() && !pipelineRunning && (
