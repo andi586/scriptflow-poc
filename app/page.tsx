@@ -68,6 +68,8 @@ type CastConfirmChoice = "template" | "upload";
 type CastConfirmation = {
   choice: CastConfirmChoice;
   file?: File;
+  /** Blob URL for immediate card preview; revoked when replaced or cleared. */
+  localPreviewUrl?: string;
 };
 
 type PipelinePhase =
@@ -181,10 +183,8 @@ export default function Home() {
   const castHomeFileInputRef = useRef<HTMLInputElement | null>(null);
   /** Which cast row is picking a file (mirrors uploadForId on character-templates page). */
   const [castUploadForTemplateId, setCastUploadForTemplateId] = useState<string | null>(null);
-  /** Object URLs for “upload my own photo” previews (revoked on replace / unmount). */
-  const [castUploadPreviewByTemplateId, setCastUploadPreviewByTemplateId] = useState<
-    Record<string, string>
-  >({});
+  /** Survives re-renders so file onChange always knows the row (avoids stale closure vs. separate preview state). */
+  const castUploadPickTargetIdRef = useRef<string | null>(null);
 
   const startNewLazySession = useCallback(() => {
     clearLazySessionFromStorage();
@@ -195,11 +195,19 @@ export default function Home() {
     setPipelineRunning(false);
     setClipsRefreshNonce(0);
     setLastSubmittedClipTaskIds([]);
-    setCastUploadPreviewByTemplateId((prev) => {
-      Object.values(prev).forEach((u) => URL.revokeObjectURL(u));
-      return {};
+    setCastConfirmations((prev) => {
+      const next: Record<string, CastConfirmation> = {};
+      for (const [id, v] of Object.entries(prev)) {
+        if (v.localPreviewUrl) URL.revokeObjectURL(v.localPreviewUrl);
+        next[id] =
+          v.choice === "upload"
+            ? { choice: "upload", file: v.file }
+            : { choice: "template" };
+      }
+      return next;
     });
     setCastUploadForTemplateId(null);
+    castUploadPickTargetIdRef.current = null;
     setInspirationFollowUpAnswers({});
   }, []);
 
@@ -285,7 +293,11 @@ export default function Home() {
       const selected = new Set(selectedTemplateIds);
       const next: Record<string, CastConfirmation> = {};
       for (const [id, value] of Object.entries(prev)) {
-        if (selected.has(id)) next[id] = value;
+        if (selected.has(id)) {
+          next[id] = value;
+        } else if (value.localPreviewUrl) {
+          URL.revokeObjectURL(value.localPreviewUrl);
+        }
       }
       return next;
     });
@@ -296,30 +308,6 @@ export default function Home() {
       prev && !selectedTemplateIds.includes(prev) ? null : prev,
     );
   }, [selectedTemplateIds]);
-
-  useEffect(() => {
-    const allowed = new Set(selectedTemplateIds);
-    setCastUploadPreviewByTemplateId((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const id of Object.keys(next)) {
-        if (!allowed.has(id)) {
-          URL.revokeObjectURL(next[id]);
-          delete next[id];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [selectedTemplateIds]);
-
-  const castUploadPreviewRef = useRef(castUploadPreviewByTemplateId);
-  castUploadPreviewRef.current = castUploadPreviewByTemplateId;
-  useEffect(() => {
-    return () => {
-      Object.values(castUploadPreviewRef.current).forEach((u) => URL.revokeObjectURL(u));
-    };
-  }, []);
 
   const runDramaPipeline = useCallback(async () => {
     console.log("[ScriptFlow] runDramaPipeline invoked", {
@@ -605,27 +593,6 @@ export default function Home() {
           </>
         ) : (
           <>
-        {pipelinePhase === "done" && projectId.trim() && (
-          <section
-            ref={clipsResultsSectionRef}
-            className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
-            aria-labelledby="clips-results-heading"
-          >
-            <h2 id="clips-results-heading" className="text-base font-semibold text-emerald-300">
-              Your clips
-            </h2>
-            <p className="mt-1 text-xs text-white/50">
-              Tasks were submitted — status and video links update below as PiAPI finishes.
-            </p>
-            <VideoResultsPanel
-              sessionId={projectId}
-              taskIds={lastSubmittedClipTaskIds}
-              refreshNonce={clipsRefreshNonce}
-              title="Scenes"
-            />
-          </section>
-        )}
-
         {/* —— Main lazy flow —— */}
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
           <h2 className="text-sm font-semibold text-amber-400">Your story</h2>
@@ -703,22 +670,26 @@ export default function Home() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  const templateId = castUploadForTemplateId;
+                  const templateId =
+                    castUploadPickTargetIdRef.current ?? castUploadForTemplateId;
                   e.target.value = "";
+                  castUploadPickTargetIdRef.current = null;
                   setCastUploadForTemplateId(null);
                   if (!file || !templateId) return;
 
                   setUploadingCastId(templateId);
                   try {
-                    setCastUploadPreviewByTemplateId((prev) => {
-                      const old = prev[templateId];
-                      if (old) URL.revokeObjectURL(old);
-                      return { ...prev, [templateId]: URL.createObjectURL(file) };
+                    setCastConfirmations((prev) => {
+                      const prevEntry = prev[templateId];
+                      if (prevEntry?.localPreviewUrl) {
+                        URL.revokeObjectURL(prevEntry.localPreviewUrl);
+                      }
+                      const localPreviewUrl = URL.createObjectURL(file);
+                      return {
+                        ...prev,
+                        [templateId]: { choice: "upload", file, localPreviewUrl },
+                      };
                     });
-                    setCastConfirmations((prev) => ({
-                      ...prev,
-                      [templateId]: { choice: "upload", file },
-                    }));
                   } finally {
                     setUploadingCastId((prev) => (prev === templateId ? null : prev));
                   }
@@ -730,10 +701,9 @@ export default function Home() {
               {selectedTemplates.map((tpl) => {
                 const c = castConfirmations[tpl.id];
                 const confirmed = !!c && (c.choice === "template" || (c.choice === "upload" && !!c.file));
-                const uploadPreviewUrl = castUploadPreviewByTemplateId[tpl.id];
                 const cardImageSrc =
-                  c?.choice === "upload" && uploadPreviewUrl
-                    ? uploadPreviewUrl
+                  c?.choice === "upload" && c.localPreviewUrl
+                    ? c.localPreviewUrl
                     : resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL);
                 return (
                   <div
@@ -746,6 +716,7 @@ export default function Home() {
                     <div className="flex flex-col gap-3 sm:flex-row">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
+                        key={c?.localPreviewUrl ?? `${tpl.id}-${c?.choice}-ref`}
                         src={cardImageSrc}
                         alt={tpl.label}
                         className="h-28 w-24 rounded-lg border border-white/10 object-cover"
@@ -772,18 +743,16 @@ export default function Home() {
                                 : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
                             )}
                             onClick={() => {
-                              setCastUploadPreviewByTemplateId((prev) => {
-                                const old = prev[tpl.id];
-                                if (!old) return prev;
-                                const next = { ...prev };
-                                delete next[tpl.id];
-                                URL.revokeObjectURL(old);
-                                return next;
+                              setCastConfirmations((prev) => {
+                                const cur = prev[tpl.id];
+                                if (cur?.localPreviewUrl) {
+                                  URL.revokeObjectURL(cur.localPreviewUrl);
+                                }
+                                return {
+                                  ...prev,
+                                  [tpl.id]: { choice: "template" },
+                                };
                               });
-                              setCastConfirmations((prev) => ({
-                                ...prev,
-                                [tpl.id]: { choice: "template" },
-                              }));
                             }}
                           >
                             Use this look
@@ -808,6 +777,7 @@ export default function Home() {
                             onClick={() => {
                               if (pipelineRunning || uploadingCastId) return;
                               if (castUploadForTemplateId === tpl.id) return;
+                              castUploadPickTargetIdRef.current = tpl.id;
                               setCastUploadForTemplateId(tpl.id);
                               requestAnimationFrame(() => castHomeFileInputRef.current?.click());
                             }}
@@ -899,6 +869,27 @@ export default function Home() {
           )}
 
         </section>
+
+        {pipelinePhase === "done" && projectId.trim() && (
+          <section
+            ref={clipsResultsSectionRef}
+            className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
+            aria-labelledby="clips-results-heading"
+          >
+            <h2 id="clips-results-heading" className="text-base font-semibold text-emerald-300">
+              Your clips
+            </h2>
+            <p className="mt-1 text-xs text-white/50">
+              Tasks were submitted — status and video links update below as PiAPI finishes.
+            </p>
+            <VideoResultsPanel
+              sessionId={projectId}
+              taskIds={lastSubmittedClipTaskIds}
+              refreshNonce={clipsRefreshNonce}
+              title="Scenes"
+            />
+          </section>
+        )}
           </>
         )}
       </main>
