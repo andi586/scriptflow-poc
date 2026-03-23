@@ -14,6 +14,9 @@ const DEFAULT_LAZY_MODEL =
   process.env.NEL_LAZY_MODEL?.trim() || "claude-haiku-4-5-20251001";
 /** Keep Claude prompt payload compact to reduce serverless timeout risk. */
 const NEL_PROMPT_BUDGET_CHARS = 2000;
+/** Must stay at the top of system prompt so truncation never drops it. */
+const NEL_OUTPUT_GUARD =
+  "Respond ONLY in English. Do not use any Chinese characters in your response. Return pure JSON only, no markdown, no explanation.";
 
 function trimToChars(input: string, maxChars: number): string {
   if (maxChars <= 0) return "";
@@ -49,10 +52,12 @@ export async function parseScript(
 
   const profile = options?.profile ?? "full";
   const lazy = profile === "lazy";
-  const systemBase = lazy ? NEL_SENTINEL_PROMPT_LAZY : NEL_SENTINEL_PROMPT;
+  const systemBase = `${NEL_OUTPUT_GUARD}\n\n${
+    lazy ? NEL_SENTINEL_PROMPT_LAZY : NEL_SENTINEL_PROMPT
+  }`;
   const userBase = lazy
-    ? `请分析以下短剧剧本（输出紧凑 JSON）：\n\n${scriptText}`
-    : `请分析以下短剧剧本：\n\n${scriptText}\n\n输出完整的故事记忆库JSON。`;
+    ? `Analyze the short drama script below and return compact valid JSON:\n\n${scriptText}`
+    : `Analyze the short drama script below:\n\n${scriptText}\n\nReturn complete story-memory JSON.`;
   const { system, user } = buildBoundedNelPayload(systemBase, userBase);
   const model = lazy ? DEFAULT_LAZY_MODEL : DEFAULT_SONNET;
   const max_tokens = lazy ? 3072 : 4096;
@@ -84,7 +89,9 @@ export async function parseScript(
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonText);
-  } catch {
+  } catch (e) {
+    console.error("[NEL parseScript] JSON parse failed. Raw Claude response:");
+    console.error(textContent.text);
     throw new Error(`JSON解析失败：${jsonText.substring(0, 200)}`);
   }
 
