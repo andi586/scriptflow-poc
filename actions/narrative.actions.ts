@@ -90,6 +90,19 @@ const piapiHeaders = (key: string) => ({
 
 const piapiGetHeaders = (key: string) => ({ "x-api-key": key });
 
+const VEO3_TWO_CHARACTER_KEYWORDS = [
+  "both",
+  "together",
+  "stands before",
+  "appears behind",
+  "faces each other",
+] as const;
+
+function shouldUseVeo3ForScenePrompt(prompt: string): boolean {
+  const s = (prompt || "").toLowerCase();
+  return VEO3_TWO_CHARACTER_KEYWORDS.some((kw) => s.includes(kw));
+}
+
 export async function analyzeScriptAction(input: {
   projectId: string;
   scriptText: string;
@@ -588,21 +601,32 @@ export async function submitKlingTasksAction(input: {
         characterRefs,
       );
 
+      const useVeo3 = shouldUseVeo3ForScenePrompt(finalPrompt);
+      const modelUsed = useVeo3 ? "veo3" : "kling";
+
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
       // `input.elements`: [{ image_url } x 1–4], plus mode/version per docs.
-      const input = buildKlingVideoGenerationInput({
-        prompt: finalPrompt,
-        aspectRatio: KLING_VIDEO_ASPECT_RATIO,
-        duration: 5,
-        referenceImageUrls,
-      });
-      // Kling Elements uses `elements: [{ image_url }]`.
-
-      const payload = {
-        model: "kling",
-        task_type: "video_generation",
-        input,
-      };
+      const payload = useVeo3
+        ? {
+            model: "veo3",
+            task_type: "veo3-video-fast",
+            input: {
+              prompt: finalPrompt,
+              aspect_ratio: "9:16",
+              duration: 8,
+              resolution: "720p",
+            },
+          }
+        : {
+            model: "kling",
+            task_type: "video_generation",
+            input: buildKlingVideoGenerationInput({
+              prompt: finalPrompt,
+              aspectRatio: KLING_VIDEO_ASPECT_RATIO,
+              duration: 5,
+              referenceImageUrls,
+            }),
+          };
 
       const res = await fetch(`${base}/task`, {
         method: "POST",
@@ -618,6 +642,7 @@ export async function submitKlingTasksAction(input: {
           project_id: projectId,
           task_id: `failed_${item.beat_number}_${Date.now()}`,
           scene_index: item.beat_number,
+          model_used: modelUsed,
           status: "failed",
           error_message: `Submit failed: ${res.status} ${text}`,
         });
@@ -635,6 +660,7 @@ export async function submitKlingTasksAction(input: {
           project_id: projectId,
           task_id: `missing_${item.beat_number}_${Date.now()}`,
           scene_index: item.beat_number,
+          model_used: modelUsed,
           status: "failed",
           error_message: "Submit response missing task_id",
         });
@@ -646,6 +672,7 @@ export async function submitKlingTasksAction(input: {
         project_id: projectId,
         task_id: taskId,
         scene_index: item.beat_number,
+        model_used: modelUsed,
         status: "processing",
         video_url: null,
         error_message: null,
