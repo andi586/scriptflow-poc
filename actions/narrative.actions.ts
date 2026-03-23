@@ -516,6 +516,7 @@ export async function submitKlingTasksAction(input: {
         typeof c.reference_image_url === "string" ? c.reference_image_url.trim() : "",
       )
       .filter((u) => /^https:\/\//i.test(u));
+    const primaryReferenceImage = referenceImageUrls[0];
 
     // 1) Check DB first: if this project+scene already has processing/success, reuse it.
     const { data: existingRows, error: existingError } = await supabase
@@ -574,6 +575,11 @@ export async function submitKlingTasksAction(input: {
         duration: 5,
         referenceImageUrls,
       });
+      if (primaryReferenceImage) {
+        // Explicitly forward a single reference image for providers/integrations
+        // that read `reference_image` in addition to Kling Elements `elements`.
+        (input as Record<string, unknown>).reference_image = primaryReferenceImage;
+      }
 
       const payload = {
         model: "kling",
@@ -874,9 +880,8 @@ async function fetchKlingTasksForProjectAggregated(
 }
 
 /**
- * Aligns UI rows to the caller's task_id order (same length as input).
- * If the same task_id appears in multiple scenes, each list position still gets a row;
- * PiAPI id is always the real `task_id` from DB (latest row by created_at when duplicates exist).
+ * Fetch tasks by `task_id` and sort by DB `scene_index` (source of truth).
+ * Never derives scene order/number from caller array indices.
  */
 async function fetchKlingTasksAlignedToOrderedTaskIds(
   supabase: ReturnType<typeof createClient>,
@@ -917,18 +922,16 @@ async function fetchKlingTasksAlignedToOrderedTaskIds(
     });
   }
 
-  return trimmed.map((tid, idx) => {
-    const t = bestByTaskId.get(tid);
-    if (t) {
-      const beat = t.beat_number > 0 ? t.beat_number : idx + 1;
-      return { ...t, beat_number: beat };
-    }
-    return {
-      beat_number: idx + 1,
-      task_id: tid,
-      status: "processing",
-    };
-  });
+  const alignedRows = trimmed
+    .map((tid) => {
+      const t = bestByTaskId.get(tid);
+      if (!t) return null;
+      return { ...t, beat_number: t.beat_number > 0 ? t.beat_number : 0 };
+    })
+    .filter((t): t is KlingTaskItem => t !== null);
+
+  alignedRows.sort((a, b) => a.beat_number - b.beat_number);
+  return alignedRows;
 }
 
 /** All PiAPI task_ids for a project, one per scene_index (latest row), sorted by scene. */
