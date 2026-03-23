@@ -602,9 +602,10 @@ export default function Home() {
                     <div className="flex flex-col gap-3 sm:flex-row">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={tpl.reference_image_url}
+                        src={tpl.reference_image_url || "https://placehold.co/240x320?text=No+Image"}
                         alt={tpl.label}
                         className="h-28 w-24 rounded-lg border border-white/10 object-cover"
+                        referrerPolicy="no-referrer"
                         onError={(e) => {
                           const img = e.currentTarget;
                           if (img.dataset.fallbackApplied === "1") return;

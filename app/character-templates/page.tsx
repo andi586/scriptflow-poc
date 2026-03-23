@@ -256,10 +256,17 @@ export default function CharacterTemplatesPage() {
                   <div className="aspect-[2/3] w-full overflow-hidden bg-zinc-900">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={tpl.reference_image_url}
+                      src={tpl.reference_image_url || "https://placehold.co/400x600?text=No+Image"}
                       alt={tpl.name}
                       className="h-full w-full object-cover"
                       loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.dataset.fallbackApplied === "1") return;
+                        img.dataset.fallbackApplied = "1";
+                        img.src = "https://placehold.co/400x600?text=Image+Unavailable";
+                      }}
                     />
                   </div>
                   <CardHeader className="pb-2">
