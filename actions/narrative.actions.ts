@@ -516,7 +516,6 @@ export async function submitKlingTasksAction(input: {
         typeof c.reference_image_url === "string" ? c.reference_image_url.trim() : "",
       )
       .filter((u) => /^https:\/\//i.test(u));
-    const primaryReferenceImage = referenceImageUrls[0];
 
     // 1) Check DB first: if this project+scene already has processing/success, reuse it.
     const { data: existingRows, error: existingError } = await supabase
@@ -575,11 +574,9 @@ export async function submitKlingTasksAction(input: {
         duration: 5,
         referenceImageUrls,
       });
-      if (primaryReferenceImage) {
-        // Explicitly forward a single reference image for providers/integrations
-        // that read `reference_image` in addition to Kling Elements `elements`.
-        (input as Record<string, unknown>).reference_image = primaryReferenceImage;
-      }
+      // TODO(piapi-research): keep pure text-driven mode for now.
+      // Re-introduce explicit character-consistency image params only after
+      // confirming PiAPI's canonical fields for this task type/version.
 
       const payload = {
         model: "kling",
