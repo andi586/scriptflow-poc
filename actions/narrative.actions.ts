@@ -1140,6 +1140,52 @@ export async function pollSingleSessionKlingVideoTaskAction(input: {
   }
 }
 
+/**
+ * Re-submit one failed scene to PiAPI Kling, then return session-aligned tasks.
+ */
+export async function retrySessionKlingSceneSubmitAction(input: {
+  sessionId: string;
+  sceneIndex: number;
+  taskIds: string[];
+}): Promise<ActionResult<{ tasks: KlingTaskItem[]; errorMessage?: string }>> {
+  try {
+    const projectId = requireProjectId(input.sessionId);
+    const sceneIndex = Number(input.sceneIndex);
+    if (!Number.isFinite(sceneIndex) || sceneIndex <= 0) {
+      return { success: false, error: "Invalid scene index." };
+    }
+
+    const promptsRes = await generateKlingPromptsAction({ projectId });
+    if (!promptsRes.success) {
+      return { success: false, error: promptsRes.error };
+    }
+    const targetPrompt = promptsRes.data.prompts.find((p) => p.beat_number === sceneIndex);
+    if (!targetPrompt) {
+      return { success: false, error: `No prompt found for scene ${sceneIndex}.` };
+    }
+
+    const submitRes = await submitKlingTasksAction({
+      projectId,
+      prompts: [targetPrompt],
+    });
+    if (!submitRes.success) {
+      return { success: false, error: submitRes.error };
+    }
+
+    const ordered = input.taskIds.map((t) => t.trim()).filter(Boolean);
+    const latestTaskId = submitRes.data.tasks[0]?.task_id?.trim();
+    if (latestTaskId && !ordered.includes(latestTaskId)) {
+      ordered.push(latestTaskId);
+    }
+
+    const supabase = createClient();
+    const tasks = await fetchKlingTasksAlignedToOrderedTaskIds(supabase, projectId, ordered);
+    return { success: true, data: { tasks } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
+  }
+}
+
 async function pollOneKlingTaskFromVideoApi(
   supabase: ReturnType<typeof createClient>,
   projectId: string,

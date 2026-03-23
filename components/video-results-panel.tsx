@@ -7,6 +7,7 @@ import {
   listKlingTaskIdsForSessionAction,
   pollSessionKlingVideoStatusAction,
   pollSingleSessionKlingVideoTaskAction,
+  retrySessionKlingSceneSubmitAction,
   resolveKlingVideoPlaybackUrlAction,
   type KlingTaskItem,
 } from "@/actions/narrative.actions";
@@ -101,6 +102,7 @@ export function VideoResultsPanel({
   const [playbackResolving, setPlaybackResolving] = useState<Record<string, boolean>>({});
   const [playbackErrorByTaskId, setPlaybackErrorByTaskId] = useState<Record<string, string>>({});
   const [downloadBusyTaskId, setDownloadBusyTaskId] = useState<string | null>(null);
+  const [retrySubmittingByTaskId, setRetrySubmittingByTaskId] = useState<Record<string, boolean>>({});
   const [autoPollActive, setAutoPollActive] = useState(false);
   const [dbTaskIds, setDbTaskIds] = useState<string[] | undefined>(undefined);
   const [dbLoadError, setDbLoadError] = useState<string | null>(null);
@@ -274,6 +276,40 @@ export function VideoResultsPanel({
       }
     },
     [sessionId],
+  );
+
+  const retryClipSubmit = useCallback(
+    async (task: KlingTaskItem) => {
+      const taskId = getTaskIdKey(task);
+      if (!sessionId.trim() || !taskId) return;
+      if (retrySubmittingByTaskId[taskId]) return;
+      const ids = taskIdsRef.current.map((t) => t.trim()).filter(Boolean);
+      setClipPollErrors((prev) => {
+        const n = { ...prev };
+        delete n[taskId];
+        return n;
+      });
+      setRetrySubmittingByTaskId((prev) => ({ ...prev, [taskId]: true }));
+      try {
+        const res = await retrySessionKlingSceneSubmitAction({
+          sessionId,
+          sceneIndex: task.beat_number,
+          taskIds: ids,
+        });
+        if (res.success) {
+          setTasks(res.data.tasks);
+          return;
+        }
+        setClipPollErrors((prev) => ({ ...prev, [taskId]: res.error }));
+      } finally {
+        setRetrySubmittingByTaskId((prev) => {
+          const n = { ...prev };
+          delete n[taskId];
+          return n;
+        });
+      }
+    },
+    [sessionId, retrySubmittingByTaskId],
   );
 
   const downloadAllAsZip = useCallback(async () => {
@@ -519,9 +555,10 @@ export function VideoResultsPanel({
                       size="sm"
                       variant="outline"
                       className="h-7 border-amber-500/40 text-xs text-amber-200"
-                      onClick={() => void retryClipPoll(piTid || task.task_id)}
+                      disabled={!!retrySubmittingByTaskId[piTid]}
+                      onClick={() => void retryClipSubmit(task)}
                     >
-                      重试
+                      {retrySubmittingByTaskId[piTid] ? "重试提交中…" : "重试"}
                     </Button>
                   </div>
                 )}
@@ -533,9 +570,19 @@ export function VideoResultsPanel({
                       size="sm"
                       variant="outline"
                       className="h-7 border-amber-500/40 text-xs text-amber-200"
+                      disabled={!!retrySubmittingByTaskId[piTid]}
+                      onClick={() => void retryClipSubmit(task)}
+                    >
+                      {retrySubmittingByTaskId[piTid] ? "重试提交中…" : "重试"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 border-white/20 text-xs text-white/70"
                       onClick={() => void retryClipPoll(piTid || task.task_id)}
                     >
-                      重试
+                      仅刷新状态
                     </Button>
                   </div>
                 )}
