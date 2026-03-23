@@ -22,10 +22,10 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci --omit=optional --no-audit --no-fund
+      - name: Install migration runtime dependency only
+        run: npm install --no-save --no-audit --no-fund pg@8
 
       - name: Apply pending migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npm run db:migrate
+        run: node scripts/apply-all-migrations.cjs

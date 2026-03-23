@@ -6,7 +6,7 @@
  *
  * Requires DATABASE_URL (Supabase → Settings → Database → URI, use pooler or direct).
  *
- * Usage:
+ * Usage (CI installs only pg, then runs this script directly):
  *   npm run db:migrate
  *   DATABASE_URL=postgres://... node scripts/apply-all-migrations.cjs
  */
