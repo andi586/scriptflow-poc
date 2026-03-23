@@ -208,14 +208,14 @@ export async function uploadCustomCharacterAction(input: {
     const fileBuffer = Buffer.from(input.base64Data, "base64");
 
     const { error: uploadError } = await supabase.storage
-      .from("character-references")
+      .from("character-images")
       .upload(path, fileBuffer, {
         upsert: true,
         contentType: input.mimeType || "application/octet-stream",
       });
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from("character-references").getPublicUrl(path);
+    const { data } = supabase.storage.from("character-images").getPublicUrl(path);
     const referenceImageUrl = data.publicUrl;
 
     const appearanceLine = `${input.name} appearance locked by uploaded reference image.`;

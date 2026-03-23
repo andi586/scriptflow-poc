@@ -37,23 +37,6 @@ function storageObjectFileName(originalName: string, contentType: string) {
   return `${stem || "image"}.${ext}`;
 }
 
-function extractStorageObjectPathFromUrl(rawUrl: string, bucket: string): string | null {
-  const url = rawUrl.trim();
-  if (!url) return null;
-  // Already a direct storage path
-  if (!/^https?:\/\//i.test(url)) return url.replace(/^\/+/, "");
-  try {
-    const u = new URL(url);
-    const marker = `/storage/v1/object/public/${bucket}/`;
-    const idx = u.pathname.indexOf(marker);
-    if (idx === -1) return null;
-    const path = u.pathname.slice(idx + marker.length);
-    return decodeURIComponent(path).replace(/^\/+/, "");
-  } catch {
-    return null;
-  }
-}
-
 export default function CharacterTemplatesPage() {
   const [templates, setTemplates] = useState<CharacterTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,19 +69,7 @@ export default function CharacterTemplatesPage() {
       };
       if (!res.ok) throw new Error(data.error ?? res.statusText);
       const rows = data.templates ?? [];
-      const supabase = createClient();
-      const signedRows = await Promise.all(
-        rows.map(async (tpl) => {
-          const objectPath = extractStorageObjectPathFromUrl(tpl.reference_image_url, "character-images");
-          if (!objectPath) return tpl;
-          const { data: signed, error: signedErr } = await supabase.storage
-            .from("character-images")
-            .createSignedUrl(objectPath, 3600);
-          if (signedErr || !signed?.signedUrl) return tpl;
-          return { ...tpl, reference_image_url: signed.signedUrl };
-        }),
-      );
-      setTemplates(signedRows);
+      setTemplates(rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

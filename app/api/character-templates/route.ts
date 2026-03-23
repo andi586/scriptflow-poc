@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAnonClient, createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/server";
 import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,13 @@ function extractCharacterImagesObjectPath(rawUrl: string): string | null {
   }
 }
 
+function buildCharacterImagesPublicUrl(path: string): string {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+  const normalizedPath = path.replace(/^\/+/, "");
+  if (!base) return `/storage/v1/object/public/character-images/${normalizedPath}`;
+  return `${base}/storage/v1/object/public/character-images/${normalizedPath}`;
+}
+
 export async function GET() {
   try {
     const supabase = createAnonClient();
@@ -33,20 +40,13 @@ export async function GET() {
 
     if (error) throw error;
     const templates = (data ?? []) as CharacterTemplateRow[];
-    const signer = createClient();
-    const signed = await Promise.all(
-      templates.map(async (tpl) => {
-        const path = extractCharacterImagesObjectPath(tpl.reference_image_url ?? "");
-        if (!path) return tpl;
-        const { data: signedData, error: signedErr } = await signer.storage
-          .from("character-images")
-          .createSignedUrl(path, 3600);
-        if (signedErr || !signedData?.signedUrl) return tpl;
-        return { ...tpl, reference_image_url: signedData.signedUrl };
-      }),
-    );
+    const normalized = templates.map((tpl) => {
+      const path = extractCharacterImagesObjectPath(tpl.reference_image_url ?? "");
+      if (!path) return tpl;
+      return { ...tpl, reference_image_url: buildCharacterImagesPublicUrl(path) };
+    });
 
-    return NextResponse.json({ templates: signed });
+    return NextResponse.json({ templates: normalized });
   } catch (e) {
     const message = e instanceof Error ? e.message : JSON.stringify(e);
     return NextResponse.json({ error: message }, { status: 500 });
