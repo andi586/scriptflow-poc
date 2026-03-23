@@ -162,6 +162,8 @@ export default function Home() {
 
   /** Read live DOM before pipeline — fixes first-click no-op when controlled state lags (IME / autofill / paste). */
   const storyIdeaTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  /** Per-template hidden file inputs; explicit click() is more reliable on mobile Safari. */
+  const castUploadInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const startNewLazySession = useCallback(() => {
     clearLazySessionFromStorage();
@@ -626,30 +628,46 @@ export default function Home() {
                           >
                             Use this look
                           </button>
-                          <label
+                          <button
+                            type="button"
                             className={cn(
                               "cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium",
                               c?.choice === "upload"
                                 ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
                                 : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
                             )}
+                            onClick={() => {
+                              const input = castUploadInputRefs.current[tpl.id];
+                              if (!input) return;
+                              // Reset so selecting the same file still triggers onChange on iOS/desktop.
+                              input.value = "";
+                              input.click();
+                            }}
                           >
                             Upload my own photo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                setCastConfirmations((prev) => ({
-                                  ...prev,
-                                  [tpl.id]: { choice: "upload", file },
-                                }));
-                                e.currentTarget.value = "";
-                              }}
-                            />
-                          </label>
+                          </button>
+                          <input
+                            ref={(el) => {
+                              castUploadInputRefs.current[tpl.id] = el;
+                            }}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="sr-only"
+                            onClick={(e) => {
+                              // Keeps change event firing when user picks the same image again.
+                              e.currentTarget.value = "";
+                            }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setCastConfirmations((prev) => ({
+                                ...prev,
+                                [tpl.id]: { choice: "upload", file },
+                              }));
+                              e.currentTarget.value = "";
+                            }}
+                          />
                         </div>
                         {c?.choice === "upload" && (
                           <p className="mt-2 text-xs text-white/55">
