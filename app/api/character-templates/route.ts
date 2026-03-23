@@ -43,21 +43,50 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAnonClient();
-    const { data, error } = await supabase
+    const { data: existingRows, error: existingError } = await supabase
       .from("character_templates")
-      .insert({
-        name,
-        archetype,
-        style_tags,
-        reference_image_url,
-        kling_prompt_base,
-      })
-      .select("*")
-      .single();
+      .select("id, created_at")
+      .ilike("name", name)
+      .ilike("archetype", archetype)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (existingError) throw existingError;
+
+    let data: CharacterTemplateRow | null = null;
+    let error: { message?: string } | null = null;
+    const existingId = existingRows?.[0]?.id;
+    if (existingId) {
+      const updated = await supabase
+        .from("character_templates")
+        .update({
+          style_tags,
+          reference_image_url,
+          kling_prompt_base,
+        })
+        .eq("id", existingId)
+        .select("*")
+        .single();
+      data = (updated.data as CharacterTemplateRow | null) ?? null;
+      error = updated.error;
+    } else {
+      const created = await supabase
+        .from("character_templates")
+        .insert({
+          name,
+          archetype,
+          style_tags,
+          reference_image_url,
+          kling_prompt_base,
+        })
+        .select("*")
+        .single();
+      data = (created.data as CharacterTemplateRow | null) ?? null;
+      error = created.error;
+    }
 
     if (error) throw error;
 
-    return NextResponse.json({ template: data as CharacterTemplateRow }, { status: 201 });
+    return NextResponse.json({ template: data as CharacterTemplateRow }, { status: existingId ? 200 : 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : JSON.stringify(e);
     return NextResponse.json({ error: message }, { status: 500 });

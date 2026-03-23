@@ -85,6 +85,7 @@ export default function CharacterTemplatesPage() {
     const templateId = uploadForId;
     e.target.value = "";
     if (!file || !templateId) return;
+    if (uploadingId) return;
 
     if (!isJpgPngWebpFile(file)) {
       setError("仅支持 JPG、PNG、WebP 格式");
@@ -96,7 +97,8 @@ export default function CharacterTemplatesPage() {
     try {
       const { blob, contentType } = await prepareImageForUpload(file);
       const supabase = createClient();
-      const objectName = `${Date.now()}_${storageObjectFileName(file.name, contentType)}`;
+      const objectName = storageObjectFileName(`reference.${file.name}`, contentType);
+      /** One template keeps one current reference file path; re-upload replaces instead of creating more. */
       const objectPath = `${templateId}/${objectName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -278,9 +280,11 @@ export default function CharacterTemplatesPage() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={uploadingId === tpl.id}
+                      disabled={!!uploadingId || uploadForId === tpl.id}
                       className="w-full border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
                       onClick={() => {
+                        if (uploadingId) return;
+                        if (uploadForId === tpl.id) return;
                         setUploadForId(tpl.id);
                         setError(null);
                         requestAnimationFrame(() => fileInputRef.current?.click());
