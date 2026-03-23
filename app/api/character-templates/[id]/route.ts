@@ -4,6 +4,7 @@ import type { CharacterTemplateRow } from "@/lib/character-templates-db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
