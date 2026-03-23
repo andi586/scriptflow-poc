@@ -129,6 +129,7 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e.message || e);
+  console.error("[db:migrate] failed:", e.message || e);
+  if (e && e.stack) console.error(e.stack);
   process.exit(1);
 });
