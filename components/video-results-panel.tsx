@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Play } from "lucide-react";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import {
   listKlingTaskIdsForSessionAction,
   pollSessionKlingVideoStatusAction,
@@ -97,10 +99,14 @@ export function VideoResultsPanel({
   const [clipPollErrors, setClipPollErrors] = useState<Record<string, string>>({});
   const [videoUnlocked, setVideoUnlocked] = useState<Record<string, boolean>>({});
   const [zipBusy, setZipBusy] = useState(false);
+  const [mergeBusy, setMergeBusy] = useState(false);
+  const [mergeProgress, setMergeProgress] = useState(0);
+  const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
   /** Fresh URLs from PiAPI at play/download time (not stale DB video_url). */
   const [playUrlByTaskId, setPlayUrlByTaskId] = useState<Record<string, string>>({});
   const [playbackResolving, setPlaybackResolving] = useState<Record<string, boolean>>({});
   const [playbackErrorByTaskId, setPlaybackErrorByTaskId] = useState<Record<string, string>>({});
+  const [, setVideoError] = useState(false);
   const [downloadBusyTaskId, setDownloadBusyTaskId] = useState<string | null>(null);
   const [retrySubmittingByTaskId, setRetrySubmittingByTaskId] = useState<Record<string, boolean>>({});
   const [autoPollActive, setAutoPollActive] = useState(false);
@@ -379,6 +385,80 @@ export function VideoResultsPanel({
     }
   }, [tasks, fetchFreshPlaybackUrl]);
 
+  const exportFinalVideo = useCallback(async () => {
+    const clips = tasks
+      .filter((t) => t.status === "success")
+      .slice()
+      .sort((a, b) => a.beat_number - b.beat_number);
+    if (clips.length === 0) return;
+
+    setMergeBusy(true);
+    setMergeProgress(0);
+    if (mergedVideoUrl) {
+      URL.revokeObjectURL(mergedVideoUrl);
+      setMergedVideoUrl(null);
+    }
+
+    try {
+      const ffmpeg = new FFmpeg();
+      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+      });
+      ffmpeg.on("progress", ({ progress }) => {
+        setMergeProgress(Math.max(0, Math.min(1, progress)));
+      });
+
+      const lines: string[] = [];
+      for (let i = 0; i < clips.length; i += 1) {
+        const t = clips[i];
+        const fileName = `scene_${String(t.beat_number).padStart(3, "0")}.mp4`;
+        const source =
+          typeof t.output_url === "string" && t.output_url.trim()
+            ? t.output_url.trim()
+            : typeof t.video_url === "string"
+              ? t.video_url.trim()
+              : "";
+        if (!source) throw new Error(`Missing video URL for scene ${t.beat_number}`);
+        await ffmpeg.writeFile(fileName, await fetchFile(source));
+        lines.push(`file '${fileName}'`);
+      }
+
+      await ffmpeg.writeFile("concat.txt", new TextEncoder().encode(lines.join("\n")));
+      await ffmpeg.exec([
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        "concat.txt",
+        "-c",
+        "copy",
+        "output.mp4",
+      ]);
+
+      const out = await ffmpeg.readFile("output.mp4");
+      if (typeof out === "string") {
+        throw new Error("FFmpeg output.mp4 read as text unexpectedly");
+      }
+      const bytes = new Uint8Array(out.byteLength);
+      bytes.set(out);
+      const blobUrl = URL.createObjectURL(new Blob([bytes.buffer], { type: "video/mp4" }));
+      setMergedVideoUrl(blobUrl);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = "final_video.mp4";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("[VideoResultsPanel] merge/export failed", err);
+    } finally {
+      setMergeBusy(false);
+    }
+  }, [tasks, mergedVideoUrl]);
+
   useEffect(() => {
     if (!sessionId.trim() || stillResolvingIds) {
       if (lazyPollIntervalRef.current) {
@@ -455,6 +535,8 @@ export function VideoResultsPanel({
   }
 
   if (effectiveIds.length === 0) return null;
+
+  const canExportFinal = tasks.length > 0 && tasks.every((t) => t.status === "success");
 
   return (
     <div className={className}>
@@ -609,7 +691,14 @@ export function VideoResultsPanel({
                         onPlay={() =>
                           setVideoUnlocked((u) => ({ ...u, [piTid]: true }))
                         }
-                        onError={() => {
+                        onError={(e) => {
+                          const video = e.currentTarget;
+                          console.error("[VideoPlayer] load failed:", {
+                            src: video.src,
+                            errorCode: video.error?.code,
+                            errorMessage: video.error?.message,
+                          });
+                          setVideoError(true);
                           if (intentionalPlaybackLoadRef.current.has(piTid)) {
                             return;
                           }
@@ -799,6 +888,28 @@ export function VideoResultsPanel({
             );
           })}
         </div>
+        {canExportFinal && (
+          <div className="pt-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={mergeBusy}
+              onClick={() => void exportFinalVideo()}
+              className="border border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25"
+            >
+              {mergeBusy ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
+                  正在合并... {Math.round(mergeProgress * 100)}%
+                </>
+              ) : mergedVideoUrl ? (
+                <>下载成片 ✓</>
+              ) : (
+                <>合并成片 / Export Final Video</>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
