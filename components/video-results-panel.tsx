@@ -594,7 +594,7 @@ export function VideoResultsPanel({
                         {playbackErrorByTaskId[piTid]}
                       </p>
                     )}
-                    <div className="relative z-10 mt-3 overflow-hidden rounded-lg border border-white/10 bg-black">
+                    <div className="relative z-10 mt-3 max-w-full overflow-hidden rounded-lg border border-white/10 bg-black">
                       <video
                         key={piTid}
                         ref={(el) => {
