@@ -43,6 +43,8 @@ import {
 } from "@/lib/inspiration-follow-up";
 import { cn } from "@/lib/utils";
 import type { CharacterRole } from "@/types";
+import { prepareImageForUpload } from "@/lib/image-compress";
+import { createClient } from "@/lib/supabase/client";
 
 /** Pasted scripts at least this long skip idea→9-shot formatting and go straight to NEL. */
 const DIRECT_SCRIPT_MIN_CHARS = 50;
@@ -88,6 +90,26 @@ type PipelinePhase =
   | "done"
   | "error";
 const CAST_IMAGE_PLACEHOLDER_URL = "https://placehold.co/240x320?text=No+Image";
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+
+function isJpgPngWebpFile(file: File): boolean {
+  const t = (file.type || "").toLowerCase();
+  if (ALLOWED_IMAGE_TYPES.has(t)) return true;
+  return /\.(jpe?g|png|webp)$/i.test(file.name);
+}
+
+function storageObjectFileName(originalName: string, contentType: string) {
+  const stem = originalName
+    .replace(/\.[a-zA-Z0-9]+$/, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 120);
+  const ext = contentType.includes("png")
+    ? "png"
+    : contentType.includes("webp")
+      ? "webp"
+      : "jpg";
+  return `${stem || "image"}.${ext}`;
+}
 
 function errMsg(e: unknown): string {
   return formatUnknownError(e);
@@ -766,23 +788,84 @@ export default function Home() {
                   castUploadPickTargetIdRef.current = null;
                   setCastUploadForTemplateId(null);
                   if (!file || !templateId) return;
+                  if (!isJpgPngWebpFile(file)) return;
 
+                  const tpl = templates.find((t) => t.id === templateId);
+                  const isUuid =
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+                      templateId,
+                    );
                   setUploadingCastId(templateId);
-                  try {
-                    setCastConfirmations((prev) => {
-                      const prevEntry = prev[templateId];
-                      if (prevEntry?.localPreviewUrl) {
-                        URL.revokeObjectURL(prevEntry.localPreviewUrl);
+                  void (async () => {
+                    try {
+                      setCastConfirmations((prev) => {
+                        const prevEntry = prev[templateId];
+                        if (prevEntry?.localPreviewUrl) {
+                          URL.revokeObjectURL(prevEntry.localPreviewUrl);
+                        }
+                        const localPreviewUrl = URL.createObjectURL(file);
+                        return {
+                          ...prev,
+                          [templateId]: {
+                            choice: "upload",
+                            file,
+                            localPreviewUrl,
+                            remotePreviewUrl: prevEntry?.remotePreviewUrl,
+                            libraryTemplateId: templateId.trim(),
+                          },
+                        };
+                      });
+
+                      if (!isUuid) return;
+                      const { blob, contentType } = await prepareImageForUpload(file);
+                      const supabase = createClient();
+                      const objectName = storageObjectFileName(`reference.${file.name}`, contentType);
+                      const objectPath = `${templateId}/${objectName}`;
+                      const { error: uploadError } = await supabase.storage
+                        .from("character-images")
+                        .upload(objectPath, blob, {
+                          contentType,
+                          upsert: true,
+                        });
+                      if (uploadError) throw new Error(uploadError.message);
+                      const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
+                      const url = pub.publicUrl;
+                      if (!url) throw new Error("Could not get public URL for uploaded image");
+
+                      const patchRes = await fetch(`/api/character-templates/${templateId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ reference_image_url: url }),
+                        cache: "no-store",
+                      });
+                      if (!patchRes.ok) {
+                        const body = (await patchRes.json().catch(() => ({}))) as { error?: string };
+                        throw new Error(body.error ?? `Update failed (${patchRes.status})`);
                       }
-                      const localPreviewUrl = URL.createObjectURL(file);
-                      return {
-                        ...prev,
-                        [templateId]: { choice: "upload", file, localPreviewUrl },
-                      };
-                    });
-                  } finally {
-                    setUploadingCastId((prev) => (prev === templateId ? null : prev));
-                  }
+
+                      setTemplates((prev) =>
+                        prev.map((t) =>
+                          t.id === templateId ? { ...t, reference_image_url: url } : t,
+                        ),
+                      );
+                      setCastConfirmations((prev) => {
+                        const existing = prev[templateId];
+                        if (!existing) return prev;
+                        return {
+                          ...prev,
+                          [templateId]: {
+                            ...existing,
+                            choice: "upload",
+                            remotePreviewUrl: url,
+                          },
+                        };
+                      });
+                    } catch (err) {
+                      console.error("[ScriptFlow] immediate cast image persist failed", err);
+                    } finally {
+                      setUploadingCastId((prev) => (prev === templateId ? null : prev));
+                    }
+                  })();
                 }}
               />
               <p className="text-xs text-amber-200/90">
