@@ -48,6 +48,7 @@ import { createClient } from "@/lib/supabase/client";
 
 /** Pasted scripts at least this long skip idea→9-shot formatting and go straight to NEL. */
 const DIRECT_SCRIPT_MIN_CHARS = 50;
+const SCRIPTFLOW_PROJECT_ID_STORAGE_KEY = "scriptflow_project_id";
 
 type HealthPayload = {
   anthropic: "ok" | "error";
@@ -384,6 +385,13 @@ export default function Home() {
       const pid = cr.data.projectId;
       setProjectId(pid);
       writeLazySessionIdToStorage(pid);
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid);
+        } catch {
+          /* ignore */
+        }
+      }
 
       activePhase = "analyzing_story";
       setPipelinePhase("analyzing_story");
@@ -586,6 +594,11 @@ export default function Home() {
     if (id) {
       setRestoredLazySessionId(id);
       setProjectId(id);
+    } else {
+      const saved = window.localStorage.getItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY)?.trim();
+      if (saved) {
+        setProjectId(saved);
+      }
     }
     setLazyStorageChecked(true);
   }, []);
