@@ -857,26 +857,17 @@ export default function Home() {
                           </button>
                           <button
                             type="button"
-                            disabled={
-                              pipelineRunning ||
-                              !!uploadingCastId ||
-                              castUploadForTemplateId === tpl.id
-                            }
+                            disabled={pipelineRunning || !!uploadingCastId}
                             className={cn(
                               "rounded-lg border px-3 py-1.5 text-xs font-medium",
                               c?.choice === "upload"
                                 ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
                                 : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
-                              (pipelineRunning ||
-                                !!uploadingCastId ||
-                                castUploadForTemplateId === tpl.id) &&
-                                "cursor-not-allowed opacity-50",
+                              (pipelineRunning || !!uploadingCastId) && "cursor-not-allowed opacity-50",
                             )}
                             onClick={() => {
                               if (pipelineRunning || uploadingCastId) return;
-                              if (castUploadForTemplateId === tpl.id) return;
                               castUploadPickTargetIdRef.current = tpl.id;
-                              setCastUploadForTemplateId(tpl.id);
                               requestAnimationFrame(() => castHomeFileInputRef.current?.click());
                             }}
                           >

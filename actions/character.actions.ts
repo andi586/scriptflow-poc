@@ -37,6 +37,13 @@ function inferRoleFromArchetype(name: string, archetype: string): CharacterRole 
   return "supporting";
 }
 
+function normalizeMaybeUrl(raw: unknown): string {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  if (!v) return "";
+  const direct = v.match(/https?:\/\/[^\s"'`]+/i);
+  return direct ? direct[0].trim() : "";
+}
+
 function mapDbRowToTemplate(row: {
   id: string;
   name: string;
@@ -346,7 +353,7 @@ export async function listProjectCharacterImagesAction(input: {
     for (const row of data ?? []) {
       const r = row as { name?: unknown; reference_image_url?: unknown };
       const name = typeof r.name === "string" ? r.name.trim() : "";
-      const url = typeof r.reference_image_url === "string" ? r.reference_image_url.trim() : "";
+      const url = normalizeMaybeUrl(r.reference_image_url);
       if (!name || !url || byName.has(name)) continue;
       byName.set(name, url);
     }
