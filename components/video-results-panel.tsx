@@ -687,10 +687,10 @@ export function VideoResultsPanel({
                         ref={(el) => {
                           clipVideoRefs.current[piTid] = el;
                         }}
-                        src={playUrlByTaskId[piTid] || undefined}
+                        src={undefined}
                         className="max-h-64 w-full object-cover"
                         playsInline
-                        preload="metadata"
+                        preload="none"
                         controls={unlocked && !!playUrlByTaskId[piTid]}
                         muted={!unlocked}
                         onPlay={() =>
