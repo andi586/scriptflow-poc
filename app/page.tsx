@@ -14,6 +14,7 @@ import {
   analyzeScriptAction,
   formatStoryIdeaAction,
   generateKlingPromptsAction,
+  listKlingTaskIdsForSessionAction,
   submitKlingTasksAction,
 } from "@/actions/narrative.actions";
 import { InspirationFollowUpCards } from "@/components/inspiration-follow-up-cards";
@@ -520,6 +521,41 @@ export default function Home() {
     }
   }, [pipelinePhase, projectId]);
 
+  /** Load PiAPI task_ids from kling_tasks for VideoResultsPanel (authoritative vs. submit response). */
+  useEffect(() => {
+    if (pipelinePhase !== "done" || !projectId.trim()) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await listKlingTaskIdsForSessionAction({ sessionId: projectId.trim() });
+      if (cancelled) return;
+      if (res.success && res.data.taskIds.length > 0) {
+        setLastSubmittedClipTaskIds(res.data.taskIds);
+        writeKlingTaskSnapshotToStorage(projectId.trim(), res.data.taskIds);
+        setClipsRefreshNonce((n) => n + 1);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pipelinePhase, projectId]);
+
+  useEffect(() => {
+    const sid = restoredLazySessionId?.trim();
+    if (!sid) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await listKlingTaskIdsForSessionAction({ sessionId: sid });
+      if (cancelled) return;
+      if (res.success && res.data.taskIds.length > 0) {
+        setLastSubmittedClipTaskIds(res.data.taskIds);
+        setClipsRefreshNonce((n) => n + 1);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [restoredLazySessionId]);
+
   useEffect(() => {
     if (pipelinePhase !== "done" || !projectId.trim()) return;
     const id = window.setTimeout(() => {
@@ -586,7 +622,7 @@ export default function Home() {
             </section>
             <VideoResultsPanel
               sessionId={restoredLazySessionId}
-              taskIds={[]}
+              taskIds={lastSubmittedClipTaskIds}
               refreshNonce={clipsRefreshNonce}
               title="Your clips"
             />
