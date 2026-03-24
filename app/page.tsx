@@ -389,8 +389,12 @@ export default function Home() {
         try {
           console.log("[project created] saving projectId to localStorage:", pid);
           window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid);
+          console.log(
+            "[project created] saved to localStorage:",
+            window.localStorage.getItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY),
+          );
         } catch {
-          /* ignore */
+          console.log("[project created] localStorage write failed");
         }
       }
 
@@ -620,6 +624,21 @@ export default function Home() {
       });
     }
   }, [pipelinePhase, projectId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pid = projectId.trim();
+    if (!pid) return;
+    try {
+      window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid);
+      console.log(
+        "[projectId effect] persisted projectId:",
+        window.localStorage.getItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY),
+      );
+    } catch {
+      console.log("[projectId effect] localStorage write failed");
+    }
+  }, [projectId]);
 
   /** Load PiAPI task_ids from kling_tasks for VideoResultsPanel (authoritative vs. submit response). */
   useEffect(() => {
