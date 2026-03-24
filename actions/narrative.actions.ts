@@ -641,12 +641,11 @@ export async function submitKlingTasksAction(input: {
       const payload = useVeo3
         ? {
             model: "veo3",
-            task_type: "veo3-video-fast",
+            task_type: "video_generation",
             input: {
               prompt: sanitizedPrompt,
               aspect_ratio: "9:16",
               duration: 8,
-              resolution: "720p",
             },
           }
         : {
