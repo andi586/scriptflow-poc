@@ -71,6 +71,8 @@ type CastConfirmation = {
   file?: File;
   /** Blob URL for immediate card preview; revoked when replaced or cleared. */
   localPreviewUrl?: string;
+  /** `character_templates.id` (UUID from DB or built-in slug) for bindTemplateCharactersAction. */
+  libraryTemplateId?: string;
 };
 
 type PipelinePhase =
@@ -203,7 +205,7 @@ export default function Home() {
         next[id] =
           v.choice === "upload"
             ? { choice: "upload", file: v.file }
-            : { choice: "template" };
+            : { choice: "template", libraryTemplateId: v.libraryTemplateId ?? id };
       }
       return next;
     });
@@ -244,14 +246,14 @@ export default function Home() {
   const hasSelectedCast = selectedTemplates.length > 0;
 
   const allSelectedCastConfirmed = useMemo(() => {
-    if (selectedTemplates.length === 0) return true;
-    return selectedTemplates.every((tpl) => {
-      const c = castConfirmations[tpl.id];
+    if (selectedTemplateIds.length === 0) return true;
+    return selectedTemplateIds.every((id) => {
+      const c = castConfirmations[id];
       if (!c) return false;
       if (c.choice === "template") return true;
       return !!c.file;
     });
-  }, [selectedTemplates, castConfirmations]);
+  }, [selectedTemplateIds, castConfirmations]);
 
   const showInspirationFollowUps = useMemo(
     () => shouldShowInspirationFollowUps(composedInspiration, false),
@@ -380,12 +382,15 @@ export default function Home() {
 
       activePhase = "locking_characters";
       setPipelinePhase("locking_characters");
-      const templateIdsToBind = selectedTemplates
-        .filter((tpl) => {
-          const c = castConfirmations[tpl.id];
-          return c?.choice === "template";
+      /** Bind by selected checkbox ids + stored library ids (not only templates still in current list). */
+      const templateIdsToBind = selectedTemplateIds
+        .filter((id) => castConfirmations[id]?.choice === "template")
+        .map((id) => {
+          const c = castConfirmations[id];
+          const raw = (c?.libraryTemplateId ?? id).trim();
+          return raw;
         })
-        .map((tpl) => tpl.id);
+        .filter(Boolean);
 
       if (templateIdsToBind.length > 0) {
         const br = await bindTemplateCharactersAction({
@@ -406,9 +411,14 @@ export default function Home() {
         return btoa(binary);
       };
 
-      for (const tpl of selectedTemplates) {
-        const c = castConfirmations[tpl.id];
+      for (const id of selectedTemplateIds) {
+        const c = castConfirmations[id];
         if (c?.choice !== "upload" || !c.file) continue;
+        const tpl = templates.find((t) => t.id === id);
+        if (!tpl) {
+          console.warn("[ScriptFlow] upload cast: no template row for selected id", id);
+          continue;
+        }
         const base64Data = await toBase64(c.file);
         const ur = await uploadCustomCharacterAction({
           projectId: pid,
@@ -468,6 +478,7 @@ export default function Home() {
     inspirationFollowUpAnswers,
     allSelectedCastConfirmed,
     selectedTemplates,
+    templates,
     castConfirmations,
   ]);
 
@@ -786,7 +797,10 @@ export default function Home() {
                                 }
                                 return {
                                   ...prev,
-                                  [tpl.id]: { choice: "template" },
+                                  [tpl.id]: {
+                                    choice: "template",
+                                    libraryTemplateId: tpl.id.trim(),
+                                  },
                                 };
                               });
                             }}
