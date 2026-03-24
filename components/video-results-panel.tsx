@@ -749,10 +749,17 @@ export function VideoResultsPanel({
                             });
                             setDownloadBusyTaskId(piTid);
                             try {
-                              const url = await fetchFreshPlaybackUrl(piTid, {
-                                beat_number: task.beat_number,
-                                taskIdKey: piTid,
-                              });
+                              const permanent =
+                                typeof task.output_url === "string"
+                                  ? task.output_url.trim()
+                                  : "";
+                              const url =
+                                permanent && /^https:\/\//i.test(permanent)
+                                  ? permanent
+                                  : await fetchFreshPlaybackUrl(piTid, {
+                                      beat_number: task.beat_number,
+                                      taskIdKey: piTid,
+                                    });
                               window.open(url, "_blank");
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {

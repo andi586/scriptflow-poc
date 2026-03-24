@@ -258,6 +258,8 @@ export type KlingTaskItem = {
   task_id: string;
   status: string;
   video_url?: string;
+  /** Supabase Storage public URL (stable); PiAPI `video_url` may expire. */
+  output_url?: string;
   error_message?: string;
 };
 
@@ -527,6 +529,70 @@ function getKlingConfig() {
   return { base, key };
 }
 
+const SCENE_VIDEOS_BUCKET = "scene-videos";
+
+async function ensureSceneVideosBucket(
+  supabase: ReturnType<typeof createClient>,
+): Promise<void> {
+  const { data: buckets, error: listErr } = await supabase.storage.listBuckets();
+  if (listErr) throw listErr;
+  if (buckets?.some((b) => b.name === SCENE_VIDEOS_BUCKET)) return;
+  const { error } = await supabase.storage.createBucket(SCENE_VIDEOS_BUCKET, {
+    public: true,
+  });
+  if (error && !/already exists/i.test(error.message)) throw error;
+}
+
+/**
+ * Fetches the provider video URL server-side and uploads to `scene-videos`.
+ * Returns the public object URL for `kling_tasks.output_url`, or null on failure.
+ */
+async function mirrorKlingVideoToSupabaseStorage(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string,
+  taskId: string,
+  sceneIndex: number,
+  sourceUrl: string,
+): Promise<string | null> {
+  const trimmed = sourceUrl.trim();
+  if (!trimmed || !/^https?:\/\//i.test(trimmed)) return null;
+
+  const supabaseBase = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+  if (
+    supabaseBase &&
+    trimmed.startsWith(`${supabaseBase}/storage/v1/object/public/${SCENE_VIDEOS_BUCKET}/`)
+  ) {
+    return trimmed;
+  }
+
+  try {
+    await ensureSceneVideosBucket(supabase);
+    const videoRes = await fetch(trimmed, { cache: "no-store" });
+    if (!videoRes.ok) {
+      console.warn("[mirrorKlingVideo] source fetch failed", videoRes.status);
+      return null;
+    }
+    const buf = Buffer.from(await videoRes.arrayBuffer());
+    if (buf.length === 0) return null;
+
+    const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const path = `${projectId}/${safeTaskId}_scene_${sceneIndex}.mp4`;
+    const { error: upErr } = await supabase.storage.from(SCENE_VIDEOS_BUCKET).upload(path, buf, {
+      contentType: "video/mp4",
+      upsert: true,
+    });
+    if (upErr) {
+      console.warn("[mirrorKlingVideo] upload failed", upErr.message);
+      return null;
+    }
+    const { data } = supabase.storage.from(SCENE_VIDEOS_BUCKET).getPublicUrl(path);
+    return data.publicUrl || null;
+  } catch (e) {
+    console.warn("[mirrorKlingVideo]", formatUnknownError(e));
+    return null;
+  }
+}
+
 /** Inserts one `kling_tasks` row scoped to `projects.id` (never omit `project_id`). */
 async function insertKlingTaskForProject(
   supabase: ReturnType<typeof createClient>,
@@ -727,7 +793,7 @@ export async function submitKlingTasksAction(input: {
     // 5) Return DB-backed tasks for scenes in this run.
     const { data: finalRows, error: finalError } = await supabase
       .from("kling_tasks")
-      .select("scene_index, task_id, status, video_url, error_message")
+      .select("scene_index, task_id, status, video_url, output_url, error_message")
       .eq("project_id", projectId)
       .in("scene_index", sceneIndices)
       .order("created_at", { ascending: false });
@@ -750,6 +816,7 @@ export async function submitKlingTasksAction(input: {
           task_id: taskId,
           status,
           video_url: typeof r.video_url === "string" ? r.video_url : undefined,
+          output_url: typeof r.output_url === "string" ? r.output_url : undefined,
           error_message:
             typeof r.error_message === "string" ? r.error_message : undefined,
         });
@@ -843,11 +910,24 @@ export async function pollKlingTasksAction(input: {
           hasVideo; // fallback: if PiAPI already returned a video url, treat as success
 
         if (isSuccess && !isFailed) {
+          const trimmedSource =
+            typeof videoUrl === "string" && videoUrl.trim() ? videoUrl.trim() : "";
+          const outputUrl = trimmedSource
+            ? await mirrorKlingVideoToSupabaseStorage(
+                supabase,
+                projectId,
+                taskId,
+                sceneIndex,
+                trimmedSource,
+              )
+            : null;
+          const storedVideoUrl = outputUrl ?? (trimmedSource || null);
           const { error: updateError } = await supabase
             .from("kling_tasks")
             .update({
               status: "success",
-              video_url: videoUrl ?? null,
+              video_url: storedVideoUrl,
+              output_url: outputUrl,
               error_message: null,
             })
             .eq("task_id", taskId);
@@ -894,7 +974,7 @@ export async function pollKlingTasksAction(input: {
     // Return DB-backed tasks for UI
     const { data: finalRows, error: finalError } = await supabase
       .from("kling_tasks")
-      .select("scene_index, task_id, status, video_url, error_message")
+      .select("scene_index, task_id, status, video_url, output_url, error_message")
       .eq("project_id", projectId)
       .in("scene_index", input.sceneIndices)
       .order("created_at", { ascending: false });
@@ -917,6 +997,7 @@ export async function pollKlingTasksAction(input: {
           task_id: taskId,
           status,
           video_url: typeof rr.video_url === "string" ? rr.video_url : undefined,
+          output_url: typeof rr.output_url === "string" ? rr.output_url : undefined,
           error_message:
             typeof rr.error_message === "string" ? rr.error_message : undefined,
         });
@@ -940,7 +1021,7 @@ async function fetchKlingTasksForProjectAggregated(
 ): Promise<KlingTaskItem[]> {
   const { data: rows, error } = await supabase
     .from("kling_tasks")
-    .select("scene_index, task_id, status, video_url, error_message")
+    .select("scene_index, task_id, status, video_url, output_url, error_message")
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
@@ -956,6 +1037,7 @@ async function fetchKlingTasksForProjectAggregated(
       task_id: typeof r.task_id === "string" ? r.task_id : "",
       status: typeof r.status === "string" ? r.status : "processing",
       video_url: typeof r.video_url === "string" ? r.video_url : undefined,
+      output_url: typeof r.output_url === "string" ? r.output_url : undefined,
       error_message: typeof r.error_message === "string" ? r.error_message : undefined,
     });
   }
@@ -977,7 +1059,7 @@ async function fetchKlingTasksAlignedToOrderedTaskIds(
   const unique = [...new Set(trimmed)];
   const { data: rows, error } = await supabase
     .from("kling_tasks")
-    .select("scene_index, task_id, status, video_url, error_message, created_at")
+    .select("scene_index, task_id, status, video_url, output_url, error_message, created_at")
     .eq("project_id", projectId)
     .in("task_id", unique);
 
@@ -1000,6 +1082,7 @@ async function fetchKlingTasksAlignedToOrderedTaskIds(
       task_id: tid,
       status: typeof r.status === "string" ? r.status : "processing",
       video_url: typeof r.video_url === "string" ? r.video_url : undefined,
+      output_url: typeof r.output_url === "string" ? r.output_url : undefined,
       error_message:
         typeof r.error_message === "string" ? r.error_message : undefined,
     });
@@ -1127,7 +1210,7 @@ export async function resolveKlingVideoPlaybackUrlAction(input: {
     const supabase = createClient();
     const { data: rows, error: rowErr } = await supabase
       .from("kling_tasks")
-      .select("task_id")
+      .select("task_id, output_url")
       .eq("project_id", projectId)
       .eq("task_id", taskId)
       .limit(1);
@@ -1135,6 +1218,15 @@ export async function resolveKlingVideoPlaybackUrlAction(input: {
     if (rowErr) throw rowErr;
     if (!rows?.length) {
       return { success: false, error: "Task not found for this session." };
+    }
+
+    const row0 = rows[0] as { output_url?: unknown };
+    const permanent =
+      typeof row0.output_url === "string" && /^https:\/\//i.test(row0.output_url.trim())
+        ? row0.output_url.trim()
+        : "";
+    if (permanent) {
+      return { success: true, data: { videoUrl: permanent } };
     }
 
     const { key } = getKlingConfig();
@@ -1302,11 +1394,20 @@ async function pollOneKlingTaskFromVideoApi(
   const terminal = parseKlingVideoPollTerminal(data, videoUrl);
 
   if (terminal === "success" && videoUrl) {
+    const trimmed = videoUrl.trim();
+    const outputUrl = await mirrorKlingVideoToSupabaseStorage(
+      supabase,
+      projectId,
+      taskId,
+      sceneIndex,
+      trimmed,
+    );
     const { error: upErr } = await supabase
       .from("kling_tasks")
       .update({
         status: "success",
-        video_url: videoUrl,
+        video_url: outputUrl ?? trimmed,
+        output_url: outputUrl,
         error_message: null,
       })
       .eq("project_id", projectId)
