@@ -758,6 +758,7 @@ export function VideoResultsPanel({
                                   taskIdKey: piTid,
                                 });
                                 const proxiedUrl = toVideoProxyUrl(url);
+                                console.log("[VideoPlayer] using src:", proxiedUrl);
                                 setPlayUrlByTaskId((prev) => ({ ...prev, [piTid]: proxiedUrl }));
                                 await nextPaint();
                                 const v = clipVideoRefs.current[piTid];
