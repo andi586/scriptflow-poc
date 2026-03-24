@@ -753,14 +753,8 @@ export function VideoResultsPanel({
                                 beat_number: task.beat_number,
                                 taskIdKey: piTid,
                               });
-                              const a = document.createElement("a");
-                              a.href = url;
-                              a.download = `scene_${task.beat_number}.mp4`;
-                              a.rel = "noreferrer";
-                              a.target = "_blank";
-                              document.body.appendChild(a);
-                              a.click();
-                              a.remove();
+                              // Open in new tab so iOS can long-press → Save to Photos (download attr is unreliable on iOS).
+                              window.open(url, "_blank");
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
                                 task_id_key: piTid,
