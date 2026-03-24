@@ -387,6 +387,7 @@ export default function Home() {
       writeLazySessionIdToStorage(pid);
       if (typeof window !== "undefined") {
         try {
+          console.log("[project created] saving projectId to localStorage:", pid);
           window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid);
         } catch {
           /* ignore */
@@ -542,7 +543,9 @@ export default function Home() {
     if (!projectId.trim() || templates.length === 0) return;
     let cancelled = false;
     void (async () => {
+      console.log("[fetchImages] calling with projectId:", projectId.trim());
       const res = await listProjectCharacterImagesAction({ projectId: projectId.trim() });
+      console.log("[fetchImages] result:", res);
       if (cancelled || !res.success || res.data.items.length === 0) return;
 
       const byName = new Map(
@@ -583,8 +586,13 @@ export default function Home() {
       setLazyStorageChecked(true);
       return;
     }
+    console.log(
+      "[init] localStorage projectId:",
+      window.localStorage.getItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY),
+    );
     const rawPrimary = window.localStorage.getItem(SCRIPTFLOW_SESSION_STORAGE_KEY);
     const id = readLazySessionIdFromStorage();
+    console.log("[init] sessionId:", id ?? null);
     // #17 debug: confirm mount read + key (check DevTools → Console)
     console.log("[ScriptFlow] session restore (mount)", {
       storageKey: SCRIPTFLOW_SESSION_STORAGE_KEY,
