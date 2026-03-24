@@ -659,6 +659,10 @@ export async function submitKlingTasksAction(input: {
             }),
           };
 
+      if (useVeo3) {
+        console.log("Veo3 payload:", JSON.stringify(payload));
+      }
+
       const res = await fetch(`${base}/task`, {
         method: "POST",
         cache: "no-store",
