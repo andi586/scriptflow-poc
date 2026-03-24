@@ -349,6 +349,12 @@ export async function listProjectCharacterImagesAction(input: {
       .order("created_at", { ascending: false });
     if (error) throw error;
 
+    console.log("[listProjectCharacterImagesAction] raw rows", {
+      project_id: projectId,
+      count: Array.isArray(data) ? data.length : 0,
+      rows: (data ?? []).slice(0, 20),
+    });
+
     const byName = new Map<string, string>();
     for (const row of data ?? []) {
       const r = row as { name?: unknown; reference_image_url?: unknown };
@@ -362,6 +368,10 @@ export async function listProjectCharacterImagesAction(input: {
       name,
       reference_image_url,
     }));
+    console.log("[listProjectCharacterImagesAction] deduped items", {
+      project_id: projectId,
+      items,
+    });
     return { success: true, data: { items } };
   } catch (e) {
     return { success: false, error: formatUnknownError(e) };
