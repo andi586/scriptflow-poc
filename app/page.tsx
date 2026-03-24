@@ -438,7 +438,10 @@ export default function Home() {
 
       for (const id of selectedTemplateIds) {
         const c = castConfirmations[id];
-        if (c?.choice !== "upload" || !c.file) continue;
+        if (c?.choice !== "upload") continue;
+        // Already persisted during file pick-time upload; skip large base64 server-action payload.
+        if (c.remotePreviewUrl) continue;
+        if (!c.file) continue;
         const tpl = templates.find((t) => t.id === id);
         if (!tpl) {
           console.warn("[ScriptFlow] upload cast: no template row for selected id", id);
