@@ -640,7 +640,7 @@ export async function submitKlingTasksAction(input: {
       // `input.elements`: [{ image_url } x 1–4], plus mode/version per docs.
       const payload = useVeo3
         ? {
-            model: "veo3-1",
+            model: "veo3.1",
             task_type: "text_to_video",
             input: {
               prompt: sanitizedPrompt,
