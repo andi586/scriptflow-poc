@@ -137,7 +137,7 @@ export async function bindTemplateCharactersAction(input: {
       try {
         const { data: dbTemplates, error: qErr } = await supabase
           .from(PROJECT_CAST_TABLE)
-          .select("id,name,archetype,style_tags,reference_image_url,kling_prompt_base")
+          .select("id,name,archetype,style_tags,reference_image_url,reference_image_path,kling_prompt_base")
           .is("project_id", null)
           .in("id", dbIds);
         if (qErr) throw qErr;
@@ -148,8 +148,19 @@ export async function bindTemplateCharactersAction(input: {
             archetype: string;
             style_tags: string[] | null;
             reference_image_url: string;
+            reference_image_path?: string | null;
             kling_prompt_base: string | null;
           };
+          const rawRefUrl = typeof r.reference_image_url === "string" ? r.reference_image_url.trim() : "";
+          const rawRefPath =
+            typeof r.reference_image_path === "string" ? r.reference_image_path.trim() : "";
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
+          const fallbackPublicUrl =
+            supabaseUrl && rawRefPath
+              ? `${supabaseUrl}/storage/v1/object/public/character-images/${rawRefPath.replace(/^\/+/, "")}`
+              : "";
+          const boundReferenceImageUrl =
+            /^https?:\/\//i.test(rawRefUrl) ? rawRefUrl : fallbackPublicUrl;
           const tags = Array.isArray(r.style_tags) ? r.style_tags : [];
           const appearanceLine =
             r.kling_prompt_base?.trim() || `${r.name} — appearance from reference image.`;
@@ -158,7 +169,7 @@ export async function bindTemplateCharactersAction(input: {
             name: r.name,
             archetype: r.archetype,
             style_tags: tags,
-            reference_image_url: r.reference_image_url,
+            reference_image_url: boundReferenceImageUrl,
             kling_prompt_base: appearanceLine,
             role: inferRoleFromArchetype(r.name, r.archetype),
             appearance: appearanceLine,
