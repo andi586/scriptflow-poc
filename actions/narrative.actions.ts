@@ -638,35 +638,40 @@ export async function submitKlingTasksAction(input: {
 
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
       // `input.elements`: [{ image_url } x 1–4], plus mode/version per docs.
-      const payload = useVeo3
-        ? {
-            model: "veo3.1",
-            task_type: "text_to_video",
-            input: {
-              prompt: sanitizedPrompt,
-            },
-          }
-        : {
-            model: "kling",
-            task_type: "video_generation",
-            input: buildKlingVideoGenerationInput({
-              prompt: sanitizedPrompt,
-              aspectRatio: KLING_VIDEO_ASPECT_RATIO,
-              duration: 5,
-              referenceImageUrls,
-            }),
-          };
+      // Veo3.1 uses a dedicated endpoint; model is implied by URL (no `model` in body).
+      const klingPayload = {
+        model: "kling",
+        task_type: "video_generation",
+        input: buildKlingVideoGenerationInput({
+          prompt: sanitizedPrompt,
+          aspectRatio: KLING_VIDEO_ASPECT_RATIO,
+          duration: 5,
+          referenceImageUrls,
+        }),
+      };
 
+      let res: Response;
       if (useVeo3) {
-        console.log("Veo3 payload:", JSON.stringify(payload));
+        const veo3Body = {
+          task_type: "text_to_video" as const,
+          input: { prompt: sanitizedPrompt },
+        };
+        const veo3Url = `${base.replace(/\/+$/, "")}/api/veo3/v1/video`;
+        console.log("Veo3 payload:", JSON.stringify(veo3Body));
+        res = await fetch(veo3Url, {
+          method: "POST",
+          cache: "no-store",
+          headers: piapiHeaders(key),
+          body: JSON.stringify(veo3Body),
+        });
+      } else {
+        res = await fetch(`${base}/task`, {
+          method: "POST",
+          cache: "no-store",
+          headers: piapiHeaders(key),
+          body: JSON.stringify(klingPayload),
+        });
       }
-
-      const res = await fetch(`${base}/task`, {
-        method: "POST",
-        cache: "no-store",
-        headers: piapiHeaders(key),
-        body: JSON.stringify(payload),
-      });
 
       if (!res.ok) {
         const text = await res.text();
