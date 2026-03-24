@@ -638,7 +638,6 @@ export async function submitKlingTasksAction(input: {
 
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
       // `input.elements`: [{ image_url } x 1–4], plus mode/version per docs.
-      // Veo3.1 uses a dedicated endpoint; model is implied by URL (no `model` in body).
       const klingPayload = {
         model: "kling",
         task_type: "video_generation",
@@ -653,15 +652,18 @@ export async function submitKlingTasksAction(input: {
       let res: Response;
       if (useVeo3) {
         const veo3Body = {
-          task_type: "text_to_video" as const,
+          model: "veo3",
+          task_type: "veo3-video-fast",
           input: { prompt: sanitizedPrompt },
         };
-        const veo3Url = `${base.replace(/\/+$/, "")}/api/veo3/v1/video`;
         console.log("Veo3 payload:", JSON.stringify(veo3Body));
-        res = await fetch(veo3Url, {
+        res = await fetch("https://api.piapi.ai/api/v1/task", {
           method: "POST",
           cache: "no-store",
-          headers: piapiHeaders(key),
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": key,
+          },
           body: JSON.stringify(veo3Body),
         });
       } else {
