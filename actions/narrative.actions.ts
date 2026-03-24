@@ -631,7 +631,9 @@ export async function submitKlingTasksAction(input: {
     }
 
     const supabase = createClient();
-    const sceneIndices = input.prompts.map((p) => p.beat_number);
+    const scenes = input.prompts;
+    const scenesToProcess = scenes.slice(0, 2);
+    const sceneIndices = scenesToProcess.map((p) => p.beat_number);
     const { data: projectCharacters } = await supabase
       .from(PROJECT_CAST_TABLE)
       .select("name, appearance, reference_image_url")
@@ -691,7 +693,7 @@ export async function submitKlingTasksAction(input: {
     const { base, key } = getKlingConfig();
 
     // We'll insert missing scenes immediately after submitting to PiAPI.
-    for (const item of input.prompts) {
+    for (const item of scenesToProcess) {
       if (existingMap.has(item.beat_number)) continue;
 
       const finalPrompt = appendKlingElementsReferenceInstructions(
