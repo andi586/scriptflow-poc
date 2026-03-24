@@ -653,7 +653,7 @@ export async function submitKlingTasksAction(input: {
       if (useVeo3) {
         const veo3Body = {
           model: "veo3",
-          task_type: "veo3-video",
+          task_type: "Veo3.1-video",
           input: { prompt: sanitizedPrompt },
         };
         console.log("Veo3 payload:", JSON.stringify(veo3Body));
