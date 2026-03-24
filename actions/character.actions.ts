@@ -328,3 +328,35 @@ export async function upsertProjectCharactersAction(input: {
     return { success: false, error: formatUnknownError(e) };
   }
 }
+
+export async function listProjectCharacterImagesAction(input: {
+  projectId: string;
+}): Promise<ActionResult<{ items: Array<{ name: string; reference_image_url: string }> }>> {
+  try {
+    const projectId = requireProjectId(input.projectId);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from(PROJECT_CAST_TABLE)
+      .select("name, reference_image_url, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    const byName = new Map<string, string>();
+    for (const row of data ?? []) {
+      const r = row as { name?: unknown; reference_image_url?: unknown };
+      const name = typeof r.name === "string" ? r.name.trim() : "";
+      const url = typeof r.reference_image_url === "string" ? r.reference_image_url.trim() : "";
+      if (!name || !url || byName.has(name)) continue;
+      byName.set(name, url);
+    }
+
+    const items = [...byName.entries()].map(([name, reference_image_url]) => ({
+      name,
+      reference_image_url,
+    }));
+    return { success: true, data: { items } };
+  } catch (e) {
+    return { success: false, error: formatUnknownError(e) };
+  }
+}

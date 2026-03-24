@@ -30,6 +30,7 @@ import {
 import { storyboardShotsToNelScriptText } from "@/lib/story-idea-format";
 import {
   bindTemplateCharactersAction,
+  listProjectCharacterImagesAction,
   listCharacterTemplatesAction,
   uploadCustomCharacterAction,
 } from "@/actions/character.actions";
@@ -71,6 +72,8 @@ type CastConfirmation = {
   file?: File;
   /** Blob URL for immediate card preview; revoked when replaced or cleared. */
   localPreviewUrl?: string;
+  /** Persisted DB URL used after refresh; never revoked. */
+  remotePreviewUrl?: string;
   /** `character_templates.id` (UUID from DB or built-in slug) for bindTemplateCharactersAction. */
   libraryTemplateId?: string;
 };
@@ -503,6 +506,46 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (!projectId.trim() || templates.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await listProjectCharacterImagesAction({ projectId: projectId.trim() });
+      if (cancelled || !res.success || res.data.items.length === 0) return;
+
+      const byName = new Map(
+        res.data.items.map((x) => [x.name.trim(), x.reference_image_url.trim()]),
+      );
+      const matchedTemplateIds = templates
+        .filter((tpl) => byName.has(tpl.name.trim()))
+        .map((tpl) => tpl.id);
+      if (matchedTemplateIds.length === 0) return;
+
+      setSelectedTemplateIds((prev) => [...new Set([...prev, ...matchedTemplateIds])]);
+      setCastConfirmations((prev) => {
+        const next = { ...prev };
+        for (const tpl of templates) {
+          const persisted = byName.get(tpl.name.trim());
+          if (!persisted) continue;
+          const existing = next[tpl.id];
+          const templateUrl = resolveRenderableImageSrc(tpl.reference_image_url, "");
+          const isTemplateImage = persisted === templateUrl;
+          next[tpl.id] = {
+            choice: isTemplateImage ? "template" : "upload",
+            libraryTemplateId: tpl.id.trim(),
+            file: existing?.file,
+            localPreviewUrl: existing?.localPreviewUrl,
+            remotePreviewUrl: persisted,
+          };
+        }
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, templates]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       setLazyStorageChecked(true);
       return;
@@ -747,10 +790,15 @@ export default function Home() {
               </p>
               {selectedTemplates.map((tpl) => {
                 const c = castConfirmations[tpl.id];
-                const confirmed = !!c && (c.choice === "template" || (c.choice === "upload" && !!c.file));
+                const confirmed =
+                  !!c &&
+                  (c.choice === "template" ||
+                    (c.choice === "upload" && (!!c.file || !!c.remotePreviewUrl)));
                 const cardImageSrc =
                   c?.choice === "upload" && c.localPreviewUrl
                     ? c.localPreviewUrl
+                    : c?.choice === "upload" && c.remotePreviewUrl
+                      ? c.remotePreviewUrl
                     : resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL);
                 return (
                   <div
@@ -763,7 +811,7 @@ export default function Home() {
                     <div className="flex flex-col gap-3 sm:flex-row">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        key={c?.localPreviewUrl ?? `${tpl.id}-${c?.choice}-ref`}
+                        key={c?.localPreviewUrl ?? c?.remotePreviewUrl ?? `${tpl.id}-${c?.choice}-ref`}
                         src={cardImageSrc}
                         alt={tpl.label}
                         className="h-28 w-24 rounded-lg border border-white/10 object-cover"
