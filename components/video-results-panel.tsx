@@ -255,6 +255,11 @@ export function VideoResultsPanel({
     [sessionId],
   );
 
+  const toVideoProxyUrl = useCallback((url: string): string => {
+    const trimmed = url.trim();
+    return `/api/video-proxy?url=${encodeURIComponent(trimmed)}`;
+  }, []);
+
   const retryClipPoll = useCallback(
     async (taskId: string) => {
       if (!sessionId.trim()) return;
@@ -752,13 +757,14 @@ export function VideoResultsPanel({
                                   beat_number: task.beat_number,
                                   taskIdKey: piTid,
                                 });
-                                setPlayUrlByTaskId((prev) => ({ ...prev, [piTid]: url }));
+                                const proxiedUrl = toVideoProxyUrl(url);
+                                setPlayUrlByTaskId((prev) => ({ ...prev, [piTid]: proxiedUrl }));
                                 await nextPaint();
                                 const v = clipVideoRefs.current[piTid];
                                 if (!v) {
                                   throw new Error("播放器未就绪，请重试");
                                 }
-                                v.src = url;
+                                v.src = proxiedUrl;
                                 v.load();
                                 await waitForVideoLoaded(v, 60_000);
                                 v.muted = false;
