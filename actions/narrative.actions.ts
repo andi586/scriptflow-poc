@@ -631,9 +631,7 @@ export async function submitKlingTasksAction(input: {
     }
 
     const supabase = createClient();
-    const scenes = input.prompts;
-    const scenesToProcess = scenes.slice(0, 2);
-    const sceneIndices = scenesToProcess.map((p) => p.beat_number);
+    const sceneIndices = input.prompts.map((p) => p.beat_number);
     const { data: projectCharacters } = await supabase
       .from(PROJECT_CAST_TABLE)
       .select("name, appearance, reference_image_url")
@@ -693,7 +691,7 @@ export async function submitKlingTasksAction(input: {
     const { base, key } = getKlingConfig();
 
     // We'll insert missing scenes immediately after submitting to PiAPI.
-    for (const item of scenesToProcess) {
+    for (const item of input.prompts) {
       if (existingMap.has(item.beat_number)) continue;
 
       const finalPrompt = appendKlingElementsReferenceInstructions(
@@ -912,6 +910,18 @@ export async function pollKlingTasksAction(input: {
           hasVideo; // fallback: if PiAPI already returned a video url, treat as success
 
         if (isSuccess && !isFailed) {
+          if (!videoUrl) {
+            const raw = JSON.stringify(data).slice(0, 500);
+            const { error: updateError } = await supabase
+              .from("kling_tasks")
+              .update({
+                status: "url_missing",
+                error_message: `无法提取视频URL，原始响应已记录: ${raw}`,
+              })
+              .eq("task_id", taskId);
+            if (updateError) throw updateError;
+            continue;
+          }
           const trimmedSource =
             typeof videoUrl === "string" && videoUrl.trim() ? videoUrl.trim() : "";
           const outputUrl = trimmedSource
@@ -1393,7 +1403,21 @@ async function pollOneKlingTaskFromVideoApi(
 
   const data = (await res.json()) as Record<string, unknown>;
   const videoUrl = extractVideoUrlFromPiResponse(data);
-  const terminal = parseKlingVideoPollTerminal(data, videoUrl);
+  const terminal = parseKlingVideoPollTerminal(data, videoUrl ?? undefined);
+
+  if (terminal === "success" && !videoUrl) {
+    const raw = JSON.stringify(data).slice(0, 500);
+    const { error: upErr } = await supabase
+      .from("kling_tasks")
+      .update({
+        status: "url_missing",
+        error_message: `无法提取视频URL，原始响应已记录: ${raw}`,
+      })
+      .eq("project_id", projectId)
+      .eq("task_id", taskId);
+    if (upErr) throw upErr;
+    return {};
+  }
 
   if (terminal === "success" && videoUrl) {
     const trimmed = videoUrl.trim();
