@@ -753,8 +753,7 @@ export function VideoResultsPanel({
                                 beat_number: task.beat_number,
                                 taskIdKey: piTid,
                               });
-                              const proxyUrl = `/api/download-video?url=${encodeURIComponent(url)}`;
-                              window.open(proxyUrl, "_blank");
+                              window.open(url, "_blank");
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
                                 task_id_key: piTid,
@@ -784,7 +783,7 @@ export function VideoResultsPanel({
                         ) : (
                           <Download className="size-3.5" aria-hidden />
                         )}
-                        下载 scene_{task.beat_number}.mp4
+                        Save Video
                       </button>
                     </div>
                   </>
