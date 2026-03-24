@@ -641,7 +641,7 @@ export async function submitKlingTasksAction(input: {
       const payload = useVeo3
         ? {
             model: "veo3-1",
-            task_type: "veo3-video-fast",
+            task_type: "text_to_video",
             input: {
               prompt: sanitizedPrompt,
             },
