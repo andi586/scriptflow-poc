@@ -527,6 +527,33 @@ function getKlingConfig() {
   return { base, key };
 }
 
+/** Inserts one `kling_tasks` row scoped to `projects.id` (never omit `project_id`). */
+async function insertKlingTaskForProject(
+  supabase: ReturnType<typeof createClient>,
+  projectUuid: string,
+  row: {
+    task_id: string;
+    scene_index: number;
+    model_used: string;
+    status: string;
+    video_url?: string | null;
+    error_message?: string | null;
+  },
+): Promise<void> {
+  const project_id = requireProjectId(projectUuid);
+  const payload = {
+    project_id,
+    task_id: row.task_id,
+    scene_index: row.scene_index,
+    model_used: row.model_used,
+    status: row.status,
+    video_url: row.video_url ?? null,
+    error_message: row.error_message ?? null,
+  };
+  const { error } = await supabase.from("kling_tasks").insert(payload);
+  if (error) throw error;
+}
+
 export async function submitKlingTasksAction(input: {
   projectId: string;
   prompts: KlingPromptItem[];
@@ -643,8 +670,7 @@ export async function submitKlingTasksAction(input: {
       if (!res.ok) {
         const text = await res.text();
         // Insert failed placeholder so UI has something persistent (optional).
-        await supabase.from("kling_tasks").insert({
-          project_id: projectId,
+        await insertKlingTaskForProject(supabase, projectId, {
           task_id: `failed_${item.beat_number}_${Date.now()}`,
           scene_index: item.beat_number,
           model_used: modelUsed,
@@ -661,8 +687,7 @@ export async function submitKlingTasksAction(input: {
           : null;
       const taskId = String(data.task_id ?? data.id ?? nested?.task_id ?? "");
       if (!taskId) {
-        await supabase.from("kling_tasks").insert({
-          project_id: projectId,
+        await insertKlingTaskForProject(supabase, projectId, {
           task_id: `missing_${item.beat_number}_${Date.now()}`,
           scene_index: item.beat_number,
           model_used: modelUsed,
@@ -673,8 +698,7 @@ export async function submitKlingTasksAction(input: {
       }
 
       // 3) Persist each PiAPI task_id to kling_tasks (source of truth for refresh / polling).
-      const { error: insertError } = await supabase.from("kling_tasks").insert({
-        project_id: projectId,
+      await insertKlingTaskForProject(supabase, projectId, {
         task_id: taskId,
         scene_index: item.beat_number,
         model_used: modelUsed,
@@ -682,7 +706,6 @@ export async function submitKlingTasksAction(input: {
         video_url: null,
         error_message: null,
       });
-      if (insertError) throw insertError;
 
       existingMap.set(item.beat_number, {
         task_id: taskId,
