@@ -753,8 +753,8 @@ export function VideoResultsPanel({
                                 beat_number: task.beat_number,
                                 taskIdKey: piTid,
                               });
-                              // Open in new tab so iOS can long-press → Save to Photos (download attr is unreliable on iOS).
-                              window.open(url, "_blank");
+                              const proxyUrl = `/api/download-video?url=${encodeURIComponent(url)}`;
+                              window.open(proxyUrl, "_blank");
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
                                 task_id_key: piTid,
