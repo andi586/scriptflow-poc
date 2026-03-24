@@ -633,7 +633,9 @@ export async function submitKlingTasksAction(input: {
       );
       const sanitizedPrompt = appendPromptSafetyAndStyleLock(finalPrompt);
 
-      const useVeo3 = shouldUseVeo3ForScenePrompt(sanitizedPrompt);
+      // TEMP: disable Veo3 routing; force all scenes through Kling path.
+      // const useVeo3 = shouldUseVeo3ForScenePrompt(sanitizedPrompt);
+      const useVeo3 = false;
       const modelUsed = useVeo3 ? "veo3" : "kling";
 
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
