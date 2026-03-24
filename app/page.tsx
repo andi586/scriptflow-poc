@@ -32,7 +32,6 @@ import {
   bindTemplateCharactersAction,
   listProjectCharacterImagesAction,
   listCharacterTemplatesAction,
-  uploadCustomCharacterAction,
 } from "@/actions/character.actions";
 import { createNewProjectAction } from "@/actions/project.actions";
 import {
@@ -438,38 +437,15 @@ export default function Home() {
         if (!br.success) throw new Error(errMsg(br.error));
       }
 
-      const toBase64 = async (file: File): Promise<string> => {
-        const buf = await file.arrayBuffer();
-        let binary = "";
-        const bytes = new Uint8Array(buf);
-        const chunk = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunk) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-        }
-        return btoa(binary);
-      };
-
       for (const id of selectedTemplateIds) {
         const c = castConfirmations[id];
         if (c?.choice !== "upload") continue;
-        // Already persisted during file pick-time upload; skip large base64 server-action payload.
-        if (c.remotePreviewUrl) continue;
-        if (!c.file) continue;
-        const tpl = templates.find((t) => t.id === id);
-        if (!tpl) {
-          console.warn("[ScriptFlow] upload cast: no template row for selected id", id);
-          continue;
+        // Locking step only accepts persisted URLs to avoid oversized server-action payloads.
+        if (!c.remotePreviewUrl) {
+          throw new Error(
+            "Uploaded cast image was not persisted yet. Please re-upload the photo and retry.",
+          );
         }
-        const base64Data = await toBase64(c.file);
-        const ur = await uploadCustomCharacterAction({
-          projectId: pid,
-          name: tpl.name,
-          role: tpl.role,
-          fileName: c.file.name || `${tpl.name}.jpg`,
-          mimeType: c.file.type || "image/jpeg",
-          base64Data,
-        });
-        if (!ur.success) throw new Error(errMsg(ur.error));
       }
 
       activePhase = "generating_prompts";
