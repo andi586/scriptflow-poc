@@ -272,15 +272,17 @@ export function VideoResultsPanel({
       return trimmed;
     }
 
-    const SUPABASE_HOST = "ktrtheitjtwpdvdvnlzj.supabase.co";
     const PUBLIC_PREFIX = "/storage/v1/object/public/";
-    if (parsed.hostname !== SUPABASE_HOST) return trimmed;
-    if (!parsed.pathname.startsWith(PUBLIC_PREFIX)) return trimmed;
 
-    const remainder = parsed.pathname.slice(PUBLIC_PREFIX.length);
+    // Be tolerant: rewrite whenever the URL contains the public storage prefix,
+    // regardless of which host produced it.
+    const idx = parsed.pathname.indexOf(PUBLIC_PREFIX);
+    if (idx === -1) return trimmed;
+
+    const remainder = parsed.pathname.slice(idx + PUBLIC_PREFIX.length);
     if (!remainder) return trimmed;
 
-    const search = parsed.search ? parsed.search : "";
+    const search = parsed.search || "";
     return `/video/${remainder}${search}`;
   }, []);
 
