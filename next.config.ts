@@ -37,6 +37,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: "/video/:path*",
+        destination:
+          "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

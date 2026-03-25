@@ -255,6 +255,35 @@ export function VideoResultsPanel({
     [sessionId],
   );
 
+  const toSameOriginVideoUrl = useCallback((url: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed) return trimmed;
+
+    // Already rewritten for same-origin.
+    if (trimmed.startsWith("/video/")) return trimmed;
+
+    // Only rewrite Supabase public storage URLs.
+    if (!/^https?:\/\//i.test(trimmed)) return trimmed;
+
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return trimmed;
+    }
+
+    const SUPABASE_HOST = "ktrtheitjtwpdvdvnlzj.supabase.co";
+    const PUBLIC_PREFIX = "/storage/v1/object/public/";
+    if (parsed.hostname !== SUPABASE_HOST) return trimmed;
+    if (!parsed.pathname.startsWith(PUBLIC_PREFIX)) return trimmed;
+
+    const remainder = parsed.pathname.slice(PUBLIC_PREFIX.length);
+    if (!remainder) return trimmed;
+
+    const search = parsed.search ? parsed.search : "";
+    return `/video/${remainder}${search}`;
+  }, []);
+
   const retryClipPoll = useCallback(
     async (taskId: string) => {
       if (!sessionId.trim()) return;
@@ -341,7 +370,8 @@ export function VideoResultsPanel({
           continue;
         }
         try {
-          const res = await fetch(url);
+          const localUrl = toSameOriginVideoUrl(url);
+          const res = await fetch(localUrl);
           if (!res.ok) throw new Error(String(res.status));
           const buf = await res.arrayBuffer();
           zip.file(`scene_${t.beat_number}.mp4`, buf);
@@ -372,7 +402,7 @@ export function VideoResultsPanel({
           continue;
         }
         const a = document.createElement("a");
-        a.href = url;
+        a.href = toSameOriginVideoUrl(url);
         a.download = `scene_${t.beat_number}.mp4`;
         a.rel = "noreferrer";
         a.target = "_blank";
@@ -414,12 +444,13 @@ export function VideoResultsPanel({
       for (let i = 0; i < clips.length; i += 1) {
         const t = clips[i];
         const fileName = `scene_${String(t.beat_number).padStart(3, "0")}.mp4`;
-        const source =
+        const sourceRaw =
           typeof t.output_url === "string" && t.output_url.trim()
             ? t.output_url.trim()
             : typeof t.video_url === "string"
               ? t.video_url.trim()
               : "";
+        const source = toSameOriginVideoUrl(sourceRaw);
         if (!source) throw new Error(`Missing video URL for scene ${t.beat_number}`);
         await ffmpeg.writeFile(fileName, await fetchFile(source));
         lines.push(`file '${fileName}'`);
@@ -753,14 +784,15 @@ export function VideoResultsPanel({
                                   taskIdKey: piTid,
                                 });
                                 const directUrl = url.trim();
-                                console.log("[VideoPlayer] using src:", directUrl);
-                                setPlayUrlByTaskId((prev) => ({ ...prev, [piTid]: directUrl }));
+                                const localUrl = toSameOriginVideoUrl(directUrl);
+                                console.log("[VideoPlayer] using src:", localUrl);
+                                setPlayUrlByTaskId((prev) => ({ ...prev, [piTid]: localUrl }));
                                 await nextPaint();
                                 const v = clipVideoRefs.current[piTid];
                                 if (!v) {
                                   throw new Error("播放器未就绪，请重试");
                                 }
-                                v.src = directUrl;
+                                v.src = localUrl;
                                 v.load();
                                 await waitForVideoLoaded(v, 60_000);
                                 v.muted = false;
@@ -851,7 +883,7 @@ export function VideoResultsPanel({
                                       beat_number: task.beat_number,
                                       taskIdKey: piTid,
                                     });
-                              window.open(url, "_blank");
+                              window.open(toSameOriginVideoUrl(url), "_blank");
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
                                 task_id_key: piTid,
