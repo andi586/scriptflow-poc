@@ -3,43 +3,20 @@
  * Supports works[0].resource.resource (Kling v1 video status) and legacy task/output shapes.
  */
 
-function findFirstUrl(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    const m = value.match(/https?:\/\/[^\s"']+/i);
-    return m ? m[0] : undefined;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findFirstUrl(item);
-      if (found) return found;
-    }
-  }
-  if (value && typeof value === "object") {
-    for (const v of Object.values(value as Record<string, unknown>)) {
-      const found = findFirstUrl(v);
-      if (found) return found;
-    }
-  }
-  return undefined;
+function isLikelyVideoUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (/\.(png|jpg|jpeg|webp)(\?|#|$)/i.test(lower)) return false;
+  if (lower.includes(".mp4")) return true;
+  if (lower.includes("video")) return true;
+  if (lower.includes("cdn")) return true;
+  return !/\.(png|jpg|jpeg|webp)(\?|#|$)/i.test(lower);
 }
 
-/** PiAPI Kling v1: works[0].resource.resource */
-function extractFromWorksArray(works: unknown): string | undefined {
-  if (!Array.isArray(works) || works.length === 0) return undefined;
-  const first = works[0];
-  if (!first || typeof first !== "object") return undefined;
-  const o = first as Record<string, unknown>;
-  const resource = o.resource;
-  if (resource && typeof resource === "object") {
-    const inner = (resource as Record<string, unknown>).resource;
-    if (typeof inner === "string" && /^https?:\/\//i.test(inner)) return inner;
-  }
-  const videoField = o.video;
-  if (videoField && typeof videoField === "object") {
-    const url = (videoField as Record<string, unknown>).url;
-    if (typeof url === "string" && url.startsWith("http")) return url;
-  }
-  return undefined;
+function toValidVideoUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  return isLikelyVideoUrl(trimmed) ? trimmed : null;
 }
 
 function collectStatusStrings(data: Record<string, unknown>): string {
@@ -88,59 +65,36 @@ export function parseKlingVideoPollTerminal(
   return "processing";
 }
 
-export function extractVideoUrlFromPiResponse(data: Record<string, unknown>): string | undefined {
-  const rootWorks = extractFromWorksArray(data.works);
-  if (rootWorks) return rootWorks;
-
+export function extractVideoUrlFromPiResponse(data: Record<string, unknown>): string | null {
   const nested =
     data.data && typeof data.data === "object" ? (data.data as Record<string, unknown>) : null;
+  if (!nested) return null;
 
-  if (nested) {
-    const w = extractFromWorksArray(nested.works);
-    if (w) return w;
-  }
-
-  const output =
-    nested && nested.output && typeof nested.output === "object"
-      ? (nested.output as Record<string, unknown>)
+  const works = Array.isArray(nested.works) ? (nested.works as unknown[]) : [];
+  const firstWork =
+    works[0] && typeof works[0] === "object"
+      ? (works[0] as Record<string, unknown>)
+      : null;
+  const resource =
+    firstWork?.resource && typeof firstWork.resource === "object"
+      ? (firstWork.resource as Record<string, unknown>)
       : null;
 
-  if (!output) {
-    return findFirstUrl(data);
-  }
+  // a) response.data.works[0].resource.resource
+  const candidateA = toValidVideoUrl(resource?.resource);
+  if (candidateA) return candidateA;
 
-  const outputObj = output as Record<string, unknown>;
-  const videoObj =
-    outputObj.video && typeof outputObj.video === "object"
-      ? (outputObj.video as Record<string, unknown>)
-      : null;
+  // b) response.data.works[0].resource.url
+  const candidateB = toValidVideoUrl(resource?.url);
+  if (candidateB) return candidateB;
 
-  const videoUrlFields = [
-    outputObj.video_url,
-    outputObj.videoUrl,
-    outputObj.url,
-    videoObj ? videoObj.url : undefined,
-  ];
-  for (const f of videoUrlFields) {
-    if (typeof f === "string" && f.startsWith("http")) return f;
-  }
+  // c) response.data.video_url
+  const candidateC = toValidVideoUrl(nested.video_url);
+  if (candidateC) return candidateC;
 
-  const works =
-    output.works && Array.isArray(output.works) ? (output.works as unknown[]) : null;
-  if (works && works.length > 0) {
-    const fromW = extractFromWorksArray(works);
-    if (fromW) return fromW;
-    const first = works[0];
-    const videoField =
-      first && typeof first === "object"
-        ? (first as Record<string, unknown>).video
-        : undefined;
-    const urlCandidate =
-      videoField && typeof videoField === "object" && typeof (videoField as Record<string, unknown>).url === "string"
-        ? String((videoField as Record<string, unknown>).url)
-        : undefined;
-    if (urlCandidate) return urlCandidate;
-  }
+  // d) response.data.url
+  const candidateD = toValidVideoUrl(nested.url);
+  if (candidateD) return candidateD;
 
-  return findFirstUrl(output) ?? findFirstUrl(data);
+  return null;
 }

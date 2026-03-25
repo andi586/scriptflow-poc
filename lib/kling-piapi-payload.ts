@@ -1,7 +1,7 @@
 /**
  * PiAPI Kling — reference images (official field names)
  *
- * - **Kling Elements** (`model: "kling"`, `task_type: "video_generation"`):
+ * - **Kling Elements** (`task_type: "video_generation"`):
  *   Use `input.elements`: an array of **1–4** objects `{ "image_url": "<https URL>" }`.
  *   Docs: https://piapi.ai/docs/kling-api/kling-elements
  *
@@ -46,7 +46,7 @@ export function buildKlingVideoGenerationInput(opts: {
     ...base,
     negative_prompt: "",
     elements,
-    mode: "std",
+    mode: "pro",
     aspect_ratio: opts.aspectRatio,
     duration: opts.duration,
     version: "1.6",
