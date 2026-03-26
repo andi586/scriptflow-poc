@@ -6,14 +6,12 @@ import type { StructureResponse, ScriptFlowState } from "@/types/script";
 
 interface Props {
   structure: StructureResponse;
-  episodeCount: 3 | 6 | 9;
   expandResult: ScriptFlowState["expandResult"];
   onConfirm: () => void;
 }
 
 export function StructureViewer({
   structure,
-  episodeCount,
   expandResult,
   onConfirm,
 }: Props) {
@@ -27,9 +25,6 @@ export function StructureViewer({
     { id: "episodes" as const, label: "剧情大纲" },
     { id: "foreshadowing" as const, label: "伏笔" },
   ];
-
-  const episodeKey =
-    episodeCount === 3 ? "three" : episodeCount === 6 ? "six" : "nine";
 
   return (
     <div className="space-y-6">
@@ -109,7 +104,7 @@ export function StructureViewer({
 
         {activeTab === "episodes" && (
           <div className="space-y-3">
-            {structure.episodes[episodeKey].map((ep) => (
+            {structure.episodes.map((ep) => (
               <div
                 key={ep.episode}
                 className="flex gap-4 rounded border border-zinc-800 p-3"

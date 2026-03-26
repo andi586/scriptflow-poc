@@ -39,11 +39,7 @@ export interface StructureResponse {
     resolution: string;
   };
   characters: ScriptCharacter[];
-  episodes: {
-    three: ScriptEpisode[];
-    six: ScriptEpisode[];
-    nine: ScriptEpisode[];
-  };
+  episodes: ScriptEpisode[];
   foreshadowing: string[];
 }
 

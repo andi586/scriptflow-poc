@@ -77,7 +77,10 @@ export default function CreatePage() {
       const structRes = await fetch("/api/script/structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result),
+        body: JSON.stringify({
+          ...result,
+          totalEpisodes: state.episodeCount,
+        }),
       });
       const structure = (await structRes.json()) as StructureResponse;
       setState((prev) => ({ ...prev, structureResult: structure }));
@@ -132,7 +135,6 @@ export default function CreatePage() {
         {!loading && state.step === 3 && state.structureResult && (
           <StructureViewer
             structure={state.structureResult}
-            episodeCount={state.episodeCount}
             expandResult={state.expandResult}
             onConfirm={handleStructureConfirm}
           />
