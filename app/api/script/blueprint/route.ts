@@ -79,7 +79,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const prompt = buildPrompt(input);
     const raw = await callClaudeForScript(prompt);
     const parsed = safeParseJSON<unknown>(raw);
-    const validated = BlueprintResponseSchema.parse(parsed);
+
+    // 修正Claude可能输出的扁平结构
+    const data = parsed as Record<string, unknown>;
+    const structure =
+      typeof data.structure === "object" && data.structure !== null
+        ? (data.structure as Record<string, unknown>)
+        : {};
+    const normalized = {
+      expandedStory: data.expandedStory ?? data,
+      structure: {
+        threeAct: structure.threeAct ?? data.threeAct,
+        characters: structure.characters ?? data.characters,
+        episodes: structure.episodes ?? data.episodes,
+        foreshadowing: structure.foreshadowing ?? data.foreshadowing,
+      },
+    };
+    const validated = BlueprintResponseSchema.parse(normalized);
 
     if (validated.structure.episodes.length !== input.totalEpisodes) {
       return NextResponse.json(
