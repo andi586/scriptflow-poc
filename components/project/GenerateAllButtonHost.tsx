@@ -13,54 +13,6 @@ export function GenerateAllButtonHost({
 }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const parseSeasonSpec = () => {
-    if (!project.script_raw) return null;
-    try {
-      const parsed = JSON.parse(project.script_raw) as {
-        expandedStory?: {
-          title?: string;
-          logline?: string;
-          world?: string;
-          tone?: string;
-          coreConflict?: string;
-        };
-        totalEpisodes?: 3 | 6 | 9;
-        structure?: {
-          threeAct?: {
-            setup?: string;
-            confrontation?: string;
-            resolution?: string;
-          };
-          characters?: Array<{
-            name: string;
-            role: "protagonist" | "antagonist" | "supporting";
-            personality: string;
-            goal: string;
-          }>;
-          foreshadowing?: string[];
-        };
-      };
-      if (!parsed.expandedStory || !parsed.structure || !parsed.totalEpisodes) return null;
-      return {
-        title: parsed.expandedStory.title ?? "",
-        logline: parsed.expandedStory.logline ?? "",
-        world: parsed.expandedStory.world ?? "",
-        tone: parsed.expandedStory.tone ?? "",
-        coreConflict: parsed.expandedStory.coreConflict ?? "",
-        totalEpisodes: parsed.totalEpisodes,
-        threeAct: {
-          setup: parsed.structure.threeAct?.setup ?? "",
-          confrontation: parsed.structure.threeAct?.confrontation ?? "",
-          resolution: parsed.structure.threeAct?.resolution ?? "",
-        },
-        characters: parsed.structure.characters ?? [],
-        foreshadowing: parsed.structure.foreshadowing ?? [],
-      };
-    } catch {
-      return null;
-    }
-  };
-
   return (
     <div className="space-y-3">
       <GenerateAllButton
@@ -68,11 +20,35 @@ export function GenerateAllButtonHost({
         beats={beats}
         onGenerateConfirmed={async () => {
           setErrorMessage(null);
-          const seasonSpec = parseSeasonSpec();
+          let scriptRaw: unknown = null;
+          try {
+            scriptRaw = project.script_raw ? JSON.parse(project.script_raw) : null;
+          } catch {
+            scriptRaw = null;
+          }
+          const rawObj =
+            typeof scriptRaw === "object" && scriptRaw !== null
+              ? (scriptRaw as Record<string, unknown>)
+              : null;
+          const rawStructure =
+            rawObj && typeof rawObj.structure === "object" && rawObj.structure !== null
+              ? (rawObj.structure as Record<string, unknown>)
+              : null;
+          const seasonSpec = rawObj
+            ? {
+                idea: rawObj.idea,
+                direction: rawObj.selectedDirection,
+                expandedStory: rawObj.expandedStory,
+                totalEpisodes: rawObj.totalEpisodes,
+                threeAct: rawStructure?.threeAct,
+                characters: rawStructure?.characters,
+                episodes: rawStructure?.episodes,
+                foreshadowing: rawStructure?.foreshadowing,
+              }
+            : null;
           if (!seasonSpec) {
-            const err = { error: "Missing seasonSpec in project.script_raw" };
-            console.error("[GENERATE ERROR]", err);
-            setErrorMessage("生成失败：缺少季节设定数据（seasonSpec）。");
+            console.error("[SEASON SPEC MISSING]", project.script_raw);
+            setErrorMessage("剧本数据不完整，请重新生成剧本");
             return;
           }
 

@@ -38,7 +38,6 @@ const RequestSchema = z.object({
   episodeNumber: z.number().int().positive(),
   rewrite: z.boolean().optional().default(false),
   rewriteInstruction: z.string().trim().min(1).optional(),
-  seasonSpec: SeasonSpecSchema,
 });
 
 const DialogueLineSchema = z.object({
@@ -81,6 +80,7 @@ const ResponseSchema = z.object({
 
 type Input = z.infer<typeof RequestSchema>;
 type EpisodeScript = z.infer<typeof EpisodeScriptSchema>;
+type PromptInput = Input & { seasonSpec: z.infer<typeof SeasonSpecSchema> };
 
 // ========================
 // Prompt Builder
@@ -102,7 +102,7 @@ function getPacingGuidance(total: 3 | 6 | 9, ep: number): string {
   return "本集属于后段，负责真相逼近、高潮连发、关系清算与结局兑现。";
 }
 
-function buildPrompt(input: Input): string {
+function buildPrompt(input: PromptInput): string {
   const { seasonSpec: s, episodeNumber: ep, rewrite, rewriteInstruction } =
     input;
 
@@ -238,10 +238,68 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const body: unknown = await req.json();
     const input = RequestSchema.parse(body);
 
-    if (input.episodeNumber > input.seasonSpec.totalEpisodes) {
+    const supabase = createServerSupabaseClient();
+    const { data: projectRow, error: projectError } = await supabase
+      .from("projects")
+      .select("script_raw")
+      .eq("id", input.projectId)
+      .single();
+
+    if (projectError || !projectRow) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    const rawScript = (projectRow as { script_raw?: string | null }).script_raw ?? null;
+    if (!rawScript) {
+      return NextResponse.json(
+        { error: "Project script_raw is empty. Please regenerate blueprint first." },
+        { status: 400 }
+      );
+    }
+
+    let scriptRaw: Record<string, unknown>;
+    try {
+      scriptRaw = JSON.parse(rawScript) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json({ error: "Invalid project script_raw JSON" }, { status: 400 });
+    }
+
+    const structure =
+      typeof scriptRaw.structure === "object" && scriptRaw.structure !== null
+        ? (scriptRaw.structure as Record<string, unknown>)
+        : {};
+
+    const seasonSpec = {
+      idea: scriptRaw.idea,
+      direction: scriptRaw.selectedDirection,
+      expandedStory: scriptRaw.expandedStory,
+      totalEpisodes: scriptRaw.totalEpisodes,
+      threeAct: structure.threeAct,
+      characters: structure.characters,
+      episodes: structure.episodes,
+      foreshadowing: structure.foreshadowing,
+    };
+
+    const expandedStory =
+      typeof seasonSpec.expandedStory === "object" && seasonSpec.expandedStory !== null
+        ? (seasonSpec.expandedStory as Record<string, unknown>)
+        : {};
+    const promptSeasonSpec = SeasonSpecSchema.parse({
+      title: expandedStory.title,
+      logline: expandedStory.logline,
+      world: expandedStory.world,
+      tone: expandedStory.tone,
+      coreConflict: expandedStory.coreConflict,
+      totalEpisodes: seasonSpec.totalEpisodes,
+      threeAct: seasonSpec.threeAct,
+      characters: seasonSpec.characters,
+      foreshadowing: seasonSpec.foreshadowing,
+    });
+
+    if (input.episodeNumber > promptSeasonSpec.totalEpisodes) {
       return NextResponse.json(
         {
-          error: `episodeNumber ${input.episodeNumber} exceeds totalEpisodes ${input.seasonSpec.totalEpisodes}`,
+          error: `episodeNumber ${input.episodeNumber} exceeds totalEpisodes ${promptSeasonSpec.totalEpisodes}`,
         },
         { status: 400 }
       );
@@ -253,7 +311,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
     const nextVersion = existingVersion + 1;
 
-    const prompt = buildPrompt(input);
+    const prompt = buildPrompt({ ...input, seasonSpec: promptSeasonSpec });
     const raw = await callClaudeForScript(prompt);
     const episode = EpisodeScriptSchema.parse(safeParseJSON(raw));
 
@@ -268,7 +326,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const persisted = await upsertEpisode({
       projectId: input.projectId,
-      totalEpisodes: input.seasonSpec.totalEpisodes,
+      totalEpisodes: promptSeasonSpec.totalEpisodes,
       episode,
       rewriteInstruction: input.rewriteInstruction,
       version: nextVersion,
