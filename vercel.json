@@ -1,15 +1,6 @@
 {
   "functions": {
-    "app/api/script/develop/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/script/structure/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/script/episode/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/audio/tts/route.ts": {
+    "app/api/**/*.ts": {
       "maxDuration": 60
     }
   }
