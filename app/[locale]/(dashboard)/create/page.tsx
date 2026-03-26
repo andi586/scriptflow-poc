@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { InspirationForm } from "@/components/script-creation/InspirationForm";
 import { DirectionSelector } from "@/components/script-creation/DirectionSelector";
+import { StructureViewer } from "@/components/script-creation/StructureViewer";
 import { NELProcessing } from "@/components/script-creation/NELProcessing";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
-import { Button } from "@/components/ui/button";
 import type {
   ScriptFlowState,
   DevelopExploreResponse,
@@ -57,22 +57,37 @@ export default function CreatePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/script/develop", {
+      const res = await fetch("/api/script/blueprint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode: "expand",
           idea: state.idea,
           selectedDirection: direction.summary,
+          totalEpisodes: state.episodeCount,
         }),
       });
-      const result = (await res.json()) as DevelopExpandResponse;
+      const raw = (await res.json()) as unknown;
+      if (!res.ok) {
+        const errMsg =
+          typeof raw === "object" &&
+          raw !== null &&
+          "error" in raw &&
+          typeof (raw as { error: unknown }).error === "string"
+            ? (raw as { error: string }).error
+            : "生成失败，请重试";
+        setError(errMsg);
+        return;
+      }
+      const result = raw as {
+        expandedStory: DevelopExpandResponse;
+        structure: StructureResponse;
+      };
       setState((prev) => ({
         ...prev,
         step: 3,
         selectedDirection: direction,
-        expandResult: result,
-        structureResult: null,
+        expandResult: result.expandedStory,
+        structureResult: result.structure,
       }));
     } catch {
       setError("生成失败，请重试");
@@ -81,28 +96,16 @@ export default function CreatePage() {
     }
   };
 
-  const handleStructureConfirm = async () => {
-    if (!state.expandResult) return;
+  const handleStructureConfirm = () => {
+    if (!state.expandResult || !state.structureResult) return;
     setError(null);
     setState((prev) => ({ ...prev, step: 4 }));
-    try {
-      const structRes = await fetch("/api/script/structure", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...state.expandResult,
-          totalEpisodes: state.episodeCount,
-        }),
-      });
-      const structure = (await structRes.json()) as StructureResponse;
-      setState((prev) => ({ ...prev, structureResult: structure, step: 5 }));
-      setTimeout(() => {
+    window.setTimeout(() => {
+      setState((prev) => ({ ...prev, step: 5 }));
+      window.setTimeout(() => {
         router.push("/dashboard");
       }, 500);
-    } catch {
-      setError("生成失败，请重试");
-      setState((prev) => ({ ...prev, step: 3 }));
-    }
+    }, 400);
   };
 
   return (
@@ -139,30 +142,16 @@ export default function CreatePage() {
           />
         )}
 
-        {!loading && state.step === 3 && state.expandResult && (
-          <div className="space-y-6 rounded-xl border border-[#D4AF37]/20 bg-[#0a0a0a] p-6">
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-[#D4AF37]">
-                {state.expandResult.title}
-              </h2>
-              <p className="text-sm text-zinc-400 italic">
-                {state.expandResult.logline}
-              </p>
-            </div>
-            <div className="space-y-2 text-sm text-zinc-300">
-              <p>世界观：{state.expandResult.world}</p>
-              <p>基调：{state.expandResult.tone}</p>
-              <p>核心冲突：{state.expandResult.coreConflict}</p>
-              <p>人物关系：{state.expandResult.characterDynamics}</p>
-            </div>
-            <Button
-              onClick={() => void handleStructureConfirm()}
-              className="h-12 w-full bg-[#D4AF37] font-bold text-black hover:bg-[#B8962E]"
-            >
-              确认结构，开始生成剧本 →
-            </Button>
-          </div>
-        )}
+        {!loading &&
+          state.step === 3 &&
+          state.expandResult &&
+          state.structureResult && (
+            <StructureViewer
+              structure={state.structureResult}
+              expandResult={state.expandResult}
+              onConfirm={handleStructureConfirm}
+            />
+          )}
 
         {state.step === 4 && (
           <div className="py-20 text-center text-zinc-400">
