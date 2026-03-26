@@ -1,8 +1,7 @@
 {
-  "framework": "nextjs",
   "functions": {
     "app/**/*.{js,ts,tsx}": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }
