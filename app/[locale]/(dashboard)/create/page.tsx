@@ -7,6 +7,7 @@ import { DirectionSelector } from "@/components/script-creation/DirectionSelecto
 import { StructureViewer } from "@/components/script-creation/StructureViewer";
 import { NELProcessing } from "@/components/script-creation/NELProcessing";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
+import { finalizeScriptWizardProjectAction } from "@/actions/script-wizard.actions";
 import type {
   ScriptFlowState,
   DevelopExploreResponse,
@@ -96,16 +97,33 @@ export default function CreatePage() {
     }
   };
 
-  const handleStructureConfirm = () => {
-    if (!state.expandResult || !state.structureResult) return;
+  const handleStructureConfirm = async () => {
+    if (
+      !state.expandResult ||
+      !state.structureResult ||
+      !state.selectedDirection ||
+      !state.exploreResult
+    ) {
+      return;
+    }
+    setLoading(true);
     setError(null);
     setState((prev) => ({ ...prev, step: 4 }));
-    window.setTimeout(() => {
-      setState((prev) => ({ ...prev, step: 5 }));
-      window.setTimeout(() => {
-        router.push("/dashboard");
-      }, 500);
-    }, 400);
+    const saveResult = await finalizeScriptWizardProjectAction({
+      idea: state.idea,
+      selectedDirection: state.selectedDirection,
+      expandResult: state.expandResult,
+      structureResult: state.structureResult,
+      episodeCount: state.episodeCount,
+      directions: state.exploreResult.directions,
+    });
+    if (!saveResult.success) {
+      setLoading(false);
+      setError(saveResult.error);
+      return;
+    }
+    setState((prev) => ({ ...prev, step: 5 }));
+    router.push(`/project/${saveResult.data.projectId}`);
   };
 
   return (
