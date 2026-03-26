@@ -3,6 +3,24 @@ import { createClient } from "@/lib/supabase/server";
 import type { AspectRatio, Beat, BeatStatus, GenerationProvider, Project, ProjectStatus, SceneGrade } from "@/types";
 import { GenerateAllButtonHost } from "@/components/project/GenerateAllButtonHost";
 
+type ScriptRawShape = {
+  expandedStory?: { title?: string; logline?: string };
+  structure?: {
+    episodes?: Array<{ episode?: number; summary?: string }>;
+  };
+};
+
+function parseScriptRaw(raw: string | null): ScriptRawShape | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return null;
+    return parsed as ScriptRawShape;
+  } catch {
+    return null;
+  }
+}
+
 function makeDummyBeats(input: {
   projectId: string;
   count: number;
@@ -70,7 +88,7 @@ export default async function ProjectIdPage({
 
   const { data: projectRow, error: projectErr } = await supabase
     .from("projects")
-    .select("status,video_duration_sec,aspect_ratio")
+    .select("status,video_duration_sec,aspect_ratio,script_raw,title")
     .eq("id", projectId)
     .single();
 
@@ -81,6 +99,8 @@ export default async function ProjectIdPage({
   const statusRaw = projectRow.status as ProjectStatus;
   const video_duration_sec = Number(projectRow.video_duration_sec);
   const aspect_ratio = (projectRow.aspect_ratio as AspectRatio) || "9:16";
+  const parsedScript = parseScriptRaw((projectRow.script_raw as string | null) ?? null);
+  const scenes = parsedScript?.structure?.episodes ?? [];
 
   const { count } = await supabase
     .from("characters")
@@ -106,7 +126,28 @@ export default async function ProjectIdPage({
 
   return (
     <div className="container max-w-4xl py-10">
-      <h1 className="text-2xl font-bold mb-4">Project Dashboard</h1>
+      <h1 className="mb-4 text-2xl font-bold">{(projectRow.title as string) || "Project Dashboard"}</h1>
+
+      {scenes.length > 0 ? (
+        <section className="mb-8 rounded-xl border border-white/10 bg-zinc-950/40 p-5">
+          <h2 className="mb-3 text-lg font-semibold">场景列表（来自 script_raw）</h2>
+          <div className="space-y-2">
+            {scenes.map((scene, idx) => (
+              <div key={`${scene.episode ?? idx}`} className="rounded-lg border border-zinc-800 p-3">
+                <div className="text-sm font-semibold text-amber-300">
+                  EP{scene.episode ?? idx + 1}
+                </div>
+                <p className="mt-1 text-sm text-zinc-300">{scene.summary ?? ""}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="mb-8 rounded-xl border border-dashed border-zinc-700 bg-zinc-950/20 p-5 text-sm text-zinc-400">
+          当前项目暂无可展示的场景数据（`script_raw.structure.episodes` 为空）。
+        </section>
+      )}
+
       <GenerateAllButtonHost project={project} beats={beats} />
     </div>
   );
