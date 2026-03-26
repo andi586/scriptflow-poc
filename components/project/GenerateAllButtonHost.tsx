@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import imageCompression from "browser-image-compression";
 import type { Beat, Project } from "@/types";
 import { GenerateAllButton } from "@/components/project/GenerateAllButton";
 import { createClient } from "@/lib/supabase/client";
@@ -76,12 +77,16 @@ export function GenerateAllButtonHost({
   };
 
   const uploadCustomImage = async (characterName: string, file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const converted = await imageCompression(file, {
+      fileType: "image/jpeg",
+      maxSizeMB: 2,
+    });
+    const ext = "jpg";
     const safeName = characterName.replace(/[^a-zA-Z0-9_-]/g, "_");
     const path = `${project.id}/locks/${safeName}-${Date.now()}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from("character-images")
-      .upload(path, file, { upsert: true });
+      .upload(path, converted, { upsert: true, contentType: "image/jpeg" });
     if (uploadError) {
       throw new Error(uploadError.message);
     }
@@ -119,7 +124,7 @@ export function GenerateAllButtonHost({
                   上传自定义图
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
