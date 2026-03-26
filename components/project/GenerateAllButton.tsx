@@ -10,12 +10,14 @@ interface Props {
   project: Project;
   beats: Beat[];
   onGenerateConfirmed: () => Promise<void>;
+  disabled?: boolean;
 }
 
 export function GenerateAllButton({
   project,
   beats,
   onGenerateConfirmed,
+  disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [estimate, setEstimate] = useState<CostEstimate | null>(null);
@@ -38,7 +40,7 @@ export function GenerateAllButton({
     <>
       <Button
         onClick={handleClick}
-        disabled={isPending || beats.length === 0}
+        disabled={disabled || isPending || beats.length === 0}
         className="bg-[#D4AF37] text-black hover:opacity-90"
       >
         {isPending ? "Calculating..." : "Generate All"}

@@ -7,6 +7,7 @@ type ScriptRawShape = {
   expandedStory?: { title?: string; logline?: string };
   structure?: {
     episodes?: Array<{ episode?: number; summary?: string }>;
+    characters?: Array<{ name: string; role: "protagonist" | "antagonist" | "supporting" }>;
   };
 };
 
@@ -56,6 +57,7 @@ function makeDummyProject(input: {
   status: ProjectStatus;
   video_duration_sec: number;
   aspect_ratio: AspectRatio;
+  script_raw: string | null;
 }): Project {
   const now = new Date().toISOString();
   return {
@@ -68,7 +70,7 @@ function makeDummyProject(input: {
     video_duration_sec: input.video_duration_sec,
     total_credits_used: 0,
     credits_budget: null,
-    script_raw: null,
+    script_raw: input.script_raw,
     status: input.status,
     created_at: now,
     updated_at: now,
@@ -88,7 +90,7 @@ export default async function ProjectIdPage({
 
   const { data: projectRow, error: projectErr } = await supabase
     .from("projects")
-    .select("status,video_duration_sec,aspect_ratio,script_raw,title")
+    .select("status,video_duration_sec,aspect_ratio,script_raw,title,character_images")
     .eq("id", projectId)
     .single();
 
@@ -101,6 +103,11 @@ export default async function ProjectIdPage({
   const aspect_ratio = (projectRow.aspect_ratio as AspectRatio) || "9:16";
   const parsedScript = parseScriptRaw((projectRow.script_raw as string | null) ?? null);
   const scenes = parsedScript?.structure?.episodes ?? [];
+  const characters = parsedScript?.structure?.characters ?? [];
+  const initialCharacterImages =
+    typeof projectRow.character_images === "object" && projectRow.character_images !== null
+      ? (projectRow.character_images as Record<string, string>)
+      : {};
 
   const { count } = await supabase
     .from("characters")
@@ -120,6 +127,7 @@ export default async function ProjectIdPage({
       ? video_duration_sec
       : 5,
     aspect_ratio,
+    script_raw: (projectRow.script_raw as string | null) ?? null,
   });
 
   const beats = makeDummyBeats({ projectId, count: 5 });
@@ -148,7 +156,12 @@ export default async function ProjectIdPage({
         </section>
       )}
 
-      <GenerateAllButtonHost project={project} beats={beats} />
+      <GenerateAllButtonHost
+        project={project}
+        beats={beats}
+        characters={characters}
+        initialCharacterImages={initialCharacterImages}
+      />
     </div>
   );
 }
