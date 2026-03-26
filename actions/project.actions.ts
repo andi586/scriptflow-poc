@@ -10,6 +10,10 @@ export async function createProjectAction(input: {
   language?: string;
 }): Promise<ActionResult<{ projectId: string }>> {
   try {
+    console.log(
+      "[CREATE PROJECT ENTRY]",
+      JSON.stringify({ title: input.title, userId: input.userId, language: input.language ?? "en" })
+    );
     const supabase = createClient();
 
     const { data, error } = await supabase
@@ -22,9 +26,15 @@ export async function createProjectAction(input: {
       .select("id")
       .single();
 
-    if (error) throw error;
+    console.log("[DB INSERT]", JSON.stringify({ newProject: data, insertError: error }));
+
+    if (error) {
+      console.log("[CREATE PROJECT EXIT EARLY]", "insert returned error before success return");
+      throw error;
+    }
     return { success: true, data: { projectId: data.id as string } };
   } catch (e) {
+    console.log("[CREATE PROJECT EXIT EARLY]", "caught exception in createProjectAction");
     return { success: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
@@ -48,6 +58,10 @@ export async function createNewProjectAction(input?: {
 }): Promise<ActionResult<{ projectId: string }>> {
   const userId = resolveProjectOwnerUserId();
   if (!userId) {
+    console.log(
+      "[CREATE PROJECT EXIT EARLY]",
+      "missing or invalid SCRIPTFLOW_DEMO_USER_ID / SCRIPTFLOW_PROJECT_OWNER_USER_ID"
+    );
     return {
       success: false,
       error:

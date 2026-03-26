@@ -44,7 +44,9 @@ export default function CreatePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "explore", idea: data.idea }),
       });
-      const result = (await res.json()) as DevelopExploreResponse;
+      const raw = (await res.json()) as unknown;
+      console.log("[DEBUG] develop response:", JSON.stringify(raw));
+      const result = raw as DevelopExploreResponse;
       setState((prev) => ({ ...prev, ...data, step: 2, exploreResult: result }));
     } catch {
       setError("生成失败，请重试");
@@ -123,7 +125,18 @@ export default function CreatePage() {
       return;
     }
     setState((prev) => ({ ...prev, step: 5 }));
-    router.push(`/project/${saveResult.data.projectId}`);
+    const data = {
+      projectId: saveResult.data.projectId,
+      id: saveResult.data.projectId,
+      project: { id: saveResult.data.projectId },
+    };
+    const projectId = data.projectId ?? data.id ?? data.project?.id;
+    if (!projectId) {
+      console.error("[ERROR] 项目ID为空，无法跳转", data);
+      setLoading(false);
+      return;
+    }
+    router.push(`/en/project/${projectId}`);
   };
 
   return (
