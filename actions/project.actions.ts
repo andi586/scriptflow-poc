@@ -42,7 +42,8 @@ export async function createProjectAction(input: {
 function resolveProjectOwnerUserId(): string | null {
   const a = process.env.SCRIPTFLOW_DEMO_USER_ID?.trim();
   const b = process.env.SCRIPTFLOW_PROJECT_OWNER_USER_ID?.trim();
-  const id = a || b || "";
+  // Prefer explicit owner ID over demo fallback when both exist.
+  const id = b || a || "";
   return id && isValidUuid(id) ? id : null;
 }
 
@@ -55,8 +56,11 @@ function resolveProjectOwnerUserId(): string | null {
  */
 export async function createNewProjectAction(input?: {
   title?: string;
+  userId?: string;
 }): Promise<ActionResult<{ projectId: string }>> {
-  const userId = resolveProjectOwnerUserId();
+  const userId =
+    (input?.userId?.trim() && isValidUuid(input.userId.trim()) ? input.userId.trim() : null) ??
+    resolveProjectOwnerUserId();
   if (!userId) {
     console.log(
       "[CREATE PROJECT EXIT EARLY]",

@@ -60,9 +60,10 @@ function makeDummyProject(input: {
 export default async function ProjectIdPage({
   params,
 }: {
-  params: { locale: string; id: string };
+  params: Promise<{ locale: string; id: string }>;
 }) {
-  const projectId = params.id.trim();
+  const { id } = await params;
+  const projectId = id?.trim();
   if (!projectId) redirect("/new-project");
 
   const supabase = createClient();

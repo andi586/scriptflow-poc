@@ -16,8 +16,10 @@ export async function finalizeScriptWizardProjectAction(input: {
   try {
     const title = input.expandResult.title?.trim() || "New project";
     const base = await createNewProjectAction({ title });
+    console.log("[BASE RESULT]", JSON.stringify(base));
     if (!base.success) return { success: false, error: base.error };
     const projectId = base.data.projectId;
+    console.log("[PROJECT ID]", projectId);
 
     const supabase = createClient();
     const scriptRaw = JSON.stringify({
