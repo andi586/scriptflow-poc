@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { InspirationForm } from "@/components/script-creation/InspirationForm";
 import { DirectionSelector } from "@/components/script-creation/DirectionSelector";
-import { StructureViewer } from "@/components/script-creation/StructureViewer";
 import { NELProcessing } from "@/components/script-creation/NELProcessing";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
+import { Button } from "@/components/ui/button";
 import type {
   ScriptFlowState,
   DevelopExploreResponse,
@@ -72,18 +72,8 @@ export default function CreatePage() {
         step: 3,
         selectedDirection: direction,
         expandResult: result,
+        structureResult: null,
       }));
-
-      const structRes = await fetch("/api/script/structure", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...result,
-          totalEpisodes: state.episodeCount,
-        }),
-      });
-      const structure = (await structRes.json()) as StructureResponse;
-      setState((prev) => ({ ...prev, structureResult: structure }));
     } catch {
       setError("生成失败，请重试");
     } finally {
@@ -91,11 +81,28 @@ export default function CreatePage() {
     }
   };
 
-  const handleStructureConfirm = () => {
-    setState((prev) => ({ ...prev, step: 5 }));
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 500);
+  const handleStructureConfirm = async () => {
+    if (!state.expandResult) return;
+    setError(null);
+    setState((prev) => ({ ...prev, step: 4 }));
+    try {
+      const structRes = await fetch("/api/script/structure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...state.expandResult,
+          totalEpisodes: state.episodeCount,
+        }),
+      });
+      const structure = (await structRes.json()) as StructureResponse;
+      setState((prev) => ({ ...prev, structureResult: structure, step: 5 }));
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 500);
+    } catch {
+      setError("生成失败，请重试");
+      setState((prev) => ({ ...prev, step: 3 }));
+    }
   };
 
   return (
@@ -132,12 +139,29 @@ export default function CreatePage() {
           />
         )}
 
-        {!loading && state.step === 3 && state.structureResult && (
-          <StructureViewer
-            structure={state.structureResult}
-            expandResult={state.expandResult}
-            onConfirm={handleStructureConfirm}
-          />
+        {!loading && state.step === 3 && state.expandResult && (
+          <div className="space-y-6 rounded-xl border border-[#D4AF37]/20 bg-[#0a0a0a] p-6">
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-[#D4AF37]">
+                {state.expandResult.title}
+              </h2>
+              <p className="text-sm text-zinc-400 italic">
+                {state.expandResult.logline}
+              </p>
+            </div>
+            <div className="space-y-2 text-sm text-zinc-300">
+              <p>世界观：{state.expandResult.world}</p>
+              <p>基调：{state.expandResult.tone}</p>
+              <p>核心冲突：{state.expandResult.coreConflict}</p>
+              <p>人物关系：{state.expandResult.characterDynamics}</p>
+            </div>
+            <Button
+              onClick={() => void handleStructureConfirm()}
+              className="h-12 w-full bg-[#D4AF37] font-bold text-black hover:bg-[#B8962E]"
+            >
+              确认结构，开始生成剧本 →
+            </Button>
+          </div>
         )}
 
         {state.step === 4 && (
