@@ -104,7 +104,7 @@ export default function AuthPage() {
           <Button
             type="button"
             variant="ghost"
-            onClick={() => setIsLogin((v) => !v)}
+            onClick={() => setIsLogin(!isLogin)}
             className="w-full text-zinc-400 hover:bg-zinc-900 hover:text-white"
           >
             {isLogin ? "没有账号？去注册" : "已有账号？去登录"}
