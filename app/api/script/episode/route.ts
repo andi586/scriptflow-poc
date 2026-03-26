@@ -4,6 +4,10 @@ import { callClaudeForScript } from "@/lib/ai/claude-script";
 import { safeParseJSON } from "@/lib/utils/parse-json";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+// ========================
+// Zod Schemas
+// ========================
+
 const CharacterSchema = z.object({
   name: z.string().min(1),
   role: z.enum(["protagonist", "antagonist", "supporting"]),
@@ -76,7 +80,11 @@ const ResponseSchema = z.object({
 });
 
 type Input = z.infer<typeof RequestSchema>;
-type EpisodeScriptParsed = z.infer<typeof EpisodeScriptSchema>;
+type EpisodeScript = z.infer<typeof EpisodeScriptSchema>;
+
+// ========================
+// Prompt Builder
+// ========================
 
 function getPacingGuidance(total: 3 | 6 | 9, ep: number): string {
   if (total === 3) {
@@ -153,6 +161,10 @@ ${rewriteBlock}
 {"episodeNumber":${ep},"title":"...","logline":"...","summary":"100-250字摘要","scenes":[{"sceneNumber":1,"sceneTitle":"...","location":"...","timeOfDay":"...","sceneDescription":"...","emotionalBeat":"...","visualPrompt":"...","dialogue":[{"character":"...","emotion":"...","text":"..."}]}]}`;
 }
 
+// ========================
+// DB Helpers
+// ========================
+
 async function getExistingVersion(
   projectId: string,
   episodeNumber: number
@@ -172,7 +184,7 @@ async function getExistingVersion(
 async function upsertEpisode(params: {
   projectId: string;
   totalEpisodes: 3 | 6 | 9;
-  episode: EpisodeScriptParsed;
+  episode: EpisodeScript;
   rewriteInstruction?: string;
   version: number;
 }) {
@@ -216,6 +228,10 @@ async function upsertEpisode(params: {
     status: row.status,
   };
 }
+
+// ========================
+// Route Handler
+// ========================
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
