@@ -95,7 +95,7 @@ export default function CreatePage() {
     setState((prev) => ({ ...prev, step: 5 }));
     setTimeout(() => {
       router.push("/dashboard");
-    }, 2000);
+    }, 500);
   };
 
   return (
@@ -138,6 +138,12 @@ export default function CreatePage() {
             expandResult={state.expandResult}
             onConfirm={handleStructureConfirm}
           />
+        )}
+
+        {state.step === 4 && (
+          <div className="py-20 text-center text-zinc-400">
+            <p>正在生成剧本...</p>
+          </div>
         )}
 
         {state.step === 5 && <NELProcessing />}
