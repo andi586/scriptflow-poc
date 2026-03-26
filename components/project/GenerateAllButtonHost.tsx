@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Beat, Project } from "@/types";
 import { GenerateAllButton } from "@/components/project/GenerateAllButton";
 
@@ -10,6 +11,8 @@ export function GenerateAllButtonHost({
   project: Project;
   beats: Beat[];
 }) {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const parseSeasonSpec = () => {
     if (!project.script_raw) return null;
     try {
@@ -64,11 +67,12 @@ export function GenerateAllButtonHost({
         project={project}
         beats={beats}
         onGenerateConfirmed={async () => {
+          setErrorMessage(null);
           const seasonSpec = parseSeasonSpec();
           if (!seasonSpec) {
             const err = { error: "Missing seasonSpec in project.script_raw" };
             console.error("[GENERATE ERROR]", err);
-            alert(JSON.stringify(err));
+            setErrorMessage("生成失败：缺少季节设定数据（seasonSpec）。");
             return;
           }
 
@@ -86,16 +90,20 @@ export function GenerateAllButtonHost({
             console.log("[GENERATE RESPONSE]", JSON.stringify(data));
             if (!res.ok) {
               console.error("[GENERATE ERROR]", data);
-              // 暂时不跳回，alert 显示错误
-              alert(JSON.stringify(data));
+              setErrorMessage(
+                typeof data === "object" && data !== null && "error" in data
+                  ? String((data as { error: unknown }).error)
+                  : "生成失败，请稍后重试。"
+              );
               return;
             }
           } catch (e) {
             console.error("[GENERATE CATCH]", e);
-            alert(String(e));
+            setErrorMessage(e instanceof Error ? e.message : String(e));
           }
         }}
       />
+      {errorMessage ? <p className="text-sm text-red-400">{errorMessage}</p> : null}
     </div>
   );
 }
