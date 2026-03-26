@@ -20,7 +20,19 @@ const ExpandedStorySchema = z.object({
 
 const CharacterSchema = z.object({
   name: z.string().min(1),
-  role: z.enum(["protagonist", "antagonist", "supporting"]),
+  role: z.string().transform((val) => {
+    if (val === "protagonist" || val === "antagonist" || val === "supporting") {
+      return val;
+    }
+    // Map other Claude role values to canonical roles.
+    if (val.includes("主角") || val.includes("protagonist") || val.includes("hero")) {
+      return "protagonist";
+    }
+    if (val.includes("反派") || val.includes("villain") || val.includes("antagonist")) {
+      return "antagonist";
+    }
+    return "supporting";
+  }) as z.ZodType<"protagonist" | "antagonist" | "supporting">,
   personality: z.string().min(1),
   goal: z.string().min(1),
 });
