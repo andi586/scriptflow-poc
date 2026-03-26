@@ -1,8 +1,20 @@
 {
-  "framework": "nextjs",
   "functions": {
-    "app/**/*.{js,ts,tsx}": {
+    "app/api/watermark-video/route.ts": {
+      "memory": 1024,
       "maxDuration": 300
+    },
+    "app/api/script/develop/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/script/structure/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/script/episode/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/audio/tts/route.ts": {
+      "maxDuration": 60
     }
   }
 }
