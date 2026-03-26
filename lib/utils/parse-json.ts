@@ -1,19 +1,25 @@
-export function safeParseJSON<T>(raw: string): T {
+export function safeParseJSON<T = unknown>(raw: string): T | null {
   try {
+    // 1. Try direct parsing first.
     return JSON.parse(raw) as T;
   } catch {
-    const firstBrace = raw.indexOf("{");
-    const lastBrace = raw.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace !== -1) {
-      return JSON.parse(raw.slice(firstBrace, lastBrace + 1)) as T;
+    // 2. Extract JSON inside markdown code fences.
+    const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      try {
+        return JSON.parse(fenceMatch[1].trim()) as T;
+      } catch {}
     }
 
-    const firstBracket = raw.indexOf("[");
-    const lastBracket = raw.lastIndexOf("]");
-    if (firstBracket !== -1 && lastBracket !== -1) {
-      return JSON.parse(raw.slice(firstBracket, lastBracket + 1)) as T;
+    // 3. Extract the first object or array block.
+    const objMatch = raw.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (objMatch) {
+      try {
+        return JSON.parse(objMatch[1]) as T;
+      } catch {}
     }
 
-    throw new Error("Invalid JSON from Claude");
+    console.error("[safeParseJSON] 全部解析策略失败，原始内容前300字：", raw.slice(0, 300));
+    return null;
   }
 }
