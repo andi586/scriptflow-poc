@@ -1,9 +1,5 @@
 {
   "functions": {
-    "app/api/watermark-video/route.ts": {
-      "memory": 1024,
-      "maxDuration": 300
-    },
     "app/api/script/develop/route.ts": {
       "maxDuration": 60
     },
