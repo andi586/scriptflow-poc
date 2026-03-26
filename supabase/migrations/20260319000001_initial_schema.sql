@@ -4,14 +4,19 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 枚举类型
+DROP TYPE IF EXISTS project_status CASCADE;
 CREATE TYPE project_status AS ENUM ('draft','analyzing','ready','generating','completed','archived');
+DROP TYPE IF EXISTS beat_status CASCADE;
 CREATE TYPE beat_status AS ENUM ('pending','generating','reviewing','approved','rejected','failed');
+DROP TYPE IF EXISTS task_status CASCADE;
 CREATE TYPE task_status AS ENUM ('queued','submitted','processing','completed','failed','retrying');
+DROP TYPE IF EXISTS generation_provider CASCADE;
 CREATE TYPE generation_provider AS ENUM ('kling','runway','veo','luma','pika');
+DROP TYPE IF EXISTS character_role CASCADE;
 CREATE TYPE character_role AS ENUM ('protagonist_female','protagonist_male','supporting','background');
 
 -- 表1: projects（痛点#11：aspect_ratio全局锁定）
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
@@ -33,7 +38,7 @@ CREATE TABLE projects (
 );
 
 -- 表2: story_memory（F01核心：全程故事记忆）
-CREATE TABLE story_memory (
+CREATE TABLE IF NOT EXISTS story_memory (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   narrative_arc TEXT NOT NULL,
@@ -49,7 +54,7 @@ CREATE TABLE story_memory (
 );
 
 -- 表3: characters（F10-F12：强制上传，解决痛点#10）
-CREATE TABLE characters (
+CREATE TABLE IF NOT EXISTS characters (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -67,7 +72,7 @@ CREATE TABLE characters (
 );
 
 -- 表4: beats（F03叙事翻译输出）
-CREATE TABLE beats (
+CREATE TABLE IF NOT EXISTS beats (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   beat_number INTEGER NOT NULL,
@@ -93,7 +98,7 @@ CREATE TABLE beats (
 );
 
 -- 表5: generation_tasks（F15并行调度）
-CREATE TABLE generation_tasks (
+CREATE TABLE IF NOT EXISTS generation_tasks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   beat_id UUID NOT NULL REFERENCES beats(id) ON DELETE CASCADE,
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -115,7 +120,7 @@ CREATE TABLE generation_tasks (
 );
 
 -- 表6: generated_assets（F27按BEAT自动归档）
-CREATE TABLE generated_assets (
+CREATE TABLE IF NOT EXISTS generated_assets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   beat_id UUID NOT NULL REFERENCES beats(id) ON DELETE CASCADE,
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
