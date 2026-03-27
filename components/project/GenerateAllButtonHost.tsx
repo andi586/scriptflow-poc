@@ -287,9 +287,9 @@ export function GenerateAllButtonHost({
             setSuccessMessage(`✅ 视频生成中！已提交 ${submitRes.data.tasks.length} 个场景任务`);
             setGenerating(false);
             
-            // 使用硬跳转到旧流程的视频展示页面
-            console.log("[REDIRECT] Hard redirecting to old flow video page");
-            window.location.href = `https://getscriptflow.com/project/${project.id}`;
+            // 跳转到旧流程首页，会自动恢复上次的生成状态
+            console.log("[REDIRECT] Redirecting to old flow homepage");
+            window.location.href = 'https://getscriptflow.com';
           } catch (e) {
             console.error("[GENERATE ERROR]", e);
             setErrorMessage("生成过程出错");
