@@ -8,7 +8,7 @@ import type { Beat, Project } from "@/types";
 import { GenerateAllButton } from "@/components/project/GenerateAllButton";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { generateKlingPromptsAction, submitKlingTasksAction } from "@/actions/narrative.actions";
+import { generateKlingPromptsAction, submitKlingTasksAction, analyzeScriptAction } from "@/actions/narrative.actions";
 
 type ScriptCharacter = {
   name: string;
@@ -40,6 +40,7 @@ export function GenerateAllButtonHost({
   const [saving, setSaving] = useState(false);
   const [processingImage, setProcessingImage] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -218,84 +219,73 @@ export function GenerateAllButtonHost({
             // 检查是否已有完整的剧本数据（包含episodes）
             const hasEpisodes = rawStructure && Array.isArray(rawStructure.episodes) && rawStructure.episodes.length > 0;
             
-            if (hasEpisodes) {
-              // 已有剧本，直接跳转到旧流程的dashboard
-              console.log("[SCRIPT EXISTS] Project already has script data, skipping episode generation");
-              console.log("[REDIRECT] Going to dashboard");
-              router.push("/en/dashboard");
-              return;
-            }
-
-            // 没有剧本，需要生成
-            const seasonSpec = rawObj
-              ? {
-                  idea: rawObj.idea,
-                  direction: rawObj.selectedDirection,
-                  expandedStory: rawObj.expandedStory,
-                  totalEpisodes: rawObj.totalEpisodes,
-                  threeAct: rawStructure?.threeAct,
-                  characters: rawStructure?.characters,
-                  episodes: rawStructure?.episodes,
-                  foreshadowing: rawStructure?.foreshadowing,
-                }
-              : null;
-            if (!seasonSpec) {
-              console.error("[SEASON SPEC MISSING]", project.script_raw);
-              setErrorMessage("剧本数据不完整，请重新生成剧本");
+            if (!hasEpisodes) {
+              setErrorMessage("项目没有剧本数据，请先生成剧本");
               setGenerating(false);
               return;
             }
 
-            console.log("[GENERATE REQUEST] No script found, calling episode API...");
-
-            // 创建 AbortController 用于超时控制
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 280000); // 280秒超时
-
-            try {
-              const res = await fetch("/api/script/episode", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  projectId: project.id,
-                  episodeNumber: 1,
-                  seasonSpec,
-                }),
-                signal: controller.signal,
-              });
-
-              clearTimeout(timeoutId);
-              const data = await res.json();
-              console.log("[GENERATE RESPONSE]", JSON.stringify(data));
-
-              if (!res.ok) {
-                console.error("[GENERATE ERROR]", data);
-                setErrorMessage(
-                  typeof data === "object" && data !== null && "error" in data
-                    ? String((data as { error: unknown }).error)
-                    : "生成失败，请稍后重试"
-                );
-                setGenerating(false);
-                return;
-              }
-
-              // 剧本生成成功，立即跳转到project页面
-              console.log("[GENERATE SUCCESS] Script generated, redirecting to project page");
-              console.log("[REDIRECT] project.id:", project.id);
-              const targetPath = `/en/project/${project.id}`;
-              console.log("[REDIRECT] Target path:", targetPath);
-              router.push(targetPath);
-            } catch (fetchError) {
-              clearTimeout(timeoutId);
-              if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-                console.error("[GENERATE TIMEOUT] Request timed out after 280 seconds");
-                setErrorMessage("生成超时，请稍后重试");
-              } else {
-                console.error("[GENERATE FETCH ERROR]", fetchError);
-                setErrorMessage(fetchError instanceof Error ? fetchError.message : "网络请求失败");
-              }
+            // 已有剧本，开始生成视频
+            console.log("[SCRIPT EXISTS] Project has script data, starting video generation");
+            
+            // 1. 从 episodes 中提取剧本文本用于 NEL 分析
+            const episodes = rawStructure.episodes as Array<{ episode?: number; summary?: string }>;
+            const scriptText = episodes
+              .map((ep, idx) => `Episode ${idx + 1}: ${ep.summary || ""}`)
+              .join("\n\n");
+            
+            if (!scriptText.trim()) {
+              setErrorMessage("无法从剧本中提取文本");
               setGenerating(false);
+              return;
             }
+
+            // 2. 调用 analyzeScriptAction 生成 story_memory
+            console.log("[STORY MEMORY] Analyzing script with NEL...");
+            const analyzeRes = await analyzeScriptAction({
+              projectId: project.id,
+              scriptText,
+              nelProfile: "lazy",
+            });
+            
+            if (!analyzeRes.success) {
+              console.error("[STORY MEMORY] Analysis failed:", analyzeRes.error);
+              setErrorMessage(`Story analysis failed: ${analyzeRes.error}`);
+              setGenerating(false);
+              return;
+            }
+            
+            console.log("[STORY MEMORY] Analysis complete, story_memory created");
+            
+            // 3. 生成 Kling 提示词
+            console.log("[KLING PROMPTS] Generating prompts...");
+            const promptsRes = await generateKlingPromptsAction({ projectId: project.id });
+            if (!promptsRes.success) {
+              console.error("[KLING PROMPTS] Failed:", promptsRes.error);
+              setErrorMessage(`Prompt generation failed: ${promptsRes.error}`);
+              setGenerating(false);
+              return;
+            }
+
+            console.log("[KLING PROMPTS] Generated", promptsRes.data.prompts.length, "prompts");
+            
+            // 4. 提交 Kling 任务
+            console.log("[KLING SUBMIT] Submitting tasks...");
+            const submitRes = await submitKlingTasksAction({
+              projectId: project.id,
+              prompts: promptsRes.data.prompts,
+            });
+
+            if (!submitRes.success) {
+              console.error("[KLING SUBMIT] Failed:", submitRes.error);
+              setErrorMessage(`Video submission failed: ${submitRes.error}`);
+              setGenerating(false);
+              return;
+            }
+
+            console.log("[KLING SUBMIT] Success:", submitRes.data.tasks.length, "tasks submitted");
+            setSuccessMessage(`✅ 视频生成中！已提交 ${submitRes.data.tasks.length} 个场景任务`);
+            setGenerating(false);
           } catch (e) {
             console.error("[GENERATE ERROR]", e);
             setErrorMessage("生成过程出错");
@@ -305,6 +295,11 @@ export function GenerateAllButtonHost({
       />
       {!allLocked ? (
         <p className="text-sm text-amber-300">请先为所有角色锁定参考图，再生成视频。</p>
+      ) : null}
+      {successMessage ? (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">
+          {successMessage}
+        </div>
       ) : null}
       {errorMessage ? <p className="text-sm text-red-400">{errorMessage}</p> : null}
     </div>
