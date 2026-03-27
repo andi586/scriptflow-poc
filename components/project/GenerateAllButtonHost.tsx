@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import imageCompression from "browser-image-compression";
+import heic2any from "heic2any";
 import type { Beat, Project } from "@/types";
 import { GenerateAllButton } from "@/components/project/GenerateAllButton";
 import { createClient } from "@/lib/supabase/client";
@@ -35,7 +37,9 @@ export function GenerateAllButtonHost({
   const [characterImages, setCharacterImages] =
     useState<Record<string, string>>(initialCharacterImages);
   const [saving, setSaving] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   useEffect(() => {
     fetch("/api/character-templates")
@@ -77,23 +81,47 @@ export function GenerateAllButtonHost({
   };
 
   const uploadCustomImage = async (characterName: string, file: File) => {
-    const converted = await imageCompression(file, {
-      fileType: "image/jpeg",
-      maxSizeMB: 2,
-    });
-    const ext = "jpg";
-    const safeName = characterName.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const path = `${project.id}/locks/${safeName}-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("character-images")
-      .upload(path, converted, { upsert: true, contentType: "image/jpeg" });
-    if (uploadError) {
-      throw new Error(uploadError.message);
+    setProcessingImage(true);
+    try {
+      let fileToUpload: Blob | File = file;
+      let ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+
+      if (
+        file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        /\.heic$/i.test(file.name) ||
+        /\.heif$/i.test(file.name)
+      ) {
+        const convertedBlob = (await heic2any({ blob: file, toType: "image/jpeg" })) as Blob;
+        fileToUpload = new File([convertedBlob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), {
+          type: "image/jpeg",
+        });
+        ext = "jpg";
+      } else {
+        const compressed = await imageCompression(file, {
+          fileType: "image/jpeg",
+          maxSizeMB: 2,
+        });
+        fileToUpload = compressed;
+        ext = "jpg";
+      }
+
+      const safeName = characterName.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const path = `${project.id}/locks/${safeName}-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("character-images")
+        .upload(path, fileToUpload, { upsert: true, contentType: "image/jpeg" });
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+      const { data: pub } = supabase.storage.from("character-images").getPublicUrl(path);
+      const next = { ...characterImages, [characterName]: pub.publicUrl };
+      setCharacterImages(next);
+      await saveCharacterImages(next);
+    } finally {
+      setProcessingImage(false);
     }
-    const { data: pub } = supabase.storage.from("character-images").getPublicUrl(path);
-    const next = { ...characterImages, [characterName]: pub.publicUrl };
-    setCharacterImages(next);
-    await saveCharacterImages(next);
   };
 
   return (
@@ -114,7 +142,7 @@ export function GenerateAllButtonHost({
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={saving}
+                    disabled={saving || processingImage}
                     onClick={() => void chooseTemplate(char.name, tpl.reference_image_url)}
                   >
                     选模板：{tpl.label || tpl.name}
@@ -124,7 +152,7 @@ export function GenerateAllButtonHost({
                   上传自定义图
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                    accept=".heic,.heif,.jpg,.jpeg,.png,.webp"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -137,6 +165,22 @@ export function GenerateAllButtonHost({
                   />
                 </label>
               </div>
+              {characterImages[char.name] ? (
+                <div className="mt-2">
+                  <img
+                    src={characterImages[char.name]}
+                    alt={`${char.name} 参考图`}
+                    className="h-20 w-20 rounded-lg object-cover border border-zinc-700"
+                    width={80}
+                    height={80}
+                  />
+                </div>
+              ) : null
+              }
+              {processingImage ? (
+                <p className="mt-2 text-xs text-amber-300">正在处理图片...</p>
+              ) : null
+              }
               <p className="mt-2 text-xs text-zinc-400">
                 {characterImages[char.name] ? "已锁定" : "未锁定"}
               </p>
@@ -203,6 +247,9 @@ export function GenerateAllButtonHost({
               );
               return;
             }
+
+            // 成功后跳转至项目镜头页
+            router.push(`/en/project/${project.id}/shots`);
           } catch (e) {
             console.error("[GENERATE CATCH]", e);
             setErrorMessage(e instanceof Error ? e.message : String(e));
