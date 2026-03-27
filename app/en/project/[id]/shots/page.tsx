@@ -64,6 +64,7 @@ export default function ShotsPage(props: ShotsPageProps) {
 
     const submitKlingTasks = async () => {
       try {
+        console.log("[KLING] Starting submission for projectId:", projectId);
         console.log("[KLING AUTO-SUBMIT] Starting video generation on page load...");
         
         const promptsRes = await generateKlingPromptsAction({ projectId });
