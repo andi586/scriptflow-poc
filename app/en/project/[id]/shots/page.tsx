@@ -14,25 +14,38 @@ interface KlingTask {
 }
 
 interface ShotsPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-// Cast params to avoid the Promise type issue
-export default function ShotsPage({ params }: ShotsPageProps) {
-  const projectId = params.id;
+// Unwrap Promise params
+export default function ShotsPage(props: ShotsPageProps) {
+  const [projectId, setProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { id } = await props.params;
+      setProjectId(id);
+    })();
+  }, [props.params]);
   const [tasks, setTasks] = useState<KlingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchTasks = async () => {
+    if (!projectId) {
+      setLoading(false);
+      return;
+    }
     try {
+      console.log("[SHOTS PAGE] Fetching tasks for projectId:", projectId);
       const res = await fetch(`/api/projects/${projectId}/kling-tasks`);
       if (!res.ok) {
         throw new Error(`Failed to fetch tasks: ${res.statusText}`);
       }
       const data = await res.json();
+      console.log("[SHOTS PAGE] Fetch success:", data);
       setTasks((data.tasks as KlingTask[]) || []);
       setError(null);
     } catch (err) {
@@ -44,17 +57,18 @@ export default function ShotsPage({ params }: ShotsPageProps) {
   };
 
   useEffect(() => {
+    if (!projectId) return;
     fetchTasks();
     const interval = setInterval(fetchTasks, 5000);
     return () => clearInterval(interval);
   }, [projectId]);
 
-  if (loading) {
+  if (loading || !projectId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#080808] text-white">
         <div className="text-center">
           <Loader className="mb-4 h-12 w-12 animate-spin text-[#D4AF37]" />
-          <p className="text-lg">加载镜头状态...</p>
+          <p className="text-lg">加载中...</p>
         </div>
       </div>
     );
