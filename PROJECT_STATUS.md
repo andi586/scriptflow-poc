@@ -87,3 +87,8 @@
 - ✅ 全部已部署到 https://getscriptflow.com（commit `d500ab3`）
 
 > 以后每完成一个功能，必须同步更新此文件以保持项目文档与代码同步。
+
+## 重要教训（2026-03-27）
+旧的create流程（getscriptflow.com首页）已端到端全通：剧本生成→Kling视频→视频播放。
+新建的/en/project/[id]/shots页面是重复劳动，暂时废弃。
+下一步：在旧create流程基础上添加配音TTS和BGM的UI，不要新建页面。

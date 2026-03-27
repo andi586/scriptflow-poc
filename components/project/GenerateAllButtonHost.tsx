@@ -8,6 +8,7 @@ import type { Beat, Project } from "@/types";
 import { GenerateAllButton } from "@/components/project/GenerateAllButton";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { generateKlingPromptsAction, submitKlingTasksAction } from "@/actions/narrative.actions";
 
 type ScriptCharacter = {
   name: string;
@@ -263,6 +264,31 @@ export function GenerateAllButtonHost({
                 );
                 setGenerating(false);
                 return;
+              }
+
+              // 剧本生成成功，开始提交Kling视频生成任务
+              console.log("[KLING SUBMIT] Starting video generation...");
+              try {
+                const promptsRes = await generateKlingPromptsAction({ projectId: project.id });
+                if (promptsRes.success) {
+                  console.log("[KLING PROMPTS] Generated", promptsRes.data.prompts.length, "prompts");
+                  const submitRes = await submitKlingTasksAction({
+                    projectId: project.id,
+                    prompts: promptsRes.data.prompts,
+                  });
+                  if (submitRes.success) {
+                    console.log("[KLING SUBMIT] Success:", submitRes.data.tasks.length, "tasks submitted");
+                  } else {
+                    console.error("[KLING SUBMIT] Failed:", submitRes.error);
+                    // 不阻断流程，继续跳转
+                  }
+                } else {
+                  console.error("[KLING PROMPTS] Failed:", promptsRes.error);
+                  // 不阻断流程，继续跳转
+                }
+              } catch (klingError) {
+                console.error("[KLING SUBMIT ERROR]", klingError);
+                // 不阻断流程，继续跳转
               }
 
               // 成功，跳转到shots页
