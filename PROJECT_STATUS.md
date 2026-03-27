@@ -89,6 +89,49 @@
 > 以后每完成一个功能，必须同步更新此文件以保持项目文档与代码同步。
 
 ## 重要教训（2026-03-27）
+
+### 上午：旧流程验证
 旧的create流程（getscriptflow.com首页）已端到端全通：剧本生成→Kling视频→视频播放。
 新建的/en/project/[id]/shots页面是重复劳动，暂时废弃。
 下一步：在旧create流程基础上添加配音TTS和BGM的UI，不要新建页面。
+
+### 下午：新流程集成（2026-03-27 14:00-17:36）
+
+**✅ 已完成：**
+1. **Kling 任务提交成功**：在 `/en/project/[id]` 页面实现完整的视频生成流程
+   - 从 `script_raw.structure.episodes` 提取剧本文本
+   - 调用 `analyzeScriptAction` 生成 `story_memory`（NEL 分析）
+   - 调用 `generateKlingPromptsAction` 生成提示词
+   - 调用 `submitKlingTasksAction` 提交 6 个场景任务
+   - 所有步骤都有详细的 console.log 日志
+
+2. **新流程剧本→视频生成链路打通**：
+   - `GenerateAllButtonHost.tsx` 实现角色锁定 + Kling 提交
+   - 支持选择模板或上传自定义图片
+   - 支持 HEIC 格式自动转换
+   - 提交成功后显示绿色成功消息
+
+3. **Middleware 白名单配置**：
+   - `middleware.ts` 添加 `/project/` 路径白名单
+   - `lib/supabase/middleware.ts` 添加 `/project/` 到 `isPublicPath`
+
+**❌ 未解决的问题：**
+1. **首页路由冲突**：
+   - `getscriptflow.com` 首页被 middleware 重定向到 `/en/new-project`
+   - 旧流程视频展示页面（`app/page.tsx`）无法直接访问
+   - `/project/[id]` 路径会重定向到 `/en/dashboard`
+
+2. **跳转到旧流程失败**：
+   - 新流程 Kling 提交成功后尝试跳转到 `https://getscriptflow.com`
+   - 但首页会被重定向，无法看到视频生成结果
+   - 需要解决新旧流程共存的路由问题
+
+**下一步计划：**
+1. 解决首页路由冲突，让旧流程首页（`app/page.tsx`）能正常访问
+2. 或者在新流程中直接显示视频生成结果，不跳转到旧流程
+3. 统一新旧流程的视频展示逻辑
+
+**技术债务：**
+- 两套流程并存导致路由复杂度增加
+- Middleware 重定向逻辑需要重新设计
+- 需要明确新旧流程的边界和职责
