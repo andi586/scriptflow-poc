@@ -60,7 +60,23 @@ export default function ShotsPage(props: ShotsPageProps) {
 
   // 页面加载时自动提交Kling任务（仅一次）
   useEffect(() => {
-    if (!projectId || klingSubmitted) return;
+    console.log("[KLING EFFECT] useEffect triggered", {
+      projectId,
+      klingSubmitted,
+      shouldRun: !(!projectId || klingSubmitted),
+    });
+    
+    if (!projectId) {
+      console.log("[KLING EFFECT] Skipping: no projectId");
+      return;
+    }
+    
+    if (klingSubmitted) {
+      console.log("[KLING EFFECT] Skipping: already submitted");
+      return;
+    }
+    
+    console.log("[KLING EFFECT] Conditions met, starting submission...");
 
     const submitKlingTasks = async () => {
       try {
