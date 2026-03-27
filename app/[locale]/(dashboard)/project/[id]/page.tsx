@@ -109,16 +109,21 @@ export default async function ProjectIdPage({
       ? (projectRow.character_images as Record<string, string>)
       : {};
 
-  const { count } = await supabase
+  const { count, error: countError } = await supabase
     .from("characters")
     .select("id", { count: "exact" })
     .eq("project_id", projectId);
 
+  if (countError) {
+    console.error("[PROJECT PAGE] Error counting characters:", countError);
+  }
+
   const charactersLength = typeof count === "number" ? count : 0;
 
-  if (statusRaw === "draft" && charactersLength === 0) {
-    redirect("/new-project");
-  }
+  // 注释掉这个重定向，允许没有 characters 表数据的项目访问
+  // if (statusRaw === "draft" && charactersLength === 0) {
+  //   redirect("/new-project");
+  // }
 
   const project = makeDummyProject({
     id: projectId,
