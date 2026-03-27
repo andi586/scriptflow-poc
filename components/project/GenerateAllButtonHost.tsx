@@ -238,6 +238,7 @@ export function GenerateAllButtonHost({
 
             // 调用API - await直到完成或失败
             try {
+              console.log('[DEBUG] About to call episode API');
               console.log("[GENERATE REQUEST] Sending request to /api/script/episode");
               const res = await fetch("/api/script/episode", {
                 method: "POST",
