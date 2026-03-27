@@ -14,14 +14,20 @@ export async function finalizeScriptWizardProjectAction(input: {
   directions: Direction[];
 }): Promise<ActionResult<{ projectId: string }>> {
   try {
+    const supabaseAuth = createClient();
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: '用户未登录，请重新登录后再试' };
+    }
+
     const title = input.expandResult.title?.trim() || "New project";
-    const base = await createNewProjectAction({ title });
+    const base = await createNewProjectAction({ title, userId: user.id });
     console.log("[BASE RESULT]", JSON.stringify(base));
     if (!base.success) return { success: false, error: base.error };
     const projectId = base.data.projectId;
     console.log("[PROJECT ID]", projectId);
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const scriptRaw = JSON.stringify({
       idea: input.idea,
       selectedDirection: input.selectedDirection,
