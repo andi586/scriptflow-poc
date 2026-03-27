@@ -219,12 +219,10 @@ export function GenerateAllButtonHost({
             const hasEpisodes = rawStructure && Array.isArray(rawStructure.episodes) && rawStructure.episodes.length > 0;
             
             if (hasEpisodes) {
-              // 已有剧本，直接跳转到project页面
+              // 已有剧本，直接跳转到旧流程的dashboard
               console.log("[SCRIPT EXISTS] Project already has script data, skipping episode generation");
-              console.log("[REDIRECT] Going to project page, project.id:", project.id);
-              const targetPath = `/en/project/${project.id}`;
-              console.log("[REDIRECT] Target path:", targetPath);
-              router.push(targetPath);
+              console.log("[REDIRECT] Going to dashboard");
+              router.push("/en/dashboard");
               return;
             }
 
