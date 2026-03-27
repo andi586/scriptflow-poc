@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
+import { generateKlingPromptsAction, submitKlingTasksAction } from "@/actions/narrative.actions";
 
 interface KlingTask {
   id: string;
@@ -32,6 +33,7 @@ export default function ShotsPage(props: ShotsPageProps) {
   const [tasks, setTasks] = useState<KlingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [klingSubmitted, setKlingSubmitted] = useState(false);
 
   const fetchTasks = async () => {
     if (!projectId) {
@@ -55,6 +57,43 @@ export default function ShotsPage(props: ShotsPageProps) {
       setLoading(false);
     }
   };
+
+  // 页面加载时自动提交Kling任务（仅一次）
+  useEffect(() => {
+    if (!projectId || klingSubmitted) return;
+
+    const submitKlingTasks = async () => {
+      try {
+        console.log("[KLING AUTO-SUBMIT] Starting video generation on page load...");
+        
+        const promptsRes = await generateKlingPromptsAction({ projectId });
+        if (!promptsRes.success) {
+          console.error("[KLING PROMPTS] Failed:", promptsRes.error);
+          return;
+        }
+
+        console.log("[KLING PROMPTS] Generated", promptsRes.data.prompts.length, "prompts");
+        
+        const submitRes = await submitKlingTasksAction({
+          projectId,
+          prompts: promptsRes.data.prompts,
+        });
+
+        if (submitRes.success) {
+          console.log("[KLING SUBMIT] Success:", submitRes.data.tasks.length, "tasks submitted");
+          setKlingSubmitted(true);
+          // 立即刷新任务列表
+          await fetchTasks();
+        } else {
+          console.error("[KLING SUBMIT] Failed:", submitRes.error);
+        }
+      } catch (klingError) {
+        console.error("[KLING AUTO-SUBMIT ERROR]", klingError);
+      }
+    };
+
+    submitKlingTasks();
+  }, [projectId, klingSubmitted]);
 
   useEffect(() => {
     if (!projectId) return;

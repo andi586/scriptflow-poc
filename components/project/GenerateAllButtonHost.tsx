@@ -266,33 +266,9 @@ export function GenerateAllButtonHost({
                 return;
               }
 
-              // 剧本生成成功，开始提交Kling视频生成任务
-              console.log("[KLING SUBMIT] Starting video generation...");
-              try {
-                const promptsRes = await generateKlingPromptsAction({ projectId: project.id });
-                if (promptsRes.success) {
-                  console.log("[KLING PROMPTS] Generated", promptsRes.data.prompts.length, "prompts");
-                  const submitRes = await submitKlingTasksAction({
-                    projectId: project.id,
-                    prompts: promptsRes.data.prompts,
-                  });
-                  if (submitRes.success) {
-                    console.log("[KLING SUBMIT] Success:", submitRes.data.tasks.length, "tasks submitted");
-                  } else {
-                    console.error("[KLING SUBMIT] Failed:", submitRes.error);
-                    // 不阻断流程，继续跳转
-                  }
-                } else {
-                  console.error("[KLING PROMPTS] Failed:", promptsRes.error);
-                  // 不阻断流程，继续跳转
-                }
-              } catch (klingError) {
-                console.error("[KLING SUBMIT ERROR]", klingError);
-                // 不阻断流程，继续跳转
-              }
-
-              // 成功，跳转到shots页
-              console.log("[GENERATE SUCCESS] Redirecting to shots page");
+              // 剧本生成成功，立即跳转到shots页（Kling提交将在shots页加载时触发）
+              console.log("[GENERATE SUCCESS] Script generated, redirecting to shots page");
+              console.log("[KLING SUBMIT] Video generation will be triggered on shots page load");
               router.push(`/en/project/${project.id}/shots`);
             } catch (fetchError) {
               clearTimeout(timeoutId);
