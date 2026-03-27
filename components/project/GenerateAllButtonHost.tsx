@@ -197,7 +197,7 @@ export function GenerateAllButtonHost({
         onGenerateConfirmed={async () => {
           setErrorMessage(null);
           setGenerating(true);
-          
+
           try {
             let scriptRaw: unknown = null;
             try {
@@ -225,8 +225,6 @@ export function GenerateAllButtonHost({
                   foreshadowing: rawStructure?.foreshadowing,
                 }
               : null;
-            
-            // 验证seasonSpec
             if (!seasonSpec) {
               console.error("[SEASON SPEC MISSING]", project.script_raw);
               setErrorMessage("剧本数据不完整，请重新生成剧本");
@@ -234,12 +232,13 @@ export function GenerateAllButtonHost({
               return;
             }
 
-            console.log("[GENERATE CONFIRM] Valid seasonSpec, initiating request...");
+            console.log("[GENERATE REQUEST] Calling episode API...");
 
-            // 调用API - await直到完成或失败
+            // 创建 AbortController 用于超时控制
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 280000); // 280秒超时
+
             try {
-              console.log('[DEBUG] About to call episode API');
-              console.log("[GENERATE REQUEST] Sending request to /api/script/episode");
               const res = await fetch("/api/script/episode", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -248,27 +247,36 @@ export function GenerateAllButtonHost({
                   episodeNumber: 1,
                   seasonSpec,
                 }),
+                signal: controller.signal,
               });
+
+              clearTimeout(timeoutId);
               const data = await res.json();
               console.log("[GENERATE RESPONSE]", JSON.stringify(data));
-              
+
               if (!res.ok) {
                 console.error("[GENERATE ERROR]", data);
                 setErrorMessage(
                   typeof data === "object" && data !== null && "error" in data
                     ? String((data as { error: unknown }).error)
-                    : "生成请求失败，请稍后重试"
+                    : "生成失败，请稍后重试"
                 );
                 setGenerating(false);
                 return;
               }
 
               // 成功，跳转到shots页
-              console.log("[GENERATE SUCCESS] Navigating to shots page");
+              console.log("[GENERATE SUCCESS] Redirecting to shots page");
               router.push(`/en/project/${project.id}/shots`);
-            } catch (e) {
-              console.error("[GENERATE REQUEST ERROR]", e);
-              setErrorMessage(e instanceof Error ? e.message : "生成请求失败");
+            } catch (fetchError) {
+              clearTimeout(timeoutId);
+              if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                console.error("[GENERATE TIMEOUT] Request timed out after 280 seconds");
+                setErrorMessage("生成超时，请稍后重试");
+              } else {
+                console.error("[GENERATE FETCH ERROR]", fetchError);
+                setErrorMessage(fetchError instanceof Error ? fetchError.message : "网络请求失败");
+              }
               setGenerating(false);
             }
           } catch (e) {
