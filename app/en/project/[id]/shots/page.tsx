@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader } from "lucide-react";
-import { generateKlingPromptsAction, submitKlingTasksAction } from "@/actions/narrative.actions";
+import { generateKlingPromptsAction, submitKlingTasksAction, analyzeScriptAction } from "@/actions/narrative.actions";
 
 interface KlingTask {
   id: string;
@@ -67,6 +67,55 @@ export default function ShotsPage(props: ShotsPageProps) {
         console.log("[KLING] Starting submission for projectId:", projectId);
         console.log("[KLING AUTO-SUBMIT] Starting video generation on page load...");
         
+        // 1. 先检查/生成 story_memory（NEL分析）
+        console.log("[STORY MEMORY] Checking if story_memory exists...");
+        
+        // 从 projects 表获取 script_raw
+        const projectRes = await fetch(`/api/projects/${projectId}`);
+        if (!projectRes.ok) {
+          throw new Error("Failed to fetch project data");
+        }
+        const projectData = await projectRes.json();
+        const scriptRaw = projectData.script_raw;
+        
+        if (!scriptRaw) {
+          throw new Error("Project has no script_raw data");
+        }
+        
+        // 解析 script_raw 获取剧本文本
+        let scriptText = "";
+        try {
+          const parsed = JSON.parse(scriptRaw);
+          // 从 episodes 中提取剧本文本
+          if (parsed.structure?.episodes && Array.isArray(parsed.structure.episodes)) {
+            scriptText = parsed.structure.episodes
+              .map((ep: any, idx: number) => `Episode ${idx + 1}: ${ep.summary || ""}`)
+              .join("\n\n");
+          }
+        } catch (e) {
+          console.error("[SCRIPT PARSE ERROR]", e);
+          throw new Error("Failed to parse script_raw");
+        }
+        
+        if (!scriptText.trim()) {
+          throw new Error("No script text found in project");
+        }
+        
+        console.log("[STORY MEMORY] Analyzing script with NEL...");
+        const analyzeRes = await analyzeScriptAction({
+          projectId,
+          scriptText,
+          nelProfile: "lazy",
+        });
+        
+        if (!analyzeRes.success) {
+          console.error("[STORY MEMORY] Analysis failed:", analyzeRes.error);
+          throw new Error(`Story analysis failed: ${analyzeRes.error}`);
+        }
+        
+        console.log("[STORY MEMORY] Analysis complete, story_memory created");
+        
+        // 2. 生成 Kling 提示词
         const promptsRes = await generateKlingPromptsAction({ projectId });
         if (!promptsRes.success) {
           console.error("[KLING PROMPTS] Failed:", promptsRes.error);
@@ -75,6 +124,7 @@ export default function ShotsPage(props: ShotsPageProps) {
 
         console.log("[KLING PROMPTS] Generated", promptsRes.data.prompts.length, "prompts");
         
+        // 3. 提交 Kling 任务
         const submitRes = await submitKlingTasksAction({
           projectId,
           prompts: promptsRes.data.prompts,
@@ -90,6 +140,7 @@ export default function ShotsPage(props: ShotsPageProps) {
         }
       } catch (klingError) {
         console.error("[KLING AUTO-SUBMIT ERROR]", klingError);
+        setError(klingError instanceof Error ? klingError.message : String(klingError));
       }
     };
 
