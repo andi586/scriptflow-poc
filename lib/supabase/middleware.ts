@@ -32,6 +32,7 @@ export const updateSession = async (request: NextRequest) => {
   const localeRootPath = /^\/[a-zA-Z-]+(\/)?$/
 
   const isPublicPath =
+    pathname === '/' ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
