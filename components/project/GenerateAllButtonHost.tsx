@@ -214,6 +214,19 @@ export function GenerateAllButtonHost({
               rawObj && typeof rawObj.structure === "object" && rawObj.structure !== null
                 ? (rawObj.structure as Record<string, unknown>)
                 : null;
+
+            // 检查是否已有完整的剧本数据（包含episodes）
+            const hasEpisodes = rawStructure && Array.isArray(rawStructure.episodes) && rawStructure.episodes.length > 0;
+            
+            if (hasEpisodes) {
+              // 已有剧本，直接跳转到shots页面触发视频生成
+              console.log("[SCRIPT EXISTS] Project already has script data, skipping episode generation");
+              console.log("[REDIRECT] Going directly to shots page for video generation");
+              router.push(`/en/project/${project.id}/shots`);
+              return;
+            }
+
+            // 没有剧本，需要生成
             const seasonSpec = rawObj
               ? {
                   idea: rawObj.idea,
@@ -233,7 +246,7 @@ export function GenerateAllButtonHost({
               return;
             }
 
-            console.log("[GENERATE REQUEST] Calling episode API...");
+            console.log("[GENERATE REQUEST] No script found, calling episode API...");
 
             // 创建 AbortController 用于超时控制
             const controller = new AbortController();
