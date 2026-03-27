@@ -226,34 +226,30 @@ export function GenerateAllButtonHost({
             return;
           }
 
-          try {
-            const res = await fetch("/api/script/episode", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                projectId: project.id,
-                episodeNumber: 1,
-                seasonSpec,
-              }),
-            });
-            const data = await res.json();
-            console.log("[GENERATE RESPONSE]", JSON.stringify(data));
-            if (!res.ok) {
-              console.error("[GENERATE ERROR]", data);
-              setErrorMessage(
-                typeof data === "object" && data !== null && "error" in data
-                  ? String((data as { error: unknown }).error)
-                  : "生成失败，请稍后重试。"
-              );
-              return;
-            }
+          // 立刻跳转到shots页
+          router.push(`/en/project/${project.id}/shots`);
 
-            // 成功后跳转至项目镜头页
-            router.push(`/en/project/${project.id}/shots`);
-          } catch (e) {
-            console.error("[GENERATE CATCH]", e);
-            setErrorMessage(e instanceof Error ? e.message : String(e));
-          }
+          // 后台fire-and-forget调用API，不等待结果
+          (async () => {
+            try {
+              const res = await fetch("/api/script/episode", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  projectId: project.id,
+                  episodeNumber: 1,
+                  seasonSpec,
+                }),
+              });
+              const data = await res.json();
+              console.log("[GENERATE RESPONSE]", JSON.stringify(data));
+              if (!res.ok) {
+                console.error("[GENERATE ERROR]", data);
+              }
+            } catch (e) {
+              console.error("[GENERATE BACKGROUND ERROR]", e);
+            }
+          })();
         }}
       />
       {!allLocked ? (
