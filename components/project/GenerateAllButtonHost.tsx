@@ -221,8 +221,10 @@ export function GenerateAllButtonHost({
             if (hasEpisodes) {
               // 已有剧本，直接跳转到project页面
               console.log("[SCRIPT EXISTS] Project already has script data, skipping episode generation");
-              console.log("[REDIRECT] Going to project page");
-              router.push(`/project/${project.id}`);
+              console.log("[REDIRECT] Going to project page, project.id:", project.id);
+              const targetPath = `/en/project/${project.id}`;
+              console.log("[REDIRECT] Target path:", targetPath);
+              router.push(targetPath);
               return;
             }
 
@@ -281,7 +283,10 @@ export function GenerateAllButtonHost({
 
               // 剧本生成成功，立即跳转到project页面
               console.log("[GENERATE SUCCESS] Script generated, redirecting to project page");
-              router.push(`/project/${project.id}`);
+              console.log("[REDIRECT] project.id:", project.id);
+              const targetPath = `/en/project/${project.id}`;
+              console.log("[REDIRECT] Target path:", targetPath);
+              router.push(targetPath);
             } catch (fetchError) {
               clearTimeout(timeoutId);
               if (fetchError instanceof Error && fetchError.name === 'AbortError') {
