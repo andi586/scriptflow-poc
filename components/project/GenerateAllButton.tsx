@@ -32,7 +32,6 @@ export function GenerateAllButton({
   };
 
   const handleConfirm = async () => {
-    setOpen(false);
     await onGenerateConfirmed();
   };
 
