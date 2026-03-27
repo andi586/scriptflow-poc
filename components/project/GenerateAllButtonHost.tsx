@@ -219,10 +219,10 @@ export function GenerateAllButtonHost({
             const hasEpisodes = rawStructure && Array.isArray(rawStructure.episodes) && rawStructure.episodes.length > 0;
             
             if (hasEpisodes) {
-              // 已有剧本，直接跳转到shots页面触发视频生成
+              // 已有剧本，直接跳转到project页面
               console.log("[SCRIPT EXISTS] Project already has script data, skipping episode generation");
-              console.log("[REDIRECT] Going directly to shots page for video generation");
-              router.push(`/en/project/${project.id}/shots`);
+              console.log("[REDIRECT] Going to project page");
+              router.push(`/project/${project.id}`);
               return;
             }
 
@@ -279,10 +279,9 @@ export function GenerateAllButtonHost({
                 return;
               }
 
-              // 剧本生成成功，立即跳转到shots页（Kling提交将在shots页加载时触发）
-              console.log("[GENERATE SUCCESS] Script generated, redirecting to shots page");
-              console.log("[KLING SUBMIT] Video generation will be triggered on shots page load");
-              router.push(`/en/project/${project.id}/shots`);
+              // 剧本生成成功，立即跳转到project页面
+              console.log("[GENERATE SUCCESS] Script generated, redirecting to project page");
+              router.push(`/project/${project.id}`);
             } catch (fetchError) {
               clearTimeout(timeoutId);
               if (fetchError instanceof Error && fetchError.name === 'AbortError') {
