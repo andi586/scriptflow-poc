@@ -38,6 +38,7 @@ export function GenerateAllButtonHost({
     useState<Record<string, string>>(initialCharacterImages);
   const [saving, setSaving] = useState(false);
   const [processingImage, setProcessingImage] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -191,50 +192,51 @@ export function GenerateAllButtonHost({
       <GenerateAllButton
         project={project}
         beats={beats}
-        disabled={!allLocked || saving}
+        disabled={!allLocked || saving || generating}
+        generating={generating}
         onGenerateConfirmed={async () => {
           setErrorMessage(null);
-          let scriptRaw: unknown = null;
-          try {
-            scriptRaw = project.script_raw ? JSON.parse(project.script_raw) : null;
-          } catch {
-            scriptRaw = null;
-          }
-          const rawObj =
-            typeof scriptRaw === "object" && scriptRaw !== null
-              ? (scriptRaw as Record<string, unknown>)
-              : null;
-          const rawStructure =
-            rawObj && typeof rawObj.structure === "object" && rawObj.structure !== null
-              ? (rawObj.structure as Record<string, unknown>)
-              : null;
-          const seasonSpec = rawObj
-            ? {
-                idea: rawObj.idea,
-                direction: rawObj.selectedDirection,
-                expandedStory: rawObj.expandedStory,
-                totalEpisodes: rawObj.totalEpisodes,
-                threeAct: rawStructure?.threeAct,
-                characters: rawStructure?.characters,
-                episodes: rawStructure?.episodes,
-                foreshadowing: rawStructure?.foreshadowing,
-              }
-            : null;
+          setGenerating(true);
           
-          // 在跳转前验证seasonSpec
-          if (!seasonSpec) {
-            console.error("[SEASON SPEC MISSING]", project.script_raw);
-            setErrorMessage("剧本数据不完整，请重新生成剧本");
-            return;
-          }
+          try {
+            let scriptRaw: unknown = null;
+            try {
+              scriptRaw = project.script_raw ? JSON.parse(project.script_raw) : null;
+            } catch {
+              scriptRaw = null;
+            }
+            const rawObj =
+              typeof scriptRaw === "object" && scriptRaw !== null
+                ? (scriptRaw as Record<string, unknown>)
+                : null;
+            const rawStructure =
+              rawObj && typeof rawObj.structure === "object" && rawObj.structure !== null
+                ? (rawObj.structure as Record<string, unknown>)
+                : null;
+            const seasonSpec = rawObj
+              ? {
+                  idea: rawObj.idea,
+                  direction: rawObj.selectedDirection,
+                  expandedStory: rawObj.expandedStory,
+                  totalEpisodes: rawObj.totalEpisodes,
+                  threeAct: rawStructure?.threeAct,
+                  characters: rawStructure?.characters,
+                  episodes: rawStructure?.episodes,
+                  foreshadowing: rawStructure?.foreshadowing,
+                }
+              : null;
+            
+            // 验证seasonSpec
+            if (!seasonSpec) {
+              console.error("[SEASON SPEC MISSING]", project.script_raw);
+              setErrorMessage("剧本数据不完整，请重新生成剧本");
+              setGenerating(false);
+              return;
+            }
 
-          console.log("[GENERATE CONFIRM] Valid seasonSpec, initiating request...");
+            console.log("[GENERATE CONFIRM] Valid seasonSpec, initiating request...");
 
-          // 调用API with 10秒超时 + await，超时仍然跳转
-          const generateTask = async () => {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000);
-
+            // 调用API - await直到完成或失败
             try {
               console.log("[GENERATE REQUEST] Sending request to /api/script/episode");
               const res = await fetch("/api/script/episode", {
@@ -245,27 +247,34 @@ export function GenerateAllButtonHost({
                   episodeNumber: 1,
                   seasonSpec,
                 }),
-                signal: controller.signal,
               });
-              clearTimeout(timeout);
               const data = await res.json();
               console.log("[GENERATE RESPONSE]", JSON.stringify(data));
+              
               if (!res.ok) {
                 console.error("[GENERATE ERROR]", data);
+                setErrorMessage(
+                  typeof data === "object" && data !== null && "error" in data
+                    ? String((data as { error: unknown }).error)
+                    : "生成请求失败，请稍后重试"
+                );
+                setGenerating(false);
+                return;
               }
-            } catch (e) {
-              clearTimeout(timeout);
-              if (e instanceof Error && e.name === "AbortError") {
-                console.warn("[GENERATE TIMEOUT] Request exceeded 10 seconds, proceeding with navigation");
-              } else {
-                console.error("[GENERATE REQUEST ERROR]", e);
-              }
-            }
-          };
 
-          // 等待请求（可能超时）后跳转
-          await generateTask();
-          router.push(`/en/project/${project.id}/shots`);
+              // 成功，跳转到shots页
+              console.log("[GENERATE SUCCESS] Navigating to shots page");
+              router.push(`/en/project/${project.id}/shots`);
+            } catch (e) {
+              console.error("[GENERATE REQUEST ERROR]", e);
+              setErrorMessage(e instanceof Error ? e.message : "生成请求失败");
+              setGenerating(false);
+            }
+          } catch (e) {
+            console.error("[GENERATE ERROR]", e);
+            setErrorMessage("生成过程出错");
+            setGenerating(false);
+          }
         }}
       />
       {!allLocked ? (
