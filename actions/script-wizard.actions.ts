@@ -12,16 +12,11 @@ export async function finalizeScriptWizardProjectAction(input: {
   structureResult: StructureResponse;
   episodeCount: 3 | 6 | 9;
   directions: Direction[];
+  userId: string;
 }): Promise<ActionResult<{ projectId: string }>> {
   try {
-    const supabaseAuth = createClient();
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    if (authError || !user) {
-      return { success: false, error: '用户未登录，请重新登录后再试' };
-    }
-
     const title = input.expandResult.title?.trim() || "New project";
-    const base = await createNewProjectAction({ title, userId: user.id });
+    const base = await createNewProjectAction({ title, userId: input.userId });
     console.log("[BASE RESULT]", JSON.stringify(base));
     if (!base.success) return { success: false, error: base.error };
     const projectId = base.data.projectId;

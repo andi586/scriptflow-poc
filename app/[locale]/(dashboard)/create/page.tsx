@@ -7,6 +7,7 @@ import { DirectionSelector } from "@/components/script-creation/DirectionSelecto
 import { StructureViewer } from "@/components/script-creation/StructureViewer";
 import { NELProcessing } from "@/components/script-creation/NELProcessing";
 import { StepIndicator } from "@/components/onboarding/StepIndicator";
+import { createClient } from "@/lib/supabase/client";
 import { finalizeScriptWizardProjectAction } from "@/actions/script-wizard.actions";
 import type {
   ScriptFlowState,
@@ -111,6 +112,15 @@ export default function CreatePage() {
     setLoading(true);
     setError(null);
     setState((prev) => ({ ...prev, step: 4 }));
+
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setError('用户未登录，请重新登录');
+      setLoading(false);
+      return;
+    }
+
     const saveResult = await finalizeScriptWizardProjectAction({
       idea: state.idea,
       selectedDirection: state.selectedDirection,
@@ -118,6 +128,7 @@ export default function CreatePage() {
       structureResult: state.structureResult,
       episodeCount: state.episodeCount,
       directions: state.exploreResult.directions,
+      userId: user.id,
     });
     if (!saveResult.success) {
       setLoading(false);
