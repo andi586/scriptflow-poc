@@ -15,3 +15,55 @@ export function stripHardcodedAspectRatioFromPrompt(prompt: string): string {
     .replace(/\s*-\s*Aspect ratio:\s*9:16[\s.]*$/i, "")
     .trim();
 }
+
+/**
+ * Submit a video generation task to Kling API
+ */
+export async function submitKlingVideoTask(opts: {
+  prompt: string;
+  referenceImageUrls: string[];
+  duration?: 5 | 10;
+}): Promise<{ taskId: string }> {
+  const apiKey = process.env.KLING_API_KEY;
+  const apiBase = process.env.KLING_API_BASE || "https://api.piapi.ai/api/v1";
+
+  if (!apiKey) {
+    throw new Error("KLING_API_KEY not configured");
+  }
+
+  const payload = {
+    task_type: "video_generation",
+    input: {
+      prompt: opts.prompt,
+      aspect_ratio: KLING_VIDEO_ASPECT_RATIO,
+      duration: opts.duration || 5,
+      negative_prompt: "",
+      elements: opts.referenceImageUrls.slice(0, 4).map(url => ({ image_url: url })),
+      mode: "pro",
+      version: "1.6",
+    },
+  };
+
+  const response = await fetch(`${apiBase}/kling/v1/video`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Kling API error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const taskId = data?.data?.task_id;
+
+  if (!taskId) {
+    throw new Error("No task_id returned from Kling API");
+  }
+
+  return { taskId };
+}

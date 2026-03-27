@@ -3,6 +3,7 @@ import { z } from "zod";
 import { callClaudeForScript } from "@/lib/ai/claude-script";
 import { safeParseJSON } from "@/lib/utils/parse-json";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { submitKlingVideoTask } from "@/lib/kling-video";
 
 // ========================
 // Zod Schemas
@@ -229,6 +230,93 @@ async function upsertEpisode(params: {
   };
 }
 
+async function generateSceneVideos(params: {
+  projectId: string;
+  episode: EpisodeScript;
+  characterImages: Record<string, string>;
+}) {
+  const supabase = createServerSupabaseClient();
+
+  for (let i = 0; i < params.episode.scenes.length; i++) {
+    const scene = params.episode.scenes[i];
+    const sceneIndex = i + 1;
+
+    try {
+      // 检查是否已有此场景的任务
+      const { data: existingTask } = await supabase
+        .from("kling_tasks")
+        .select("id, status")
+        .eq("project_id", params.projectId)
+        .eq("scene_index", sceneIndex)
+        .maybeSingle();
+
+      if (existingTask) {
+        console.log(`Scene ${sceneIndex} already has task: ${existingTask.status}`);
+        continue;
+      }
+
+      // 构建视频生成提示词
+      const prompt = `${scene.visualPrompt}\n\n${scene.sceneDescription}`;
+
+      // 收集角色参考图
+      const referenceImageUrls: string[] = [];
+      for (const dialogue of scene.dialogue) {
+        const characterName = dialogue.character;
+        const imageUrl = params.characterImages[characterName];
+        if (imageUrl && !referenceImageUrls.includes(imageUrl)) {
+          referenceImageUrls.push(imageUrl);
+        }
+      }
+
+      // 如果没有角色图片，使用默认图片或跳过
+      if (referenceImageUrls.length === 0) {
+        console.log(`Scene ${sceneIndex}: No character images found, skipping video generation`);
+        continue;
+      }
+
+      // 调用 Kling API
+      console.log(`Scene ${sceneIndex}: Submitting video task to Kling API`);
+      const { taskId } = await submitKlingVideoTask({
+        prompt,
+        referenceImageUrls,
+        duration: 5,
+      });
+
+      // 创建 kling_tasks 记录
+      const { error: insertError } = await supabase
+        .from("kling_tasks")
+        .insert({
+          task_id: taskId,
+          project_id: params.projectId,
+          scene_index: sceneIndex,
+          status: "processing",
+        });
+
+      if (insertError) {
+        console.error(`Failed to create kling_task for scene ${sceneIndex}:`, insertError);
+      } else {
+        console.log(`Scene ${sceneIndex}: Created kling_task with task_id ${taskId}`);
+      }
+
+    } catch (error) {
+      console.error(`Scene ${sceneIndex}: Failed to generate video:`, error);
+      // 记录失败状态
+      const { error: insertError } = await supabase
+        .from("kling_tasks")
+        .insert({
+          project_id: params.projectId,
+          scene_index: sceneIndex,
+          status: "failed",
+          error_message: error instanceof Error ? error.message : String(error),
+        });
+
+      if (insertError) {
+        console.error(`Failed to record error for scene ${sceneIndex}:`, insertError);
+      }
+    }
+  }
+}
+
 // ========================
 // Route Handler
 // ========================
@@ -331,6 +419,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       rewriteInstruction: input.rewriteInstruction,
       version: nextVersion,
     });
+
+    // 获取项目角色图片
+    const { data: characterImagesData, error: imagesError } = await supabase
+      .from("projects")
+      .select("character_images")
+      .eq("id", input.projectId)
+      .single();
+
+    let characterImages: Record<string, string> = {};
+    if (!imagesError && characterImagesData?.character_images) {
+      try {
+        characterImages = JSON.parse(characterImagesData.character_images as string);
+      } catch (e) {
+        console.warn("Failed to parse character_images:", e);
+      }
+    }
+
+    // 为每个场景生成视频任务
+    try {
+      await generateSceneVideos({
+        projectId: input.projectId,
+        episode,
+        characterImages,
+      });
+    } catch (videoError) {
+      console.error("Video generation failed:", videoError);
+      // 不阻止剧本生成的成功响应，但记录错误
+    }
 
     const response = ResponseSchema.parse({ success: true, episode, persisted });
     return NextResponse.json(response);
