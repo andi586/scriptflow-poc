@@ -36,6 +36,7 @@ export const updateSession = async (request: NextRequest) => {
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api') ||
+    pathname.startsWith('/project/') ||
     localeAuthPath.test(pathname)
 
   if (!user && !isPublicPath) {
