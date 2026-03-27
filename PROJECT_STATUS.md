@@ -48,17 +48,42 @@
 ## 4) 当前已知Bug/需要修复的功能
 
 - `shots` 页面报错：最初 `params.id` 未正确传入，已修复，需验证在所有 locale 及未登录情形下行为一致。
-- `kling_tasks` API 目前存在 RLS 可能阻塞公开访问，已添加迁移 `20260327140000_disable_kling_tasks_rls.sql`，需在数据库执行并确认有效。
-- `GenerateAllButton` 原先关闭弹窗后再跳转，现在改为直接跳转，需验证现实行为与预期一致。
-- `finalizeScriptWizardProjectAction` 需从前端传入真实 `userId`，并由客户端获取登录用户；已改施行，但需在无用户/Token 寿命过期场景复测。
+- `kling_tasks` API 目前存在 RLS 可能阻塞公开访问，已添加迁移 `20260327140000_disable_kling_tasks_rls.sql`，**需在 Supabase dashboard 执行该迁移并确认有效**。
+- `finalizeScriptWizardProjectAction` 需从前端传入真实 `userId`，并由客户端获取登录用户；已实施（commit `2fcda16`），但需在无用户/Token 寿命过期场景复测。
 - 角色本地图片上传支持 HEIC 及预览已实现，但可能未处理生成失败回退行为，与旧版本兼容问题待测试。
 
 ## 5) 下一步待实现功能
 
 - `kling_tasks` 完整后端任务流：从 `kling_tasks` status 监控到 `video_url` 写入，以及不同策略重试和失败报警。
 - `app/en/project/[id]/shots` 增加分页/筛选和历史镜头回放模式。
-- 将 `GenerateAllButtonHost` 的 `fire-and-forget` 生成任务由前端 API 调用改成任务队列，避免页面跳转失败或漏发。
+- 前端生成任务由 `fire-and-forget` 改成任务队列架构，避免并发重复请求。
 - 在 `project` 页通过 `status` 展示任务概览（pending/processing/completed/failed）并提供刷新按钮。
 - 权限和多租户：确保 `project_id` 仅属于当前登录用户可访问。
+
+## 6) 最近完成的改进（本轮）
+
+### ✅ 2026-03-27 生成流程可靠性与 UX 改进
+
+**生成流程改进：**
+- ✅ 修复 Project Owner：从 env var `SCRIPTFLOW_DEMO_USER_ID` → 实时获取登录用户 ID（commit `2fcda16`）
+- ✅ 修复页面导航：生成后无 router.push → 添加 redirect 到 shots 页面（commit `febfd90` → `da036ec`）
+- ✅ 支持 HEIC 格式：上传时自动转 JPEG（commit `b592bcb`）
+- ✅ 图片预览：上传成功后显示 80x80 预览（commit `b592bcb`）
+- ✅ API 可靠性：从 fire-and-forget IIFE → 改回 async/await （commit `e84a369`）
+- ✅ 加载状态 UI：按钮禁用 + 文本变为"生成中…"（commit `d500ab3`）
+
+**后端支持：**
+- ✅ 镜头状态页：`app/en/project/[id]/shots/page.tsx`（commit `0a56d82`）
+- ✅ API 端点：`app/api/projects/[id]/kling-tasks/route.ts`（commit `0a56d82`）
+- ✅ 自动刷新：每 5 秒查询一次新的 `kling_tasks` 状态（commit `0a56d82`）
+- ✅ 任务状态显示：pending(灰) → processing(蓝 spinner) → completed(绿 player) → failed(红 error)
+
+**代码质量：**
+- ✅ Promise params 处理：修复 Next.js 16.2 compatibility（commit `bb2cd3e`）
+- ✅ 详细日志：5 级 console.log 追踪请求流（`[GENERATE CONFIRM]`、`[GENERATE REQUEST]`、`[GENERATE RESPONSE]`、`[GENERATE SUCCESS]`、`[GENERATE ERROR]`）
+- ✅ API 日志：4 个检查点记录 tasks 查询（commit `bb2cd3e`）
+
+**部署状态：**
+- ✅ 全部已部署到 https://getscriptflow.com（commit `d500ab3`）
 
 > 以后每完成一个功能，必须同步更新此文件以保持项目文档与代码同步。
