@@ -220,18 +220,23 @@ export function GenerateAllButtonHost({
                 foreshadowing: rawStructure?.foreshadowing,
               }
             : null;
+          
+          // 在跳转前验证seasonSpec
           if (!seasonSpec) {
             console.error("[SEASON SPEC MISSING]", project.script_raw);
             setErrorMessage("剧本数据不完整，请重新生成剧本");
             return;
           }
 
-          // 立刻跳转到shots页
-          router.push(`/en/project/${project.id}/shots`);
+          console.log("[GENERATE CONFIRM] Valid seasonSpec, initiating request...");
 
-          // 后台fire-and-forget调用API，不等待结果
-          (async () => {
+          // 调用API with 10秒超时 + await，超时仍然跳转
+          const generateTask = async () => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+
             try {
+              console.log("[GENERATE REQUEST] Sending request to /api/script/episode");
               const res = await fetch("/api/script/episode", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -240,16 +245,27 @@ export function GenerateAllButtonHost({
                   episodeNumber: 1,
                   seasonSpec,
                 }),
+                signal: controller.signal,
               });
+              clearTimeout(timeout);
               const data = await res.json();
               console.log("[GENERATE RESPONSE]", JSON.stringify(data));
               if (!res.ok) {
                 console.error("[GENERATE ERROR]", data);
               }
             } catch (e) {
-              console.error("[GENERATE BACKGROUND ERROR]", e);
+              clearTimeout(timeout);
+              if (e instanceof Error && e.name === "AbortError") {
+                console.warn("[GENERATE TIMEOUT] Request exceeded 10 seconds, proceeding with navigation");
+              } else {
+                console.error("[GENERATE REQUEST ERROR]", e);
+              }
             }
-          })();
+          };
+
+          // 等待请求（可能超时）后跳转
+          await generateTask();
+          router.push(`/en/project/${project.id}/shots`);
         }}
       />
       {!allLocked ? (
