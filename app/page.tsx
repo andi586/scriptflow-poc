@@ -455,9 +455,41 @@ export default function Home() {
 
       activePhase = "submitting_kling";
       setPipelinePhase("submitting_kling");
+      let finalPrompts = gr.data.prompts;
+      try {
+        const geneticsRes = await fetch(
+          `/api/character/consistency?characterId=default`
+        );
+        if (geneticsRes.ok) {
+          const { genetics } = await geneticsRes.json();
+          if (genetics) {
+            finalPrompts = await Promise.all(
+              gr.data.prompts.map(async (item) => {
+                const injectRes = await fetch('/api/character/consistency', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    action: 'inject',
+                    characterId: 'default',
+                    basePrompt: item.prompt,
+                  }),
+                });
+                if (injectRes.ok) {
+                  const { compiled } = await injectRes.json();
+                  return { ...item, prompt: compiled?.positive ?? item.prompt };
+                }
+                return item;
+              })
+            );
+          }
+        }
+      } catch {
+        // 静默降级，使用原始prompts
+      }
+
       const sr = await submitKlingTasksAction({
         projectId: pid,
-        prompts: gr.data.prompts,
+        prompts: finalPrompts,
       });
       if (!sr.success) throw new Error(errMsg(sr.error));
       const submittedIds = sr.data.tasks
