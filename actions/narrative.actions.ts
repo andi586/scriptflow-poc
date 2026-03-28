@@ -515,6 +515,26 @@ export async function generateKlingPromptsAction(input: {
       throw new Error("Claude 没有返回可用的提示词。");
     }
 
+    // F81: 写入 script_raw 供 TTS 使用
+    const scriptRaw = {
+      structure: {
+        episodes: prompts.map((item, index) => ({
+          episode: index + 1,
+          summary: item.prompt,
+        })),
+      },
+    };
+
+    const { error: scriptRawError } = await supabase
+      .from("projects")
+      .update({ script_raw: JSON.stringify(scriptRaw) })
+      .eq("id", projectId);
+
+    if (scriptRawError) {
+      console.error("[F81] Failed to write script_raw:", scriptRawError);
+      // 不阻断主流程，仅记录错误
+    }
+
     return { success: true, data: { prompts } };
   } catch (e) {
     return { success: false, error: formatUnknownError(e) };
