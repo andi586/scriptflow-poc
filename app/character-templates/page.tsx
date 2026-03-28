@@ -357,6 +357,11 @@ export default function CharacterTemplatesPage() {
             </div>
             <div className="grid gap-2 sm:col-span-2">
               <label className="text-xs font-medium text-white/70">参考图 URL</label>
+              <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-xs text-amber-200">
+                  ⚠️ <strong>Best results:</strong> Use a close-up portrait photo (shoulders and above, front-facing). Full-body photos reduce character consistency.
+                </p>
+              </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                 <input
                   ref={formFileInputRef}
@@ -387,6 +392,13 @@ export default function CharacterTemplatesPage() {
                 </Button>
               </div>
               <p className="text-[11px] text-white/40">支持 JPG / PNG / WebP；大于 2MB 时会自动压缩。</p>
+              {referenceImageUrl && (
+                <div className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
+                  <p className="text-xs text-emerald-200">
+                    ✅ Photo uploaded. For best character consistency, ensure the photo shows face and shoulders clearly.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="grid gap-2 sm:col-span-2">
               <label className="text-xs font-medium text-white/70">Kling prompt base</label>

@@ -912,6 +912,11 @@ export default function Home() {
                   })();
                 }}
               />
+              <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-xs text-amber-200">
+                  ⚠️ <strong>For best results:</strong> Use a close-up portrait (face and shoulders only). Full-body photos reduce character consistency in video generation.
+                </p>
+              </div>
               <p className="text-xs text-amber-200/90">
                 Confirm each selected role: choose template look or upload your own photo.
               </p>
