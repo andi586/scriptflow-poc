@@ -19,6 +19,7 @@ import {
 } from "@/actions/narrative.actions";
 import { InspirationFollowUpCards } from "@/components/inspiration-follow-up-cards";
 import { VideoResultsPanel } from "@/components/video-results-panel";
+import { DirectorReviewPanel } from "@/components/director-review-panel";
 import { formatUnknownError } from "@/lib/format-error";
 import {
   clearLazySessionFromStorage,
@@ -86,6 +87,7 @@ type PipelinePhase =
   | "analyzing_story"
   | "locking_characters"
   | "generating_prompts"
+  | "director_review"
   | "submitting_kling"
   | "done"
   | "error";
@@ -129,6 +131,7 @@ const PHASE_LABEL: Record<Exclude<PipelinePhase, "idle" | "error">, string> = {
   analyzing_story: "Analyzing story...",
   locking_characters: "Locking characters...",
   generating_prompts: "Generating prompts...",
+  director_review: "Awaiting director review...",
   submitting_kling: "Submitting to Kling...",
   done: "All set!",
 };
@@ -194,6 +197,10 @@ export default function Home() {
   const [pipelinePhase, setPipelinePhase] = useState<PipelinePhase>("idle");
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [directorReviewPrompts, setDirectorReviewPrompts] = useState<Array<{ prompt: string; [key: string]: any }>>([]);
+  const [showDirectorReview, setShowDirectorReview] = useState(false);
+  const [isSubmittingToKling, setIsSubmittingToKling] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   /** Bumps when Kling submit finishes so VideoResultsPanel reloads task_ids from Supabase. */
   const [clipsRefreshNonce, setClipsRefreshNonce] = useState(0);
   /** PiAPI task ids from the last successful submit — keeps results panel visible before DB list catches up. */
@@ -383,6 +390,7 @@ export default function Home() {
       }
       const pid = cr.data.projectId;
       setProjectId(pid);
+      setCurrentProjectId(pid);
       writeLazySessionIdToStorage(pid);
       if (typeof window !== "undefined") {
         try {
@@ -453,53 +461,12 @@ export default function Home() {
       const gr = await generateKlingPromptsAction({ projectId: pid });
       if (!gr.success) throw new Error(errMsg(gr.error));
 
-      activePhase = "submitting_kling";
-      setPipelinePhase("submitting_kling");
-      let finalPrompts = gr.data.prompts;
-      try {
-        const geneticsRes = await fetch(
-          `/api/character/consistency?characterId=default`
-        );
-        if (geneticsRes.ok) {
-          const { genetics } = await geneticsRes.json();
-          if (genetics) {
-            finalPrompts = await Promise.all(
-              gr.data.prompts.map(async (item) => {
-                const injectRes = await fetch('/api/character/consistency', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    action: 'inject',
-                    characterId: 'default',
-                    basePrompt: item.prompt,
-                  }),
-                });
-                if (injectRes.ok) {
-                  const { compiled } = await injectRes.json();
-                  return { ...item, prompt: compiled?.positive ?? item.prompt };
-                }
-                return item;
-              })
-            );
-          }
-        }
-      } catch {
-        // 静默降级，使用原始prompts
-      }
-
-      const sr = await submitKlingTasksAction({
-        projectId: pid,
-        prompts: finalPrompts,
-      });
-      if (!sr.success) throw new Error(errMsg(sr.error));
-      const submittedIds = sr.data.tasks
-        .map((t) => t.task_id.trim())
-        .filter((id) => id.length > 0);
-      writeKlingTaskSnapshotToStorage(pid, submittedIds);
-      setLastSubmittedClipTaskIds(submittedIds);
-      setClipsRefreshNonce((n) => n + 1);
-
-      setPipelinePhase("done");
+      // Step 4: Director Review
+      activePhase = "director_review";
+      setPipelinePhase("director_review");
+      setDirectorReviewPrompts(gr.data.prompts);
+      setShowDirectorReview(true);
+      return; // Pause pipeline, wait for director approval
     } catch (e) {
       setPipelinePhase("error");
       const raw = e instanceof Error ? e.message : errMsg(e);
@@ -530,6 +497,32 @@ export default function Home() {
     templates,
     castConfirmations,
   ]);
+
+  async function handleDirectorApprove(editedPrompts: Array<{ prompt: string; [key: string]: any }>) {
+    setIsSubmittingToKling(true);
+    setShowDirectorReview(false);
+    try {
+      setPipelinePhase("submitting_kling");
+      const sr = await submitKlingTasksAction({
+        projectId: currentProjectId!,
+        prompts: editedPrompts as any,
+      });
+      if (!sr.success) throw new Error(errMsg(sr.error));
+      const submittedIds = sr.data.tasks
+        .map((t: any) => t.task_id.trim())
+        .filter((id: string) => id.length > 0);
+      writeKlingTaskSnapshotToStorage(currentProjectId!, submittedIds);
+      setLastSubmittedClipTaskIds(submittedIds);
+      setClipsRefreshNonce((n) => n + 1);
+      setPipelinePhase("done");
+    } catch (e) {
+      setPipelinePhase("error");
+      const raw = e instanceof Error ? e.message : errMsg(e);
+      setPipelineError(raw);
+    } finally {
+      setIsSubmittingToKling(false);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/healthcheck")
@@ -1092,6 +1085,20 @@ export default function Home() {
           )}
 
         </section>
+
+        {showDirectorReview && (
+          <section className="mt-6">
+            <DirectorReviewPanel
+              prompts={directorReviewPrompts}
+              onApprove={handleDirectorApprove}
+              onCancel={() => {
+                setShowDirectorReview(false);
+                setPipelinePhase("idle");
+              }}
+              isSubmitting={isSubmittingToKling}
+            />
+          </section>
+        )}
 
         {pipelinePhase === "done" && projectId.trim() && (
           <section
