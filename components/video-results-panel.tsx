@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Loader2, Play } from "lucide-react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { AudioGenerationPanel } from "@/components/audio-generation-panel";
 import {
   listKlingTaskIdsForSessionAction,
   pollSessionKlingVideoStatusAction,
@@ -945,6 +946,13 @@ export function VideoResultsPanel({
               )}
             </Button>
           </div>
+        )}
+        
+        {tasks.length > 0 && tasks.every(isClipDone) && (
+          <AudioGenerationPanel
+            projectId={sessionId}
+            sceneNumbers={tasks.map((t) => t.beat_number)}
+          />
         )}
       </div>
     </div>
