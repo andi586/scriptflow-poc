@@ -648,6 +648,7 @@ export async function submitKlingTasksAction(input: {
       .filter((x) => /^https:\/\//i.test(x.url))
       .slice(0, 4);
     const referenceImageUrls = characterRefs.map((x) => x.url);
+    const multiRefUrls = referenceImageUrls;
     console.log("[submitKlingTasksAction] referenceImageUrls", referenceImageUrls);
 
     // 1) Check DB first: if this project+scene already has processing/success, reuse it.
@@ -714,7 +715,7 @@ export async function submitKlingTasksAction(input: {
           prompt: sanitizedPrompt,
           aspectRatio: KLING_VIDEO_ASPECT_RATIO,
           duration: 5,
-          referenceImageUrls,
+          referenceImageUrls: multiRefUrls,
         }),
       };
 
