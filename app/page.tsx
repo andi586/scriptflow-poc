@@ -20,11 +20,11 @@ export default function LandingPage() {
             The world's first AI production platform that respects <b>Creator Sovereignty</b>. Build your IP Empire with automated narrative engineering.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 h-12 text-lg">
-              Start Creating Free <ArrowRight className="ml-2 h-5 w-5" />
+            <Button asChild size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 h-12 text-lg">
+              <a href="/app-flow">Start Creating Free <ArrowRight className="ml-2 h-5 w-5" /></a>
             </Button>
-            <Button size="lg" className="border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white h-12 text-lg">
-              View Showcase
+            <Button asChild size="lg" className="border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white h-12 text-lg">
+              <a href="/app-flow">View Showcase</a>
             </Button>
           </div>
         </div>
@@ -148,7 +148,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Standard Generation Speed</div>
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Basic Asset Access</div>
               </CardContent>
-              <CardFooter><Button className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white">Get Started</Button></CardFooter>
+              <CardFooter><Button asChild className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white"><a href="/app-flow">Get Started</a></Button></CardFooter>
             </Card>
             <Card className="bg-zinc-900 border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.15)] scale-105">
               <CardHeader className="relative">
@@ -163,7 +163,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> NEL Custom Model Training</div>
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Advanced Analytics</div>
               </CardContent>
-              <CardFooter><Button className="w-full bg-purple-600 hover:bg-purple-700">Go Pro</Button></CardFooter>
+              <CardFooter><Button asChild className="w-full bg-purple-600 hover:bg-purple-700"><a href="/app-flow">Go Pro</a></Button></CardFooter>
             </Card>
             <Card className="bg-zinc-900 border-zinc-800">
               <CardHeader>
@@ -177,7 +177,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Team Collaboration</div>
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> 24/7 Priority Support</div>
               </CardContent>
-              <CardFooter><Button className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white">Contact Sales</Button></CardFooter>
+              <CardFooter><Button asChild className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white"><a href="/app-flow">Contact Sales</a></Button></CardFooter>
             </Card>
           </div>
         </div>
@@ -186,8 +186,8 @@ export default function LandingPage() {
       <section className="py-24 text-center bg-zinc-950 relative overflow-hidden">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50" />
         <h2 className="text-4xl font-bold mb-8">Ready to own your future?</h2>
-        <Button size="lg" className="bg-purple-600 hover:bg-purple-700 px-12 h-14 text-xl font-bold rounded-full">
-          Start Creating Free
+        <Button asChild size="lg" className="bg-purple-600 hover:bg-purple-700 px-12 h-14 text-xl font-bold rounded-full">
+          <a href="/app-flow">Start Creating Free</a>
         </Button>
         <div className="mt-12 text-zinc-600 text-sm flex flex-col items-center gap-4">
           <div className="flex justify-center gap-8 items-center">
