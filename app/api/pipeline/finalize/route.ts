@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     const srtContent = entriesToSrt(allEntries)
     await supabase.from('projects').update({ srt_content: srtContent, subtitle_generated_at: new Date().toISOString() }).eq('id', projectId)
 
-    const { data: tasks } = await supabase.from('kling_tasks').select('video_url, scene_number').eq('project_id', projectId).eq('status', 'success').order('scene_number')
+    const { data: tasks } = await supabase.from('kling_tasks').select('video_url, scene_index').eq('project_id', projectId).eq('status', 'success').order('scene_index')
     if (!tasks?.length) return NextResponse.json({ success: false, error: 'No completed videos found' }, { status: 400 })
 
     const shotVideoUrls = tasks.map((t: any) => t.video_url).filter(Boolean)
