@@ -23,7 +23,7 @@ export default function LandingPage() {
             <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 h-12 text-lg">
               Start Creating Free <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" className="border-zinc-800 hover:bg-zinc-900 h-12 text-lg">
+            <Button size="lg" variant="outline" className="border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white h-12 text-lg">
               View Showcase
             </Button>
           </div>
