@@ -38,21 +38,21 @@ export default function LandingPage() {
               <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Cpu className="text-purple-500" />
               </div>
-              <h3 className="text-xl font-bold mb-3">NEL (Neural Expressive)</h3>
+              <h3 className="text-xl font-bold mb-3">NEL — Your Personal AI Director</h3>
               <p className="text-zinc-400 text-sm leading-relaxed">Personalized style models that capture your unique narrative voice. Your DNA, your AI.</p>
             </div>
             <div className="p-8 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-purple-500/50 transition-all group">
               <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Zap className="text-purple-500" />
               </div>
-              <h3 className="text-xl font-bold mb-3">HTS (Human Touch Standard)</h3>
+              <h3 className="text-xl font-bold mb-3">HTS — Anti-AI Filter</h3>
               <p className="text-zinc-400 text-sm leading-relaxed">8-rule human authenticity engine. Auto-blocks AI-flavored content before it kills your retention. Score below 6? We stop it before it goes live.</p>
             </div>
             <div className="p-8 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-purple-500/50 transition-all group">
               <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Lock className="text-purple-500" />
               </div>
-              <h3 className="text-xl font-bold mb-3">F80 Multi-Provider Fault Tolerance</h3>
+              <h3 className="text-xl font-bold mb-3">F80 — 99.9% Uptime Guaranteed</h3>
               <p className="text-zinc-400 text-sm leading-relaxed">99.9% uptime. $3.50 hard cap per episode. Auto-failover across Kling, Veo, and Runway. Your production never stops.</p>
             </div>
           </div>
@@ -94,7 +94,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="py-20 bg-zinc-900/30">
+      <section className="py-12 bg-zinc-900/30">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -133,7 +133,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="py-20">
+      <section className="py-12">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-16">Choose Your Production Tier</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -189,10 +189,17 @@ export default function LandingPage() {
         <Button size="lg" className="bg-purple-600 hover:bg-purple-700 px-12 h-14 text-xl font-bold rounded-full">
           Start Creating Free
         </Button>
-        <div className="mt-12 text-zinc-600 text-sm flex justify-center gap-8 items-center">
-          <span className="flex items-center gap-1"><Globe className="h-4 w-4" /> Wyoming-Governed</span>
-          <span className="flex items-center gap-1"><Coins className="h-4 w-4" /> Stripe Integrated</span>
-          <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> EU AI Act Compliant</span>
+        <div className="mt-12 text-zinc-600 text-sm flex flex-col items-center gap-4">
+          <div className="flex justify-center gap-8 items-center">
+            <span className="flex items-center gap-1"><Globe className="h-4 w-4" /> Wyoming-Governed</span>
+            <span className="flex items-center gap-1"><Coins className="h-4 w-4" /> Stripe Integrated</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> EU AI Act Compliant</span>
+          </div>
+          <div className="flex gap-4 text-zinc-500">
+            <a href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy Policy</a>
+            <span>|</span>
+            <a href="/terms" className="hover:text-zinc-300 transition-colors">Terms of Service</a>
+          </div>
         </div>
       </section>
     </div>
