@@ -515,15 +515,69 @@ export async function generateKlingPromptsAction(input: {
       throw new Error("Claude 没有返回可用的提示词。");
     }
 
-    // F81: 写入 script_raw 供 TTS 使用
-    const scriptRaw = {
-      structure: {
-        episodes: prompts.map((item, index) => ({
-          episode: index + 1,
-          summary: item.prompt,
-        })),
-      },
-    };
+    // F81 v2: 从blueprint提取对白写入script_raw
+    // 先用Claude从原始剧本提取每场景的角色对白
+    const dialogueExtractionPrompt = `
+You are a dialogue extraction expert.
+Based on the following Kling video prompt sequence, infer and generate character dialogue for each scene.
+Characters: Caius (wolf emperor/CEO, male, deep authoritative voice), Luna (female lead, intelligent sensitive), Marcus (antagonist, cold), Narrator (narration).
+
+Kling prompts:
+${prompts.map((p, i) => `Scene ${i + 1}: ${p.prompt}`).join('\n')}
+
+Return strict JSON format with no other text:
+{
+  "episodes": [
+    {
+      "episode": 1,
+      "lines": [
+        {"character": "narrator", "text": "Narration content"},
+        {"character": "caius", "text": "Dialogue content"},
+        {"character": "luna", "text": "Dialogue content"}
+      ]
+    }
+  ]
+}
+
+Requirements:
+- Each scene should have 2-4 dialogue lines
+- Dialogue must match scene emotion
+- character must be one of: caius / luna / marcus / narrator (lowercase)
+- Dialogue in English
+`;
+
+    let scriptRaw;
+    try {
+      const { generateText } = await import('ai');
+      const { anthropic: anthropicSDK } = await import('@ai-sdk/anthropic');
+      
+      const { text: dialogueJson } = await generateText({
+        model: anthropicSDK('claude-sonnet-4-5'),
+        prompt: dialogueExtractionPrompt,
+      });
+      
+      const cleanJson = dialogueJson.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const dialogueData = JSON.parse(cleanJson);
+      
+      scriptRaw = {
+        structure: {
+          episodes: dialogueData.episodes,
+        },
+      };
+    } catch (err) {
+      console.error('[F81 v2] Dialogue extraction failed, using fallback:', err);
+      // Fallback：至少把prompt作为旁白
+      scriptRaw = {
+        structure: {
+          episodes: prompts.map((item, index) => ({
+            episode: index + 1,
+            lines: [
+              { character: 'narrator', text: item.prompt.slice(0, 200) }
+            ],
+          })),
+        },
+      };
+    }
 
     const { error: scriptRawError } = await supabase
       .from("projects")
@@ -531,8 +585,7 @@ export async function generateKlingPromptsAction(input: {
       .eq("id", projectId);
 
     if (scriptRawError) {
-      console.error("[F81] Failed to write script_raw:", scriptRawError);
-      // 不阻断主流程，仅记录错误
+      console.error("[F81 v2] Failed to write script_raw:", scriptRawError);
     }
 
     return { success: true, data: { prompts } };

@@ -69,18 +69,36 @@ export function AudioGenerationPanel({
         throw new Error("No episodes found in script");
       }
 
-      // 3. 提取每个场景的对话（简化版：使用 summary 作为旁白）
-      const lines: TTSLine[] = [];
+      // 3. 提取每个场景的对话（F83 v1: 支持新格式 lines 数组和旧格式 summary）
+      const ttsLines: TTSLine[] = [];
+
       for (const ep of episodes) {
-        const epObj = ep as { episode?: number; summary?: string };
-        const summary = epObj.summary || "";
-        if (summary.trim()) {
-          lines.push({
-            character: "Narrator",
-            text: summary.trim(),
+        const epObj = ep as { 
+          episode?: number; 
+          summary?: string;
+          lines?: Array<{ character?: string; text?: string }>;
+        };
+        
+        if (epObj.lines && Array.isArray(epObj.lines)) {
+          // 新格式：多角色对白
+          for (const line of epObj.lines) {
+            if (line.character && line.text) {
+              ttsLines.push({ 
+                character: line.character, 
+                text: line.text 
+              });
+            }
+          }
+        } else if (epObj.summary) {
+          // 旧格式兼容：作为旁白
+          ttsLines.push({ 
+            character: 'narrator', 
+            text: epObj.summary 
           });
         }
       }
+
+      const lines = ttsLines;
 
       if (lines.length === 0) {
         throw new Error("No dialogue found in script");
