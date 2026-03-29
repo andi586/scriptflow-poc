@@ -27,20 +27,31 @@ export async function POST(req: NextRequest) {
 
     const scriptRaw = JSON.parse(project.script_raw)
     const episodes = scriptRaw?.structure?.episodes || []
-    const segments = episodes.map((ep: any, i: number) => {
-      const lines = ep.lines || []
-      const text = lines.map((l: any) => l.text).join(' ') || ep.summary || ''
-      const character = lines[0]?.character || 'narrator'
-      return { shotIndex: i, text: text.trim(), character, voiceId: VOICE_MAP[character] || VOICE_MAP.narrator }
-    }).filter((s: any) => s.text.length > 0)
 
-    const ttsRes = await fetch(`${baseUrl}/api/audio/tts`, {
+    const lines: { character: string; text: string }[] = []
+    for (const ep of episodes) {
+      if (Array.isArray(ep.lines)) {
+        for (const line of ep.lines) {
+          if (line.text?.trim()) {
+            lines.push({ character: line.character || 'narrator', text: line.text.trim() })
+          }
+        }
+      } else if (ep.summary?.trim()) {
+        lines.push({ character: 'narrator', text: ep.summary.trim() })
+      }
+    }
+
+    if (lines.length === 0) {
+      return NextResponse.json({ success: false, error: 'No dialogue lines found in script_raw' }, { status: 400 })
+    }
+
+    const ttsRes = await fetch(baseUrl + '/api/audio/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, segments }),
+      body: JSON.stringify({ projectId, lines }),
     })
     const ttsData = await ttsRes.json()
-    if (!ttsData.success) return NextResponse.json({ success: false, error: `TTS failed: ${ttsData.error}` }, { status: 500 })
+    if (!ttsData.success) return NextResponse.json({ success: false, error: 'TTS failed: ' + ttsData.error }, { status: 500 })
 
     await supabase.from('projects').update({ generation_status: 'generating_subtitle' }).eq('id', projectId)
 
@@ -58,26 +69,27 @@ export async function POST(req: NextRequest) {
     await supabase.from('projects').update({ srt_content: srtContent, subtitle_generated_at: new Date().toISOString() }).eq('id', projectId)
 
     const { data: tasks } = await supabase.from('kling_tasks').select('video_url, scene_number').eq('project_id', projectId).eq('status', 'success').order('scene_number')
-    if (!tasks?.length) return NextResponse.json({ success: false, error: 'No completed videos' }, { status: 400 })
+    if (!tasks?.length) return NextResponse.json({ success: false, error: 'No completed videos found' }, { status: 400 })
 
     const shotVideoUrls = tasks.map((t: any) => t.video_url).filter(Boolean)
     const audioUrls = (ttsData.items || []).map((i: any) => i.audioUrl)
 
     await supabase.from('projects').update({ generation_status: 'merging' }).eq('id', projectId)
 
-    const mergeRes = await fetch(`${baseUrl}/api/audio/merge`, {
+    const mergeRes = await fetch(baseUrl + '/api/audio/merge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId, shotVideoUrls, audioUrls, srtContent }),
     })
     const mergeData = await mergeRes.json()
-    if (!mergeData.success) return NextResponse.json({ success: false, error: `Merge failed: ${mergeData.error}` }, { status: 500 })
+    if (!mergeData.success) return NextResponse.json({ success: false, error: 'Merge failed: ' + mergeData.error }, { status: 500 })
 
     const finalVideoUrl = mergeData.mergedVideoUrl || mergeData.url
     await supabase.from('projects').update({ final_video_url: finalVideoUrl, generation_status: 'completed' }).eq('id', projectId)
 
     return NextResponse.json({ success: true, finalVideoUrl })
   } catch (error) {
-    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
