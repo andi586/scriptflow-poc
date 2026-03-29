@@ -1,7 +1,7 @@
 export interface CharacterTimestampsInput {
   characters: string[]
   character_start_times_seconds: number[]
-  character_end_times_amps: number[]
+  character_end_times_seconds: number[]
 }
 export interface SubtitleEntry {
   index: number
@@ -16,7 +16,7 @@ export function formatSrtTimestamp(s: number): string {
   return `${pad2(Math.floor(safe/3600))}:${pad2(Math.floor((safe%3600)/60))}:${pad2(Math.floor(safe%60))},${pad3(Math.round((safe-Math.floor(safe))*1000))}`
 }
 export function timestampsToSubtitleEntries(input: CharacterTimestampsInput, options: { offsetSeconds?: number; startIndex?: number; maxCharsPerCue?: number; maxDurationSeconds?: number } = {}): SubtitleEntry[] {
-  const chars = input.characters, starts = input.character_start_times_seconds, ends = input.character_end_times_amps
+  const chars = input.characters, starts = input.character_start_times_seconds, ends = input.character_end_times_seconds
   const offsetSeconds = options.offsetSeconds ?? 0, maxCharsPerCue = options.maxCharsPerCue ?? 22, maxDurationSeconds = options.maxDurationSeconds ?? 3.8, startIndex = options.startIndex ?? 1
   const entries: SubtitleEntry[] = []
   let buffer = '', cueStart = -1, cueEnd = -1, entryIndex = startIndex
