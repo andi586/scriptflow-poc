@@ -15,7 +15,7 @@ function getSupabaseAdmin() {
 }
 
 function getFfmpegPath(): string {
-  return (ffmpegStatic as string) || 'ffmpeg'
+  return (require("ffmpeg-static") as string)
 }
 
 async function downloadToFile(url: string, outPath: string): Promise<void> {
