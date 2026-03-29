@@ -23,7 +23,7 @@ export default function LandingPage() {
             <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 h-12 text-lg">
               Start Creating Free <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button size="lg" variant="outline" className="border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white h-12 text-lg">
+            <Button size="lg" className="border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white h-12 text-lg">
               View Showcase
             </Button>
           </div>
@@ -148,7 +148,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Standard Generation Speed</div>
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Basic Asset Access</div>
               </CardContent>
-              <CardFooter><Button className="w-full border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white" variant="outline">Get Started</Button></CardFooter>
+              <CardFooter><Button className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white">Get Started</Button></CardFooter>
             </Card>
             <Card className="bg-zinc-900 border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.15)] scale-105">
               <CardHeader className="relative">
@@ -177,7 +177,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Team Collaboration</div>
                 <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> 24/7 Priority Support</div>
               </CardContent>
-              <CardFooter><Button className="w-full border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white" variant="outline">Contact Sales</Button></CardFooter>
+              <CardFooter><Button className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white">Contact Sales</Button></CardFooter>
             </Card>
           </div>
         </div>
