@@ -1,208 +1,119 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import ffmpegPath from 'ffmpeg-static';
-import { spawn } from 'child_process';
-import { writeFile, unlink, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import ffmpegStatic from 'ffmpeg-static'
+import { spawn } from 'node:child_process'
+import { promises as fs } from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'
+export const maxDuration = 300
+export const dynamic = 'force-dynamic'
 
-interface AudioTrack {
-  url: string;
-  startTime: number;
-  duration?: number;
-  volume?: number;
+function getSupabaseAdmin() {
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-interface MergeRequest {
-  projectId: string;
-  tracks: AudioTrack[];
-  outputDuration: number;
+function getFfmpegPath(): string {
+  return (ffmpegStatic as string) || 'ffmpeg'
 }
 
-async function downloadFile(url: string, filepath: string): Promise<void> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to download: ${url}`);
-  }
-  const buffer = await response.arrayBuffer();
-  await writeFile(filepath, Buffer.from(buffer));
+async function downloadToFile(url: string, outPath: string): Promise<void> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Download failed: ${url} (${res.status})`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  await fs.writeFile(outPath, buf)
 }
 
-function runFFmpeg(args: string[]): Promise<void> {
+function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (!ffmpegPath) {
-      reject(new Error('FFmpeg binary not found'));
-      return;
-    }
-
-    const ffmpeg = spawn(ffmpegPath, args);
-    let stderr = '';
-
-    ffmpeg.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    ffmpeg.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`FFmpeg exited with code ${code}: ${stderr}`));
-      }
-    });
-
-    ffmpeg.on('error', (err) => {
-      reject(err);
-    });
-  });
+    const child = spawn(getFfmpegPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderr = ''
+    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`FFmpeg failed (${code}): ${stderr.slice(-500)}`))
+    })
+  })
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sf-merge-'))
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const body = await req.json()
+    const { projectId, shotVideoUrls, audioUrls, srtContent, bgMusicUrl } = body
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!projectId) return NextResponse.json({ success: false, error: 'projectId required' }, { status: 400 })
+    if (!Array.isArray(shotVideoUrls) || shotVideoUrls.length === 0) return NextResponse.json({ success: false, error: 'shotVideoUrls required' }, { status: 400 })
+    if (!Array.isArray(audioUrls) || audioUrls.length === 0) return NextResponse.json({ success: false, error: 'audioUrls required' }, { status: 400 })
+
+    // Download videos
+    const videoPaths: string[] = []
+    for (let i = 0; i < shotVideoUrls.length; i++) {
+      const vp = path.join(workDir, `v${i}.mp4`)
+      await downloadToFile(shotVideoUrls[i], vp)
+      videoPaths.push(vp)
     }
 
-    const body: MergeRequest = await request.json();
-    const { projectId, tracks, outputDuration } = body;
-
-    if (!projectId || !tracks || tracks.length === 0) {
-      return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    // Download audios
+    const audioPaths: string[] = []
+    for (let i = 0; i < audioUrls.length; i++) {
+      const ap = path.join(workDir, `a${i}.mp3`)
+      await downloadToFile(audioUrls[i], ap)
+      audioPaths.push(ap)
     }
 
-    // Verify project ownership
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('user_id', user.id)
-      .single();
+    // Concat videos
+    const listFile = path.join(workDir, 'list.txt')
+    await fs.writeFile(listFile, videoPaths.map(p => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'))
+    const concatVideo = path.join(workDir, 'concat.mp4')
+    await runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', concatVideo])
 
-    if (projectError || !project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    // Concat audios
+    const audioListFile = path.join(workDir, 'alist.txt')
+    await fs.writeFile(audioListFile, audioPaths.map(p => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'))
+    const concatAudio = path.join(workDir, 'audio.m4a')
+    await runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', audioListFile, '-c', 'aac', '-b:a', '192k', concatAudio])
+
+    // Write SRT
+    let srtPath: string | undefined
+    if (srtContent?.trim()) {
+      srtPath = path.join(workDir, 'sub.srt')
+      await fs.writeFile(srtPath, srtContent, 'utf8')
     }
 
-    // Create temp directory
-    const tempDir = join(tmpdir(), `audio-merge-${Date.now()}`);
-    await mkdir(tempDir, { recursive: true });
+    // Final merge
+    const finalPath = path.join(workDir, 'final.mp4')
+    const ffArgs = ['-y', '-i', concatVideo, '-i', concatAudio, '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-crf', '23', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '192k', '-shortest']
 
-    try {
-      // Download all audio files
-      const inputFiles: string[] = [];
-      for (let i = 0; i < tracks.length; i++) {
-        const track = tracks[i];
-        const inputPath = join(tempDir, `input_${i}.mp3`);
-        await downloadFile(track.url, inputPath);
-        inputFiles.push(inputPath);
-      }
-
-      // Build FFmpeg filter complex
-      const filterParts: string[] = [];
-      const inputs: string[] = [];
-
-      for (let i = 0; i < tracks.length; i++) {
-        const track = tracks[i];
-        const volume = track.volume ?? 1.0;
-        
-        // Add delay and volume adjustment
-        filterParts.push(
-          `[${i}:a]adelay=${Math.round(track.startTime * 1000)}|${Math.round(track.startTime * 1000)},volume=${volume}[a${i}]`
-        );
-        inputs.push(`-i`);
-        inputs.push(inputFiles[i]);
-      }
-
-      // Mix all tracks
-      const mixInputs = tracks.map((_, i) => `[a${i}]`).join('');
-      filterParts.push(`${mixInputs}amix=inputs=${tracks.length}:duration=longest[out]`);
-
-      const filterComplex = filterParts.join(';');
-      const outputPath = join(tempDir, 'output.mp3');
-
-      // Run FFmpeg
-      const ffmpegArgs = [
-        ...inputs,
-        '-filter_complex', filterComplex,
-        '-map', '[out]',
-        '-t', outputDuration.toString(),
-        '-c:a', 'libmp3lame',
-        '-b:a', '192k',
-        '-y',
-        outputPath
-      ];
-
-      await runFFmpeg(ffmpegArgs);
-
-      // Read output file
-      const outputBuffer = await require('fs/promises').readFile(outputPath);
-
-      // Upload to Supabase Storage
-      const fileName = `${projectId}/audio-mix-${Date.now()}.mp3`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('generated-videos')
-        .upload(fileName, outputBuffer, {
-          contentType: 'audio/mpeg',
-          upsert: false
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('generated-videos')
-        .getPublicUrl(fileName);
-
-      // Save to audio_assets table
-      const { data: asset, error: assetError } = await supabase
-        .from('audio_assets')
-        .insert({
-          project_id: projectId,
-          type: 'mix',
-          name: `Audio Mix ${new Date().toISOString()}`,
-          url: publicUrl,
-          duration: outputDuration,
-          metadata: {
-            tracks: tracks.length,
-            created_at: new Date().toISOString()
-          }
-        })
-        .select()
-        .single();
-
-      if (assetError) {
-        console.error('Failed to save asset:', assetError);
-      }
-
-      // Cleanup temp files
-      for (const file of inputFiles) {
-        await unlink(file).catch(() => {});
-      }
-      await unlink(outputPath).catch(() => {});
-
-      return NextResponse.json({
-        success: true,
-        url: publicUrl,
-        assetId: asset?.id,
-        duration: outputDuration
-      });
-
-    } finally {
-      // Cleanup temp directory
-      await unlink(tempDir).catch(() => {});
+    if (srtPath) {
+      const escaped = srtPath.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'")
+      ffArgs.push('-vf', `subtitles='${escaped}'`)
     }
 
+    ffArgs.push(finalPath)
+    await runFfmpeg(ffArgs)
+
+    // Upload to Supabase
+    const supabase = getSupabaseAdmin()
+    const storagePath = `episodes/${projectId}/final-${Date.now()}.mp4`
+    const fileBuffer = await fs.readFile(finalPath)
+
+    const { error: uploadError } = await supabase.storage
+      .from('generated-videos')
+      .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true })
+
+    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`)
+
+    const { data } = supabase.storage.from('generated-videos').getPublicUrl(storagePath)
+    const mergedVideoUrl = data.publicUrl
+
+    return NextResponse.json({ success: true, mergedVideoUrl, url: mergedVideoUrl })
   } catch (error) {
-    console.error('Audio merge error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to merge audio' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {})
   }
 }
