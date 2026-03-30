@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       const lines = ep.lines ?? []
       lines.forEach((line: any, lineIndex: number) => {
         const role = (line.character ?? line.role ?? '').toLowerCase()
-        const text = line.dialogue ?? line.text ?? ''
+        const text = line.text ?? line.dialogue ?? ''
         if (role && text && ['caius', 'luna', 'marcus'].includes(role)) {
           dialogueBlocks.push({ shotIndex: epIndex, role, text })
         }
