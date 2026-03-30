@@ -25,15 +25,20 @@ export async function POST(req: NextRequest) {
     const { data: project } = await supabase.from('projects').select('script_raw').eq('id', projectId).single()
     if (!project?.script_raw) return NextResponse.json({ success: false, error: 'No script_raw' }, { status: 400 })
 
-    const scriptRaw = JSON.parse(project.script_raw)
+    // script_raw may be stored as a JSON string or already parsed object
+    const scriptRaw = typeof project.script_raw === 'string'
+      ? JSON.parse(project.script_raw)
+      : project.script_raw
     const episodes = scriptRaw?.structure?.episodes || []
 
     const lines: { character: string; text: string }[] = []
     for (const ep of episodes) {
       if (Array.isArray(ep.lines)) {
         for (const line of ep.lines) {
-          if (line.text?.trim()) {
-            lines.push({ character: line.character || 'narrator', text: line.text.trim() })
+          // Support both `dialogue` and `text` field names
+          const text = (line.dialogue ?? line.text ?? '').toString().trim()
+          if (text) {
+            lines.push({ character: line.character || 'narrator', text })
           }
         }
       } else if (ep.summary?.trim()) {

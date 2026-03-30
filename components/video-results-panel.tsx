@@ -103,6 +103,10 @@ export function VideoResultsPanel({
   const [mergeBusy, setMergeBusy] = useState(false);
   const [mergeProgress, setMergeProgress] = useState(0);
   const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
+  const [cloudMergeBusy, setCloudMergeBusy] = useState(false);
+  const [cloudMergedVideoUrl, setCloudMergedVideoUrl] = useState<string | null>(null);
+  const [cloudMergeError, setCloudMergeError] = useState<string | null>(null);
+  const cloudMergeTriggeredRef = useRef(false);
   /** Fresh URLs from PiAPI at play/download time (not stale DB video_url). */
   const [playUrlByTaskId, setPlayUrlByTaskId] = useState<Record<string, string>>({});
   const [playbackResolving, setPlaybackResolving] = useState<Record<string, boolean>>({});
@@ -492,6 +496,63 @@ export function VideoResultsPanel({
       setMergeBusy(false);
     }
   }, [tasks, mergedVideoUrl]);
+
+  // Auto-trigger cloud merge when all clips succeed
+  useEffect(() => {
+    if (cloudMergeTriggeredRef.current) return;
+    if (tasks.length === 0) return;
+    if (!tasks.every((t) => t.status === "success")) return;
+
+    cloudMergeTriggeredRef.current = true;
+    void (async () => {
+      setCloudMergeBusy(true);
+      setCloudMergeError(null);
+      setCloudMergedVideoUrl(null);
+      try {
+        const clips = tasks
+          .slice()
+          .sort((a, b) => a.beat_number - b.beat_number);
+        const videoUrls: string[] = [];
+        for (const t of clips) {
+          const tid = getTaskIdKey(t);
+          if (!tid) continue;
+          const permanent =
+            typeof t.output_url === "string" && t.output_url.trim()
+              ? t.output_url.trim()
+              : "";
+          const url =
+            permanent && /^https:\/\//i.test(permanent)
+              ? permanent
+              : await fetchFreshPlaybackUrl(tid, {
+                  beat_number: t.beat_number,
+                  taskIdKey: tid,
+                });
+          videoUrls.push(url);
+        }
+        const res = await fetch("/api/merge-videos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId: sessionId, videoUrls }),
+        });
+        const data = (await res.json()) as {
+          success: boolean;
+          finalVideoUrl?: string;
+          error?: string;
+        };
+        if (!data.success || !data.finalVideoUrl) {
+          throw new Error(data.error || "Merge failed");
+        }
+        setCloudMergedVideoUrl(data.finalVideoUrl);
+      } catch (err) {
+        setCloudMergeError(
+          err instanceof Error ? err.message : String(err)
+        );
+        cloudMergeTriggeredRef.current = false;
+      } finally {
+        setCloudMergeBusy(false);
+      }
+    })();
+  }, [tasks, sessionId, fetchFreshPlaybackUrl]);
 
   useEffect(() => {
     if (!sessionId.trim() || stillResolvingIds) {
@@ -945,6 +1006,34 @@ export function VideoResultsPanel({
                 <>合并成片 / Export Final Video</>
               )}
             </Button>
+          </div>
+        )}
+
+        {/* Auto cloud merge status */}
+        {cloudMergeBusy && (
+          <div className="flex items-center gap-2 text-xs text-sky-300/80">
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            Merging all clips in the cloud…
+          </div>
+        )}
+
+        {cloudMergeError && (
+          <p className="text-xs text-red-400" role="alert">
+            Cloud merge failed: {cloudMergeError}
+          </p>
+        )}
+
+        {cloudMergedVideoUrl && (
+          <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-4">
+            <a
+              href={cloudMergedVideoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
+            >
+              <Download className="size-4" aria-hidden />
+              🎬 Download Final Episode
+            </a>
           </div>
         )}
         
