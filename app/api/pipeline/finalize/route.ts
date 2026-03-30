@@ -18,6 +18,7 @@ const CHARACTER_VOICE_ENV_MAP: Record<string, string> = {
   caius: 'ELEVENLABS_VOICE_ID_CAIUS',
   luna: 'ELEVENLABS_VOICE_ID_LUNA',
   marcus: 'ELEVENLABS_VOICE_ID_MARCUS',
+  narrator: 'ELEVENLABS_VOICE_ID_NARRATOR',
 }
 
 export async function POST(request: NextRequest) {
