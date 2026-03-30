@@ -529,7 +529,7 @@ export function VideoResultsPanel({
                 });
           videoUrls.push(url);
         }
-        const res = await fetch("/api/merge-videos", {
+        const res = await fetch("/api/pipeline/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projectId: sessionId, videoUrls }),
@@ -540,7 +540,7 @@ export function VideoResultsPanel({
           error?: string;
         };
         if (!data.success || !data.finalVideoUrl) {
-          throw new Error(data.error || "Merge failed");
+          throw new Error(data.error || "Finalize failed");
         }
         setCloudMergedVideoUrl(data.finalVideoUrl);
       } catch (err) {
