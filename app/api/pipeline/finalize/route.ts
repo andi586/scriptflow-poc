@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
       if (!voiceId) throw new Error(`Missing voice ID for ${block.role}`)
 
       const apiKey = process.env.ELEVENLABS_API_KEY
+      console.error("[finalize] apiKey prefix=", apiKey?.slice(0,8))
       const res = await fetch(`${ELEVENLABS_WITH_TIMESTAMPS_BASE_URL}/${voiceId}/with-timestamps`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey! },
