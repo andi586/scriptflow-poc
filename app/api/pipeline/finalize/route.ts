@@ -140,13 +140,13 @@ function getSupabaseAdminClient(): SupabaseClient {
 async function getCompletedVideoUrls(supabase: SupabaseClient, projectId: string): Promise<string[]> {
   const { data } = await supabase
     .from('kling_tasks')
-    .select('video_url, shot_index, created_at')
+    .select('video_url, scene_index, created_at')
     .eq('project_id', projectId)
     .eq('status', 'success')
     .not('video_url', 'is', null)
 
   return (data ?? [])
-    .sort((a, b) => (a.shot_index ?? 0) - (b.shot_index ?? 0))
+    .sort((a, b) => (a.scene_index ?? 0) - (b.scene_index ?? 0))
     .map(r => r.video_url as string)
 }
 
