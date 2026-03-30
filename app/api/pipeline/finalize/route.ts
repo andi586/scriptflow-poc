@@ -88,7 +88,9 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ text: block.text, model_id: ELEVENLABS_MODEL_ID }),
       })
 
-      const data = await res.json()
+      const rawText = await res.text()
+      console.error("[ElevenLabs raw text]", rawText.substring(0,300))
+      const data = JSON.parse(rawText)
       console.error("[ElevenLabs raw]", JSON.stringify(data).substring(0,200))
       if (!data.audio_base64) throw new Error('ElevenLabs missing audio_base64')
 
