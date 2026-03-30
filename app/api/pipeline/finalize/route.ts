@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
       })
 
       const data = await res.json()
+      console.error("[ElevenLabs raw]", JSON.stringify(data).substring(0,200))
       if (!data.audio_base64) throw new Error('ElevenLabs missing audio_base64')
 
       const audioBuffer = Buffer.from(data.audio_base64, 'base64')
