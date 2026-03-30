@@ -1,100 +1,164 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { entriesToSrt, timestampsToSubtitleEntries } from '@/lib/subtitle/generate-srt'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-const VOICE_MAP: Record<string, string> = {
-  luna: '21m00Tcm4TlvDq8ikWAM',
-  caius: 'TxGEqnHWrfWFTfGW9XjX',
-  marcus: 'EXAVITQu4vr4xnSDxMaL',
-  narrator: 'pNInz6obpgDQGcFmaJgB',
+const ELEVENLABS_WITH_TIMESTAMPS_BASE_URL = 'https://api.elevenlabs.io/v1/text-to-speech'
+const RAILWAY_MERGE_URL = process.env.VIDEO_MERGE_SERVICE_URL + '/merge'
+
+const MIN_SHOT_DURATION_SECONDS = 4.5
+const MAX_SHOT_DURATION_SECONDS = 8.0
+const SHOT_LEAD_IN_SECONDS = 0.35
+const SHOT_TAIL_OUT_SECONDS = 0.45
+const GENERATED_AUDIO_BUCKET = process.env.GENERATED_AUDIO_BUCKET ?? 'generated-audio'
+const ELEVENLABS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_multilingual_v2'
+
+const CHARACTER_VOICE_ENV_MAP: Record<string, string> = {
+  caius: 'ELEVENLABS_VOICE_ID_CAIUS',
+  luna: 'ELEVENLABS_VOICE_ID_LUNA',
+  marcus: 'ELEVENLABS_VOICE_ID_MARCUS',
 }
 
-export async function POST(req: NextRequest) {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getscriptflow.com'
+export async function POST(request: NextRequest) {
   try {
-    const { projectId } = await req.json()
-    if (!projectId) return NextResponse.json({ success: false, error: 'projectId required' }, { status: 400 })
+    const body = await request.json()
+    const projectId = body.projectId?.trim()
+    if (!projectId) return NextResponse.json({ success: false, error: 'Missing projectId' }, { status: 400 })
 
-    await supabase.from('projects').update({ generation_status: 'generating_audio' }).eq('id', projectId)
+    const supabase = getSupabaseAdminClient()
 
-    const { data: project } = await supabase.from('projects').select('script_raw').eq('id', projectId).single()
-    if (!project?.script_raw) return NextResponse.json({ success: false, error: 'No script_raw' }, { status: 400 })
+    // 从 projects 表读取 script_raw
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('script_raw')
+      .eq('id', projectId)
+      .single()
 
-    // script_raw may be stored as a JSON string or already parsed object
+    if (projectError || !project) {
+      return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
+    }
+
     const scriptRaw = typeof project.script_raw === 'string'
       ? JSON.parse(project.script_raw)
       : project.script_raw
-    const episodes = scriptRaw?.structure?.episodes || []
 
-    const lines: { character: string; text: string }[] = []
-    for (const ep of episodes) {
-      if (Array.isArray(ep.lines)) {
-        for (const line of ep.lines) {
-          // Support both `dialogue` and `text` field names
-          const text = (line.dialogue ?? line.text ?? '').toString().trim()
-          if (text) {
-            lines.push({ character: line.character || 'narrator', text })
-          }
+    // 解析对白块：structure.episodes[].lines[]
+    const dialogueBlocks: Array<{ shotIndex: number; role: string; text: string }> = []
+    const episodes = scriptRaw?.structure?.episodes ?? []
+    episodes.forEach((ep: any, epIndex: number) => {
+      const lines = ep.lines ?? []
+      lines.forEach((line: any, lineIndex: number) => {
+        const role = (line.character ?? line.role ?? '').toLowerCase()
+        const text = line.dialogue ?? line.text ?? ''
+        if (role && text && ['caius', 'luna', 'marcus'].includes(role)) {
+          dialogueBlocks.push({ shotIndex: epIndex, role, text })
         }
-      } else if (ep.summary?.trim()) {
-        lines.push({ character: 'narrator', text: ep.summary.trim() })
-      }
+      })
+    })
+
+    if (dialogueBlocks.length === 0) {
+      return NextResponse.json({ success: false, error: 'No dialogue blocks found' }, { status: 422 })
     }
 
-    if (lines.length === 0) {
-      return NextResponse.json({ success: false, error: 'No dialogue lines found in script_raw' }, { status: 400 })
+    // 获取视频URLs
+    const videoUrls = body.videoUrls?.length > 0
+      ? body.videoUrls
+      : await getCompletedVideoUrls(supabase, projectId)
+
+    if (videoUrls.length === 0) {
+      return NextResponse.json({ success: false, error: 'No completed video URLs' }, { status: 422 })
     }
 
-    const ttsRes = await fetch(baseUrl + '/api/audio/tts', {
+    // 生成TTS配音
+    const audioList = []
+    let runningOffset = 0
+    const srtChunks: string[] = []
+    let srtSeq = 1
+
+    for (const block of dialogueBlocks) {
+      const voiceId = process.env[CHARACTER_VOICE_ENV_MAP[block.role]]
+      if (!voiceId) throw new Error(`Missing voice ID for ${block.role}`)
+
+      const apiKey = process.env.ELEVENLABS_API_KEY
+      const res = await fetch(`${ELEVENLABS_WITH_TIMESTAMPS_BASE_URL}/${voiceId}/with-timestamps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey! },
+        body: JSON.stringify({ text: block.text, model_id: ELEVENLABS_MODEL_ID }),
+      })
+
+      const data = await res.json()
+      if (!data.audio_base64) throw new Error('ElevenLabs missing audio_base64')
+
+      const audioBuffer = Buffer.from(data.audio_base64, 'base64')
+      const alignment = data.normalized_alignment ?? data.alignment
+      const duration = Math.max(0, ...alignment.character_end_times_seconds)
+
+      const storagePath = `${projectId}/dialogue-audio/${String(audioList.length + 1).padStart(3, '0')}-${block.role}.mp3`
+      await supabase.storage.from(GENERATED_AUDIO_BUCKET).upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+      const { data: urlData } = supabase.storage.from(GENERATED_AUDIO_BUCKET).getPublicUrl(storagePath)
+
+      audioList.push({ audioUrl: urlData.publicUrl, duration })
+
+      // 生成SRT
+      srtChunks.push(`${srtSeq}\n${formatSrtTime(runningOffset)} --> ${formatSrtTime(runningOffset + duration)}\n${block.text}`)
+      srtSeq++
+      runningOffset += duration
+    }
+
+    // 调用Railway合并
+    const mergeRes = await fetch(RAILWAY_MERGE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, lines }),
+      body: JSON.stringify({
+        projectId,
+        videoUrls,
+        audioUrls: audioList.map(a => a.audioUrl),
+        srtContent: srtChunks.join('\n\n'),
+      }),
     })
-    const ttsData = await ttsRes.json()
-    if (!ttsData.success) return NextResponse.json({ success: false, error: 'TTS failed: ' + ttsData.error }, { status: 500 })
 
-    await supabase.from('projects').update({ generation_status: 'generating_subtitle' }).eq('id', projectId)
-
-    let allEntries: any[] = []
-    let nextIndex = 1, offsetSeconds = 0
-    for (const item of ttsData.items || []) {
-      if (item.timestamps) {
-        const entries = timestampsToSubtitleEntries(item.timestamps, { offsetSeconds, startIndex: nextIndex })
-        allEntries.push(...entries)
-        nextIndex += entries.length
-        offsetSeconds += item.durationSeconds || 0
-      }
-    }
-    const srtContent = entriesToSrt(allEntries)
-    await supabase.from('projects').update({ srt_content: srtContent, subtitle_generated_at: new Date().toISOString() }).eq('id', projectId)
-
-    const { data: tasks } = await supabase.from('kling_tasks').select('video_url, scene_index').eq('project_id', projectId).eq('status', 'success').order('scene_index')
-    if (!tasks?.length) return NextResponse.json({ success: false, error: 'No completed videos found' }, { status: 400 })
-
-    const shotVideoUrls = tasks.map((t: any) => t.video_url).filter(Boolean)
-    const audioUrls = (ttsData.items || []).map((i: any) => i.audioUrl)
-
-    await supabase.from('projects').update({ generation_status: 'merging' }).eq('id', projectId)
-
-    const mergeRes = await fetch(baseUrl + '/api/audio/merge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, shotVideoUrls, audioUrls, srtContent }),
-    })
     const mergeData = await mergeRes.json()
-    if (!mergeData.success) return NextResponse.json({ success: false, error: 'Merge failed: ' + mergeData.error }, { status: 500 })
+    if (!mergeData.success || !mergeData.finalVideoUrl) {
+      throw new Error(mergeData.error ?? 'Railway merge failed')
+    }
 
-    const finalVideoUrl = mergeData.mergedVideoUrl || mergeData.url
-    await supabase.from('projects').update({ final_video_url: finalVideoUrl, generation_status: 'completed' }).eq('id', projectId)
+    return NextResponse.json({ success: true, finalVideoUrl: mergeData.finalVideoUrl })
 
-    return NextResponse.json({ success: true, finalVideoUrl })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('[pipeline/finalize]', error)
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
   }
+}
+
+function getSupabaseAdminClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+}
+
+async function getCompletedVideoUrls(supabase: SupabaseClient, projectId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('kling_tasks')
+    .select('video_url, shot_index, created_at')
+    .eq('project_id', projectId)
+    .eq('status', 'success')
+    .not('video_url', 'is', null)
+
+  return (data ?? [])
+    .sort((a, b) => (a.shot_index ?? 0) - (b.shot_index ?? 0))
+    .map(r => r.video_url as string)
+}
+
+function formatSrtTime(seconds: number): string {
+  const ms = Math.round(seconds * 1000)
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  const msRem = ms % 1000
+  return `${pad(h,2)}:${pad(m,2)}:${pad(s,2)},${pad(msRem,3)}`
+}
+
+function pad(n: number, len: number): string {
+  return String(n).padStart(len, '0')
 }
