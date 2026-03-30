@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
 
     for (const block of dialogueBlocks) {
       const voiceId = process.env[CHARACTER_VOICE_ENV_MAP[block.role]]
+      console.error("[finalize] role=", block.role, "voiceId=", voiceId)
       if (!voiceId) throw new Error(`Missing voice ID for ${block.role}`)
 
       const apiKey = process.env.ELEVENLABS_API_KEY
