@@ -57,46 +57,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Failed to fetch kling_tasks' }, { status: 500 })
     }
 
-    // 解析对白块：structure.episodes[0].lines[]
-    const dialogueBlocks: Array<{ shotIndex: number; role: string; text: string }> = []
+    // 解析对白块：structure.episodes[0].lines[]（容错：lines 不存在或为空则跳过）
     const episodes = scriptRaw?.structure?.episodes ?? []
     const firstEpisodeLines: Array<{ character: string; text: string }> = episodes[0]?.lines ?? []
+    const hasDialogue = firstEpisodeLines.length > 0
 
-    firstEpisodeLines.forEach((line: any, lineIndex: number) => {
-      const role = (line.character ?? line.role ?? '').toLowerCase()
-      const text = line.text ?? line.dialogue ?? ''
-      if (role && text) {
-        dialogueBlocks.push({ shotIndex: lineIndex, role, text })
-      }
-    })
+    const dialogueBlocks: Array<{ shotIndex: number; role: string; text: string }> = []
 
-    if (dialogueBlocks.length === 0) {
-      return NextResponse.json({ success: false, error: 'No dialogue blocks found' }, { status: 422 })
+    if (hasDialogue) {
+      firstEpisodeLines.forEach((line: any, lineIndex: number) => {
+        const role = (line.character ?? line.role ?? '').toLowerCase()
+        const text = line.text ?? line.dialogue ?? ''
+        if (role && text) {
+          dialogueBlocks.push({ shotIndex: lineIndex, role, text })
+        }
+      })
     }
 
-    // 写入 dialogue_blocks 表（先删旧记录）
-    const { error: deleteError } = await supabase
-      .from('dialogue_blocks')
-      .delete()
-      .eq('project_id', projectId)
+    // 写入 dialogue_blocks 表（仅当有对白时）
+    if (dialogueBlocks.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('dialogue_blocks')
+        .delete()
+        .eq('project_id', projectId)
 
-    if (deleteError) {
-      console.error('[finalize] Failed to delete old dialogue_blocks:', deleteError)
-      return NextResponse.json({ success: false, error: 'Failed to clear old dialogue_blocks' }, { status: 500 })
-    }
-
-    const dialogueBlockRows = firstEpisodeLines.map((line: any, lineIndex: number) => {
-      const shotId = klingTasks?.[lineIndex]?.id ?? null
-      return {
-        project_id: projectId,
-        shot_id: shotId,
-        character: line.character ?? line.role ?? '',
-        text: line.text ?? line.dialogue ?? '',
-        emotion: 'neutral',
+      if (deleteError) {
+        console.error('[finalize] Failed to delete old dialogue_blocks:', deleteError)
+        return NextResponse.json({ success: false, error: 'Failed to clear old dialogue_blocks' }, { status: 500 })
       }
-    }).filter((row: any) => row.character && row.text)
 
-    if (dialogueBlockRows.length > 0) {
+      const dialogueBlockRows = firstEpisodeLines.map((line: any, lineIndex: number) => {
+        const shotId = klingTasks?.[lineIndex]?.id ?? null
+        return {
+          project_id: projectId,
+          shot_id: shotId,
+          character: line.character ?? line.role ?? '',
+          text: line.text ?? line.dialogue ?? '',
+          emotion: 'neutral',
+        }
+      }).filter((row: any) => row.character && row.text)
+
       const { error: insertError } = await supabase
         .from('dialogue_blocks')
         .insert(dialogueBlockRows)
@@ -105,9 +105,11 @@ export async function POST(request: NextRequest) {
         console.error('[finalize] Failed to insert dialogue_blocks:', insertError)
         return NextResponse.json({ success: false, error: 'Failed to insert dialogue_blocks' }, { status: 500 })
       }
-    }
 
-    console.log(`[finalize] Inserted ${dialogueBlockRows.length} dialogue_blocks for project ${projectId}`)
+      console.log(`[finalize] Inserted ${dialogueBlockRows.length} dialogue_blocks for project ${projectId}`)
+    } else {
+      console.log(`[finalize] No dialogue lines found — skipping dialogue_blocks write for project ${projectId}`)
+    }
 
     // 获取视频URLs
     const videoUrls = body.videoUrls?.length > 0
@@ -118,45 +120,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No completed video URLs' }, { status: 422 })
     }
 
-    // 生成TTS配音
-    const audioList = []
-    let runningOffset = 0
+    // 生成TTS配音（仅当有对白时）
+    const audioList: Array<{ audioUrl: string; duration: number }> = []
     const srtChunks: string[] = []
-    let srtSeq = 1
 
-    for (const block of dialogueBlocks) {
-      const voiceId = process.env[CHARACTER_VOICE_ENV_MAP[block.role]]
-      console.error("[finalize] role=", block.role, "voiceId=", voiceId)
-      if (!voiceId) throw new Error(`Missing voice ID for ${block.role}`)
+    if (dialogueBlocks.length > 0) {
+      let runningOffset = 0
+      let srtSeq = 1
 
-      const apiKey = process.env.ELEVENLABS_API_KEY
-      console.error("[finalize] apiKey prefix=", apiKey?.slice(0,8))
-      const res = await fetch(`${ELEVENLABS_WITH_TIMESTAMPS_BASE_URL}/${voiceId}/with-timestamps`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey! },
-        body: JSON.stringify({ text: block.text, model_id: ELEVENLABS_MODEL_ID }),
-      })
+      for (const block of dialogueBlocks) {
+        const voiceId = process.env[CHARACTER_VOICE_ENV_MAP[block.role]]
+        console.error("[finalize] role=", block.role, "voiceId=", voiceId)
+        if (!voiceId) throw new Error(`Missing voice ID for ${block.role}`)
 
-      const rawText = await res.text()
-      console.error("[ElevenLabs raw text]", rawText.substring(0,300))
-      const data = JSON.parse(rawText)
-      console.error("[ElevenLabs raw]", JSON.stringify(data).substring(0,200))
-      if (!data.audio_base64) throw new Error('ElevenLabs missing audio_base64')
+        const apiKey = process.env.ELEVENLABS_API_KEY
+        console.error("[finalize] apiKey prefix=", apiKey?.slice(0,8))
+        const res = await fetch(`${ELEVENLABS_WITH_TIMESTAMPS_BASE_URL}/${voiceId}/with-timestamps`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey! },
+          body: JSON.stringify({ text: block.text, model_id: ELEVENLABS_MODEL_ID }),
+        })
 
-      const audioBuffer = Buffer.from(data.audio_base64, 'base64')
-      const alignment = data.normalized_alignment ?? data.alignment
-      const duration = Math.max(0, ...alignment.character_end_times_seconds)
+        const rawText = await res.text()
+        console.error("[ElevenLabs raw text]", rawText.substring(0,300))
+        const data = JSON.parse(rawText)
+        console.error("[ElevenLabs raw]", JSON.stringify(data).substring(0,200))
+        if (!data.audio_base64) throw new Error('ElevenLabs missing audio_base64')
 
-      const storagePath = `${projectId}/dialogue-audio/${String(audioList.length + 1).padStart(3, '0')}-${block.role}.mp3`
-      await supabase.storage.from(GENERATED_AUDIO_BUCKET).upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
-      const { data: urlData } = supabase.storage.from(GENERATED_AUDIO_BUCKET).getPublicUrl(storagePath)
+        const audioBuffer = Buffer.from(data.audio_base64, 'base64')
+        const alignment = data.normalized_alignment ?? data.alignment
+        const duration = Math.max(0, ...alignment.character_end_times_seconds)
 
-      audioList.push({ audioUrl: urlData.publicUrl, duration })
+        const storagePath = `${projectId}/dialogue-audio/${String(audioList.length + 1).padStart(3, '0')}-${block.role}.mp3`
+        await supabase.storage.from(GENERATED_AUDIO_BUCKET).upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+        const { data: urlData } = supabase.storage.from(GENERATED_AUDIO_BUCKET).getPublicUrl(storagePath)
 
-      // 生成SRT
-      srtChunks.push(`${srtSeq}\n${formatSrtTime(runningOffset)} --> ${formatSrtTime(runningOffset + duration)}\n${block.text}`)
-      srtSeq++
-      runningOffset += duration
+        audioList.push({ audioUrl: urlData.publicUrl, duration })
+
+        // 生成SRT
+        srtChunks.push(`${srtSeq}\n${formatSrtTime(runningOffset)} --> ${formatSrtTime(runningOffset + duration)}\n${block.text}`)
+        srtSeq++
+        runningOffset += duration
+      }
+    } else {
+      console.log(`[finalize] No dialogue — calling Railway merge with empty audio/srt for project ${projectId}`)
     }
 
     // 调用Railway合并
