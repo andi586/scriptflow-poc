@@ -852,25 +852,7 @@ export default function Home() {
           aria-label="Primary"
         >
           <div className="min-w-0 shrink text-xl font-extrabold tracking-tight">ScriptFlow</div>
-          <div className="flex items-center gap-3">
-            <MyProjectsPanel onStartNew={startNewLazySession} />
-            <div
-              className="hidden sm:flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 sm:gap-3 sm:px-3 sm:py-1.5"
-              aria-label="API health"
-            >
-              <HealthDot
-                label="Anthropic"
-                status={health?.anthropic}
-                errorText={health?.errors?.anthropic}
-              />
-              <HealthDot label="PiAPI" status={health?.piapi} errorText={health?.errors?.piapi} />
-              <HealthDot
-                label="Supabase"
-                status={health?.supabase}
-                errorText={health?.errors?.supabase}
-              />
-            </div>
-          </div>
+          <MyProjectsPanel onStartNew={startNewLazySession} />
         </nav>
       </header>
 
