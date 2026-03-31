@@ -14,9 +14,10 @@ function getSupabaseAdmin() {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
-  const projectId = params.id?.trim()
+  const { id } = await context.params
+  const projectId = id?.trim()
   if (!projectId) {
     return NextResponse.json({ error: 'Missing project id' }, { status: 400 })
   }
