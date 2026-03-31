@@ -774,7 +774,8 @@ export function VideoResultsPanel({
                                       beat_number: task.beat_number,
                                       taskIdKey: piTid,
                                     });
-                              window.open(toSameOriginVideoUrl(url), "_blank");
+                              const downloadUrl = `/api/download?url=${encodeURIComponent(url)}`;
+                              window.open(downloadUrl, "_blank");
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
                                 task_id_key: piTid,
@@ -839,7 +840,7 @@ export function VideoResultsPanel({
               className="w-full rounded-lg border border-white/10 bg-black"
             />
             <a
-              href={cloudMergedVideoUrl}
+              href={`/api/download?url=${encodeURIComponent(cloudMergedVideoUrl)}`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
