@@ -44,6 +44,30 @@ export async function POST(request: NextRequest) {
       ? JSON.parse(project.script_raw)
       : project.script_raw
 
+    // 查询 script_edits 表，将用户编辑的台词覆盖到 scriptRaw（Director Mode）
+    const { data: scriptEdits } = await supabase
+      .from('script_edits')
+      .select('episode_index, line_index, edited_line')
+      .eq('project_id', projectId)
+      .eq('status', 'edited')
+      .order('episode_index', { ascending: true })
+      .order('line_index', { ascending: true })
+
+    if (scriptEdits && scriptEdits.length > 0) {
+      const episodes: any[] = scriptRaw?.structure?.episodes ?? []
+      for (const edit of scriptEdits) {
+        const ep = episodes[edit.episode_index]
+        if (!ep || !Array.isArray(ep.lines)) continue
+        const line = ep.lines[edit.line_index]
+        if (!line) continue
+        const editedText = edit.edited_line?.text ?? edit.edited_line
+        if (typeof editedText === 'string') {
+          ep.lines[edit.line_index] = { ...line, text: editedText }
+        }
+      }
+      console.log(`[finalize] Applied ${scriptEdits.length} script_edits for project ${projectId}`)
+    }
+
     // 获取 kling_tasks 按 scene_index 排序（用于 shot_id 映射）
     const { data: klingTasks, error: klingError } = await supabase
       .from('kling_tasks')
