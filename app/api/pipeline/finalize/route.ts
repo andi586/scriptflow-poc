@@ -44,23 +44,70 @@ export async function POST(request: NextRequest) {
       ? JSON.parse(project.script_raw)
       : project.script_raw
 
-    // 解析对白块：structure.episodes[].lines[]
+    // 获取 kling_tasks 按 scene_index 排序（用于 shot_id 映射）
+    const { data: klingTasks, error: klingError } = await supabase
+      .from('kling_tasks')
+      .select('id, scene_index')
+      .eq('project_id', projectId)
+      .eq('status', 'success')
+      .not('video_url', 'is', null)
+      .order('scene_index', { ascending: true })
+
+    if (klingError) {
+      return NextResponse.json({ success: false, error: 'Failed to fetch kling_tasks' }, { status: 500 })
+    }
+
+    // 解析对白块：structure.episodes[0].lines[]
     const dialogueBlocks: Array<{ shotIndex: number; role: string; text: string }> = []
     const episodes = scriptRaw?.structure?.episodes ?? []
-    episodes.forEach((ep: any, epIndex: number) => {
-      const lines = ep.lines ?? []
-      lines.forEach((line: any, lineIndex: number) => {
-        const role = (line.character ?? line.role ?? '').toLowerCase()
-        const text = line.text ?? line.dialogue ?? ''
-        if (role && text && ['caius', 'luna', 'marcus', 'narrator'].includes(role)) {
-          dialogueBlocks.push({ shotIndex: epIndex, role, text })
-        }
-      })
+    const firstEpisodeLines: Array<{ character: string; text: string }> = episodes[0]?.lines ?? []
+
+    firstEpisodeLines.forEach((line: any, lineIndex: number) => {
+      const role = (line.character ?? line.role ?? '').toLowerCase()
+      const text = line.text ?? line.dialogue ?? ''
+      if (role && text) {
+        dialogueBlocks.push({ shotIndex: lineIndex, role, text })
+      }
     })
 
     if (dialogueBlocks.length === 0) {
       return NextResponse.json({ success: false, error: 'No dialogue blocks found' }, { status: 422 })
     }
+
+    // 写入 dialogue_blocks 表（先删旧记录）
+    const { error: deleteError } = await supabase
+      .from('dialogue_blocks')
+      .delete()
+      .eq('project_id', projectId)
+
+    if (deleteError) {
+      console.error('[finalize] Failed to delete old dialogue_blocks:', deleteError)
+      return NextResponse.json({ success: false, error: 'Failed to clear old dialogue_blocks' }, { status: 500 })
+    }
+
+    const dialogueBlockRows = firstEpisodeLines.map((line: any, lineIndex: number) => {
+      const shotId = klingTasks?.[lineIndex]?.id ?? null
+      return {
+        project_id: projectId,
+        shot_id: shotId,
+        character: line.character ?? line.role ?? '',
+        text: line.text ?? line.dialogue ?? '',
+        emotion: 'neutral',
+      }
+    }).filter((row: any) => row.character && row.text)
+
+    if (dialogueBlockRows.length > 0) {
+      const { error: insertError } = await supabase
+        .from('dialogue_blocks')
+        .insert(dialogueBlockRows)
+
+      if (insertError) {
+        console.error('[finalize] Failed to insert dialogue_blocks:', insertError)
+        return NextResponse.json({ success: false, error: 'Failed to insert dialogue_blocks' }, { status: 500 })
+      }
+    }
+
+    console.log(`[finalize] Inserted ${dialogueBlockRows.length} dialogue_blocks for project ${projectId}`)
 
     // 获取视频URLs
     const videoUrls = body.videoUrls?.length > 0

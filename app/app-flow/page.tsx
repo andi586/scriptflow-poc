@@ -716,18 +716,18 @@ export default function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-4xl px-6 py-8 sm:py-12">
-        <p className="text-sm text-white/60">从你的灵感，到你的短剧。</p>
+        <p className="text-sm text-white/60">From your idea to your short drama.</p>
 
         {!lazyStorageChecked ? (
-          <p className="mt-10 text-center text-sm text-white/40">正在恢复会话…</p>
+          <p className="mt-10 text-center text-sm text-white/40">Restoring session…</p>
         ) : restoredLazySessionId ? (
           <>
             <section className="mt-8 rounded-2xl border border-amber-500/35 bg-gradient-to-b from-amber-500/10 to-black/30 p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-sm font-semibold text-amber-400">已恢复上次生成</h2>
+                  <h2 className="text-sm font-semibold text-amber-400">Previous session restored</h2>
                   <p className="mt-1 max-w-xl text-xs text-white/50">
-                    会话已保存在本机（痛点 #17）。将自动从 Supabase 拉取任务并轮询成片状态。
+                    Session saved locally. Pulling tasks from Supabase and polling for video status.
                   </p>
                 </div>
                 <Button
@@ -736,7 +736,7 @@ export default function Home() {
                   className="shrink-0 border-amber-500/45 text-amber-100 hover:bg-amber-500/15"
                   onClick={startNewLazySession}
                 >
-                  开始新项目
+                  Start new project
                 </Button>
               </div>
             </section>
@@ -1058,8 +1058,8 @@ export default function Home() {
               )}
             >
               {inspirationGenerateReady
-                ? "灵感已够丰富 — Generate 已高亮，可一键开拍。"
-                : "达到约 50 字并包含主角、矛盾与结局线索后，追问卡片会消失且按钮高亮。"}
+                ? "Your idea is rich enough — Generate is highlighted, ready to shoot."
+                : "Add ~50 characters including protagonist, conflict, and resolution cues to unlock the button."}
             </p>
           )}
 

@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Play } from "lucide-react";
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
-import { AudioGenerationPanel } from "@/components/audio-generation-panel";
 import {
   listKlingTaskIdsForSessionAction,
   pollSessionKlingVideoStatusAction,
@@ -66,7 +63,7 @@ function waitForVideoLoaded(video: HTMLVideoElement, timeoutMs: number): Promise
   return new Promise((resolve, reject) => {
     const to = window.setTimeout(() => {
       cleanup();
-      reject(new Error("视频加载超时，请重试"));
+      reject(new Error("Video load timed out, please retry"));
     }, timeoutMs);
     const ok = () => {
       cleanup();
@@ -74,7 +71,7 @@ function waitForVideoLoaded(video: HTMLVideoElement, timeoutMs: number): Promise
     };
     const bad = () => {
       cleanup();
-      reject(new Error("视频无法加载，请重试"));
+      reject(new Error("Video failed to load, please retry"));
     };
     const cleanup = () => {
       window.clearTimeout(to);
@@ -99,10 +96,6 @@ export function VideoResultsPanel({
   const [lazyPollBusy, setLazyPollBusy] = useState(false);
   const [clipPollErrors, setClipPollErrors] = useState<Record<string, string>>({});
   const [videoUnlocked, setVideoUnlocked] = useState<Record<string, boolean>>({});
-  const [zipBusy, setZipBusy] = useState(false);
-  const [mergeBusy, setMergeBusy] = useState(false);
-  const [mergeProgress, setMergeProgress] = useState(0);
-  const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
   const [cloudMergeBusy, setCloudMergeBusy] = useState(false);
   const [cloudMergedVideoUrl, setCloudMergedVideoUrl] = useState<string | null>(null);
   const [cloudMergeError, setCloudMergeError] = useState<string | null>(null);
@@ -119,7 +112,7 @@ export function VideoResultsPanel({
   const [dbLoadError, setDbLoadError] = useState<string | null>(null);
   const lazyPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const clipVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
-  /** While true, ignore `<video onError>` so empty src / load races don’t show a false error before user intent. */
+  /** While true, ignore `<video onError>` so empty src / load races don't show a false error before user intent. */
   const intentionalPlaybackLoadRef = useRef<Set<string>>(new Set());
   const taskIdsRef = useRef<string[]>([]);
 
@@ -354,150 +347,7 @@ export function VideoResultsPanel({
     [sessionId, retrySubmittingByTaskId],
   );
 
-  const downloadAllAsZip = useCallback(async () => {
-    const clips = tasks.filter(
-      (t) => t.status === "success" && !!t.task_id?.trim(),
-    );
-    if (clips.length === 0) return;
-    setZipBusy(true);
-    try {
-      const JSZip = (await import("jszip")).default;
-      const zip = new JSZip();
-      let added = 0;
-      for (const t of clips) {
-        const tid = getTaskIdKey(t);
-        if (!tid) continue;
-        let url: string;
-        try {
-          url = await fetchFreshPlaybackUrl(tid, {
-            beat_number: t.beat_number,
-            taskIdKey: tid,
-          });
-        } catch {
-          continue;
-        }
-        try {
-          const localUrl = toSameOriginVideoUrl(url);
-          const res = await fetch(localUrl);
-          if (!res.ok) throw new Error(String(res.status));
-          const buf = await res.arrayBuffer();
-          zip.file(`scene_${t.beat_number}.mp4`, buf);
-          added += 1;
-        } catch {
-          /* CORS */
-        }
-      }
-      if (added > 0) {
-        const blob = await zip.generateAsync({ type: "blob" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "scriptflow_clips.zip";
-        a.click();
-        URL.revokeObjectURL(a.href);
-        return;
-      }
-      for (const t of clips) {
-        const tid = getTaskIdKey(t);
-        if (!tid) continue;
-        let url: string;
-        try {
-          url = await fetchFreshPlaybackUrl(tid, {
-            beat_number: t.beat_number,
-            taskIdKey: tid,
-          });
-        } catch {
-          continue;
-        }
-        const a = document.createElement("a");
-        a.href = toSameOriginVideoUrl(url);
-        a.download = `scene_${t.beat_number}.mp4`;
-        a.rel = "noreferrer";
-        a.target = "_blank";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
-    } finally {
-      setZipBusy(false);
-    }
-  }, [tasks, fetchFreshPlaybackUrl]);
-
-  const exportFinalVideo = useCallback(async () => {
-    const clips = tasks
-      .filter((t) => t.status === "success")
-      .slice()
-      .sort((a, b) => a.beat_number - b.beat_number);
-    if (clips.length === 0) return;
-
-    setMergeBusy(true);
-    setMergeProgress(0);
-    if (mergedVideoUrl) {
-      URL.revokeObjectURL(mergedVideoUrl);
-      setMergedVideoUrl(null);
-    }
-
-    try {
-      const ffmpeg = new FFmpeg();
-      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-      });
-      ffmpeg.on("progress", ({ progress }) => {
-        setMergeProgress(Math.max(0, Math.min(1, progress)));
-      });
-
-      const lines: string[] = [];
-      for (let i = 0; i < clips.length; i += 1) {
-        const t = clips[i];
-        const fileName = `scene_${String(t.beat_number).padStart(3, "0")}.mp4`;
-        const sourceRaw =
-          typeof t.output_url === "string" && t.output_url.trim()
-            ? t.output_url.trim()
-            : typeof t.video_url === "string"
-              ? t.video_url.trim()
-              : "";
-        const source = toSameOriginVideoUrl(sourceRaw);
-        if (!source) throw new Error(`Missing video URL for scene ${t.beat_number}`);
-        await ffmpeg.writeFile(fileName, await fetchFile(source));
-        lines.push(`file '${fileName}'`);
-      }
-
-      await ffmpeg.writeFile("concat.txt", new TextEncoder().encode(lines.join("\n")));
-      await ffmpeg.exec([
-        "-f",
-        "concat",
-        "-safe",
-        "0",
-        "-i",
-        "concat.txt",
-        "-c",
-        "copy",
-        "output.mp4",
-      ]);
-
-      const out = await ffmpeg.readFile("output.mp4");
-      if (typeof out === "string") {
-        throw new Error("FFmpeg output.mp4 read as text unexpectedly");
-      }
-      const bytes = new Uint8Array(out.byteLength);
-      bytes.set(out);
-      const blobUrl = URL.createObjectURL(new Blob([bytes.buffer], { type: "video/mp4" }));
-      setMergedVideoUrl(blobUrl);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = "final_video.mp4";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (err) {
-      console.error("[VideoResultsPanel] merge/export failed", err);
-    } finally {
-      setMergeBusy(false);
-    }
-  }, [tasks, mergedVideoUrl]);
-
-  // Auto-trigger cloud merge when all clips succeed
+  // Auto-trigger cloud merge (finalize) when all clips succeed
   useEffect(() => {
     if (cloudMergeTriggeredRef.current) return;
     if (tasks.length === 0) return;
@@ -610,7 +460,7 @@ export function VideoResultsPanel({
       <div className={className}>
         <div className="mt-8 flex items-center gap-2 border-t border-white/10 pt-6 text-sm text-white/55">
           <Loader2 className="size-4 shrink-0 animate-spin text-amber-400" aria-hidden />
-          正在从 Supabase 加载任务列表…
+          Loading task list from Supabase…
         </div>
       </div>
     );
@@ -621,9 +471,9 @@ export function VideoResultsPanel({
       <div className={className}>
         <div className="mt-8 space-y-2 border-t border-white/10 pt-6">
           <p className="text-sm text-red-400" role="alert">
-            无法加载任务：{dbLoadError}
+            Failed to load tasks: {dbLoadError}
           </p>
-          <p className="text-xs text-white/45">请使用「开始新项目」或检查 session 是否有效。</p>
+          <p className="text-xs text-white/45">Please start a new project or check if the session is valid.</p>
         </div>
       </div>
     );
@@ -631,39 +481,16 @@ export function VideoResultsPanel({
 
   if (effectiveIds.length === 0) return null;
 
-  const canExportFinal = tasks.length > 0 && tasks.every((t) => t.status === "success");
-
   return (
     <div className={className}>
       <div className="mt-8 space-y-4 border-t border-white/10 pt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-white">{title}</h3>
-          {tasks.length > 0 && tasks.every(isClipDone) && (
-            <Button
-              type="button"
-              size="sm"
-              disabled={zipBusy}
-              onClick={() => void downloadAllAsZip()}
-              className="border border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25"
-            >
-              {zipBusy ? (
-                <>
-                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
-                  打包中…
-                </>
-              ) : (
-                <>
-                  <Download className="mr-1.5 size-4" aria-hidden />
-                  下载全部
-                </>
-              )}
-            </Button>
-          )}
         </div>
         <p className="text-xs text-white/50">
           {autoPoll && autoPollActive ? (
             <>
-              已开启自动同步（每 {Math.round(pollIntervalMs / 1000)} 秒）· PiAPI Kling 视频状态
+              Auto-syncing every {Math.round(pollIntervalMs / 1000)}s · Kling video status
               {lazyPollBusy ? (
                 <Loader2
                   className="ml-1 inline size-3.5 animate-spin text-amber-400"
@@ -674,13 +501,13 @@ export function VideoResultsPanel({
           ) : (
             <>
               {tasks.length > 0 && tasks.every((t) => t.status === "success" || t.status === "failed")
-                ? "全部场景已结束（成功或失败）。"
-                : "手动刷新或等待任务完成。"}
+                ? "All scenes finished (success or failed)."
+                : "Waiting for tasks to complete."}
               {tasks.length > 0 ? (
                 <>
                   {" "}
-                  原始排队约{" "}
-                  <strong className="text-amber-200">{estimatedMinutes} 分钟</strong>（估算）。
+                  Estimated queue time:{" "}
+                  <strong className="text-amber-200">{estimatedMinutes} min</strong>.
                 </>
               ) : null}
             </>
@@ -735,7 +562,7 @@ export function VideoResultsPanel({
                       disabled={!!retrySubmittingByTaskId[piTid]}
                       onClick={() => void retryClipSubmit(task)}
                     >
-                      {retrySubmittingByTaskId[piTid] ? "重试提交中…" : "重试"}
+                      {retrySubmittingByTaskId[piTid] ? "Retrying…" : "Retry"}
                     </Button>
                   </div>
                 )}
@@ -750,7 +577,7 @@ export function VideoResultsPanel({
                       disabled={!!retrySubmittingByTaskId[piTid]}
                       onClick={() => void retryClipSubmit(task)}
                     >
-                      {retrySubmittingByTaskId[piTid] ? "重试提交中…" : "重试"}
+                      {retrySubmittingByTaskId[piTid] ? "Retrying…" : "Retry"}
                     </Button>
                     <Button
                       type="button"
@@ -759,7 +586,7 @@ export function VideoResultsPanel({
                       className="h-7 border-white/20 text-xs text-white/70"
                       onClick={() => void retryClipPoll(piTid || task.task_id)}
                     >
-                      仅刷新状态
+                      Refresh status
                     </Button>
                   </div>
                 )}
@@ -806,7 +633,7 @@ export function VideoResultsPanel({
                           });
                           setPlaybackErrorByTaskId((prev) => ({
                             ...prev,
-                            [piTid]: "播放中断，可再次点击播放获取新地址。",
+                            [piTid]: "Playback interrupted. Click play again to get a fresh URL.",
                           }));
                           setPlayUrlByTaskId((prev) => {
                             const next = { ...prev };
@@ -854,7 +681,7 @@ export function VideoResultsPanel({
                                 await nextPaint();
                                 const v = clipVideoRefs.current[piTid];
                                 if (!v) {
-                                  throw new Error("播放器未就绪，请重试");
+                                  throw new Error("Player not ready, please retry");
                                 }
                                 v.src = localUrl;
                                 v.load();
@@ -913,8 +740,8 @@ export function VideoResultsPanel({
                           )}
                           <span className="text-xs font-medium text-white/90">
                             {playbackResolving[piTid]
-                              ? "正在从 PiAPI 获取播放地址…"
-                              : "点击播放"}
+                              ? "Fetching playback URL from PiAPI…"
+                              : "Click to play"}
                           </span>
                         </button>
                       )}
@@ -977,7 +804,7 @@ export function VideoResultsPanel({
                         ) : (
                           <Download className="size-3.5" aria-hidden />
                         )}
-                        Save Video
+                        Download
                       </button>
                     </div>
                   </>
@@ -986,28 +813,6 @@ export function VideoResultsPanel({
             );
           })}
         </div>
-        {canExportFinal && (
-          <div className="pt-2">
-            <Button
-              type="button"
-              size="sm"
-              disabled={mergeBusy}
-              onClick={() => void exportFinalVideo()}
-              className="border border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25"
-            >
-              {mergeBusy ? (
-                <>
-                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
-                  正在合并... {Math.round(mergeProgress * 100)}%
-                </>
-              ) : mergedVideoUrl ? (
-                <>下载成片 ✓</>
-              ) : (
-                <>合并成片 / Export Final Video</>
-              )}
-            </Button>
-          </div>
-        )}
 
         {/* Auto cloud merge status */}
         {cloudMergeBusy && (
@@ -1024,7 +829,15 @@ export function VideoResultsPanel({
         )}
 
         {cloudMergedVideoUrl && (
-          <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-4">
+          <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-4 space-y-3">
+            <h4 className="text-sm font-semibold text-sky-300">🎬 Final Episode Ready</h4>
+            <video
+              src={cloudMergedVideoUrl}
+              controls
+              autoPlay
+              playsInline
+              className="w-full rounded-lg border border-white/10 bg-black"
+            />
             <a
               href={cloudMergedVideoUrl}
               target="_blank"
@@ -1032,16 +845,9 @@ export function VideoResultsPanel({
               className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
             >
               <Download className="size-4" aria-hidden />
-              🎬 Download Final Episode
+              Download Final Episode
             </a>
           </div>
-        )}
-        
-        {tasks.length > 0 && tasks.every(isClipDone) && (
-          <AudioGenerationPanel
-            projectId={sessionId}
-            sceneNumbers={tasks.map((t) => t.beat_number)}
-          />
         )}
       </div>
     </div>
