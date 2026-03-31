@@ -1115,7 +1115,7 @@ export default function Home() {
               Your clips
             </h2>
             <p className="mt-1 text-xs text-white/50">
-              Tasks were submitted — status and video links update below as PiAPI finishes.
+              Sit back and relax — we'll notify you when your episode is ready.
             </p>
             <VideoResultsPanel
               sessionId={projectId}

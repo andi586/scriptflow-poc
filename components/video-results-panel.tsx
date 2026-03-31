@@ -460,7 +460,7 @@ export function VideoResultsPanel({
       <div className={className}>
         <div className="mt-8 flex items-center gap-2 border-t border-white/10 pt-6 text-sm text-white/55">
           <Loader2 className="size-4 shrink-0 animate-spin text-amber-400" aria-hidden />
-          Loading task list from Supabase…
+          Loading your scenes…
         </div>
       </div>
     );
@@ -490,7 +490,7 @@ export function VideoResultsPanel({
         <p className="text-xs text-white/50">
           {autoPoll && autoPollActive ? (
             <>
-              Auto-syncing every {Math.round(pollIntervalMs / 1000)}s · Kling video status
+              Your scenes are being created — usually 3–5 minutes.
               {lazyPollBusy ? (
                 <Loader2
                   className="ml-1 inline size-3.5 animate-spin text-amber-400"
@@ -501,15 +501,8 @@ export function VideoResultsPanel({
           ) : (
             <>
               {tasks.length > 0 && tasks.every((t) => t.status === "success" || t.status === "failed")
-                ? "All scenes finished (success or failed)."
-                : "Waiting for tasks to complete."}
-              {tasks.length > 0 ? (
-                <>
-                  {" "}
-                  Estimated queue time:{" "}
-                  <strong className="text-amber-200">{estimatedMinutes} min</strong>.
-                </>
-              ) : null}
+                ? "All scenes finished."
+                : "Your scenes are being created — usually 3–5 minutes."}
             </>
           )}
         </p>
@@ -534,7 +527,7 @@ export function VideoResultsPanel({
                   {processing && (
                     <span className="inline-flex items-center gap-1.5 rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium capitalize text-amber-200">
                       <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                      Processing
+                      Creating...
                     </span>
                   )}
                   {done && (
@@ -740,7 +733,7 @@ export function VideoResultsPanel({
                           )}
                           <span className="text-xs font-medium text-white/90">
                             {playbackResolving[piTid]
-                              ? "Fetching playback URL from PiAPI…"
+                              ? "Loading…"
                               : "Click to play"}
                           </span>
                         </button>
