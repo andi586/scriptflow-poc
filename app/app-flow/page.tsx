@@ -20,6 +20,7 @@ import {
 import { InspirationFollowUpCards } from "@/components/inspiration-follow-up-cards";
 import { VideoResultsPanel } from "@/components/video-results-panel";
 import { DirectorReviewPanel } from "@/components/director-review-panel";
+import { ScriptReviewPanel } from "@/components/script-review-panel";
 import { formatUnknownError } from "@/lib/format-error";
 import {
   clearLazySessionFromStorage,
@@ -201,6 +202,17 @@ export default function Home() {
   const [showDirectorReview, setShowDirectorReview] = useState(false);
   const [isSubmittingToKling, setIsSubmittingToKling] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+
+  // Director Mode state
+  const [directorModeActive, setDirectorModeActive] = useState(false);
+  const [showScriptReview, setShowScriptReview] = useState(false);
+  const [scriptReviewData, setScriptReviewData] = useState<{
+    episode: any;
+    characters: Array<{ name: string; description?: string }>;
+    projectTitle?: string;
+  } | null>(null);
+  const [isSavingLines, setIsSavingLines] = useState(false);
+  const [directorModeKlingPrompts, setDirectorModeKlingPrompts] = useState<Array<{ prompt: string; [key: string]: any }>>([]);
   /** Bumps when Kling submit finishes so VideoResultsPanel reloads task_ids from Supabase. */
   const [clipsRefreshNonce, setClipsRefreshNonce] = useState(0);
   /** PiAPI task ids from the last successful submit — keeps results panel visible before DB list catches up. */
@@ -343,6 +355,149 @@ export default function Home() {
       prev && !selectedTemplateIds.includes(prev) ? null : prev,
     );
   }, [selectedTemplateIds]);
+
+  // Director Mode pipeline: same as Ghost Mode but pauses after script gen for ScriptReviewPanel
+  const runDirectorModePipeline = useCallback(async () => {
+    const latestIdea = storyIdeaTextareaRef.current?.value ?? storyIdea;
+    if (latestIdea !== storyIdea) setStoryIdea(latestIdea);
+
+    const trimmedRaw = latestIdea.trim();
+    const composedForRun = composeInspirationForNel(latestIdea, inspirationFollowUpAnswers);
+    const isDirectScript = trimmedRaw.length >= DIRECT_SCRIPT_MIN_CHARS;
+    const canActuallyRun = isDirectScript || composedForRun.trim().length >= 8;
+    if (!canActuallyRun) {
+      setPipelineError("Add a bit more detail (8+ characters), or paste a full script (50+ characters).");
+      return;
+    }
+    if (!allSelectedCastConfirmed) {
+      setPipelineError("Please confirm your cast first");
+      return;
+    }
+
+    setPipelineError(null);
+    setPipelineRunning(true);
+    setDirectorModeActive(true);
+    setShowScriptReview(false);
+    setScriptReviewData(null);
+    setLastSubmittedClipTaskIds([]);
+    let activePhase: PipelinePhase = "creating_project";
+    setPipelinePhase("creating_project");
+
+    try {
+      const cr = await createNewProjectAction();
+      if (!cr.success) throw new Error(errMsg(cr.error));
+      const pid = cr.data.projectId;
+      setProjectId(pid);
+      setCurrentProjectId(pid);
+      writeLazySessionIdToStorage(pid);
+      if (typeof window !== "undefined") {
+        try { window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid); } catch {}
+      }
+
+      activePhase = "analyzing_story";
+      setPipelinePhase("analyzing_story");
+      let nelScript: string;
+      if (isDirectScript) {
+        nelScript = trimmedRaw;
+      } else {
+        const fr = await formatStoryIdeaAction({ idea: composedForRun.trim() });
+        if (!fr.success) throw new Error(errMsg(fr.error));
+        nelScript = storyboardShotsToNelScriptText(fr.data.shots);
+      }
+
+      const ar = await analyzeScriptAction({ projectId: pid, scriptText: nelScript, nelProfile: "lazy" });
+      if (!ar.success) throw new Error(errMsg(ar.error));
+
+      activePhase = "locking_characters";
+      setPipelinePhase("locking_characters");
+      const templateIdsToBind = selectedTemplateIds
+        .filter((id) => castConfirmations[id]?.choice === "template")
+        .map((id) => (castConfirmations[id]?.libraryTemplateId ?? id).trim())
+        .filter(Boolean);
+      if (templateIdsToBind.length > 0) {
+        const br = await bindTemplateCharactersAction({ projectId: pid, templateIds: templateIdsToBind });
+        if (!br.success) throw new Error(errMsg(br.error));
+      }
+
+      activePhase = "generating_prompts";
+      setPipelinePhase("generating_prompts");
+      const gr = await generateKlingPromptsAction({ projectId: pid });
+      if (!gr.success) throw new Error(errMsg(gr.error));
+
+      // Fetch script_raw to populate ScriptReviewPanel
+      const scriptRes = await fetch(`/api/projects/${pid}/script-raw`).catch(() => null);
+      let episode: any = {};
+      let characters: Array<{ name: string; description?: string }> = [];
+      if (scriptRes?.ok) {
+        const scriptData = await scriptRes.json().catch(() => ({}));
+        const scriptRaw = scriptData.script_raw
+          ? (typeof scriptData.script_raw === "string" ? JSON.parse(scriptData.script_raw) : scriptData.script_raw)
+          : {};
+        episode = scriptRaw?.structure?.episodes?.[0] ?? {};
+        characters = (scriptRaw?.structure?.characters ?? []).map((c: any) => ({
+          name: c.name ?? c.character ?? "",
+          description: c.description ?? c.appearance ?? "",
+        }));
+      }
+
+      // Pause here — show ScriptReviewPanel
+      setDirectorModeKlingPrompts(gr.data.prompts);
+      setScriptReviewData({ episode, characters, projectTitle: pid });
+      setShowScriptReview(true);
+      setPipelinePhase("director_review");
+    } catch (e) {
+      setPipelinePhase("error");
+      const raw = e instanceof Error ? e.message : errMsg(e);
+      setPipelineError(`${activePhase}: ${raw}`);
+      setDirectorModeActive(false);
+    } finally {
+      setPipelineRunning(false);
+    }
+  }, [
+    storyIdea, selectedTemplateIds, inspirationFollowUpAnswers,
+    allSelectedCastConfirmed, castConfirmations,
+  ]);
+
+  // Director Mode: user confirmed edited lines → save → submit Kling
+  const handleScriptReviewConfirm = useCallback(async (editedLines: Array<{ character: string; text: string }>) => {
+    if (!currentProjectId) return;
+    setIsSavingLines(true);
+    try {
+      // Save edited lines back to projects.script_raw
+      const saveRes = await fetch("/api/script/update-lines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: currentProjectId, lines: editedLines }),
+      });
+      if (!saveRes.ok) {
+        const err = await saveRes.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? "Failed to save edited lines");
+      }
+
+      // Now submit Kling tasks using the stored prompts
+      setShowScriptReview(false);
+      setIsSubmittingToKling(true);
+      setPipelinePhase("submitting_kling");
+      const sr = await submitKlingTasksAction({
+        projectId: currentProjectId,
+        prompts: directorModeKlingPrompts as any,
+      });
+      if (!sr.success) throw new Error(errMsg(sr.error));
+      const submittedIds = sr.data.tasks
+        .map((t: any) => t.task_id.trim())
+        .filter((id: string) => id.length > 0);
+      writeKlingTaskSnapshotToStorage(currentProjectId, submittedIds);
+      setLastSubmittedClipTaskIds(submittedIds);
+      setClipsRefreshNonce((n) => n + 1);
+      setPipelinePhase("done");
+    } catch (e) {
+      setPipelinePhase("error");
+      setPipelineError(e instanceof Error ? e.message : errMsg(e));
+    } finally {
+      setIsSavingLines(false);
+      setIsSubmittingToKling(false);
+    }
+  }, [currentProjectId, directorModeKlingPrompts]);
 
   const runDramaPipeline = useCallback(async () => {
     console.log("[ScriptFlow] runDramaPipeline invoked", {
@@ -1037,8 +1192,30 @@ export default function Home() {
             }}
             onClick={() => void runDramaPipeline()}
           >
-            {pipelineRunning ? "Working on it…" : "Generate My Drama"}
+            {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate My Drama"}
           </Button>
+
+          {/* Director Mode button */}
+          {!pipelineRunning && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2 w-full border-white/20 text-xs text-white/60 hover:bg-white/5 hover:text-white/80"
+              onPointerDown={() => {
+                const el = storyIdeaTextareaRef.current;
+                if (el && el.value !== storyIdea) {
+                  flushSync(() => setStoryIdea(el.value));
+                }
+              }}
+              onClick={() => void runDirectorModePipeline()}
+            >
+              Director Mode — Review Each Step
+            </Button>
+          )}
+          {pipelineRunning && directorModeActive && (
+            <p className="mt-2 text-center text-xs text-amber-200/70">Working on it…</p>
+          )}
           {!canRunDramaLive && !pipelineRunning && (
             <p className="mt-2 text-center text-xs text-white/40">
               Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
@@ -1105,7 +1282,50 @@ export default function Home() {
           </section>
         )}
 
-        {pipelinePhase === "done" && projectId.trim() && (
+        {/* Director Mode: Script Review Panel */}
+        {showScriptReview && scriptReviewData && currentProjectId && (
+          <section className="mt-6">
+            <ScriptReviewPanel
+              projectId={currentProjectId}
+              projectTitle={scriptReviewData.projectTitle}
+              episode={scriptReviewData.episode}
+              characters={scriptReviewData.characters}
+              isSaving={isSavingLines || isSubmittingToKling}
+              onConfirm={(editedLines) => void handleScriptReviewConfirm(editedLines)}
+              onStartOver={() => {
+                setShowScriptReview(false);
+                setScriptReviewData(null);
+                setDirectorModeActive(false);
+                setPipelinePhase("idle");
+                setPipelineError(null);
+              }}
+            />
+          </section>
+        )}
+
+        {/* Director Mode: show clips after Kling submit */}
+        {directorModeActive && pipelinePhase === "done" && currentProjectId && (
+          <section
+            ref={clipsResultsSectionRef}
+            className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
+            aria-labelledby="director-clips-heading"
+          >
+            <h2 id="director-clips-heading" className="text-base font-semibold text-emerald-300">
+              Your clips
+            </h2>
+            <p className="mt-1 text-xs text-white/50">
+              Sit back and relax — we'll notify you when your episode is ready.
+            </p>
+            <VideoResultsPanel
+              sessionId={currentProjectId}
+              taskIds={lastSubmittedClipTaskIds}
+              refreshNonce={clipsRefreshNonce}
+              title="Scenes"
+            />
+          </section>
+        )}
+
+        {pipelinePhase === "done" && projectId.trim() && !directorModeActive && (
           <section
             ref={clipsResultsSectionRef}
             className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
