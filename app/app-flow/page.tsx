@@ -1196,12 +1196,10 @@ export default function Home() {
           </Button>
 
           {/* Director Mode button — always visible below main button */}
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="sm"
-            className="mt-2 w-full border-white/30 text-xs text-white hover:bg-white/10 hover:border-white/50"
             disabled={pipelineRunning}
+            className="w-full mt-2 py-3 border border-white text-white text-sm rounded-lg hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             onPointerDown={() => {
               const el = storyIdeaTextareaRef.current;
               if (el && el.value !== storyIdea) {
@@ -1210,8 +1208,8 @@ export default function Home() {
             }}
             onClick={() => void runDirectorModePipeline()}
           >
-            {pipelineRunning && directorModeActive ? "Working on it…" : "Director Mode — Review Each Step"}
-          </Button>
+            {pipelineRunning && directorModeActive ? "Working on it…" : "🎬 Director Mode — Review Each Step"}
+          </button>
           {!canRunDramaLive && !pipelineRunning && (
             <p className="mt-2 text-center text-xs text-white/40">
               Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
