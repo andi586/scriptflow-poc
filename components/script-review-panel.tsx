@@ -83,9 +83,6 @@ export function ScriptReviewPanel({
         <h2 className="text-base font-bold text-amber-400">
           🎬 Director Review
         </h2>
-        {projectTitle && (
-          <p className="mt-1 text-sm font-semibold text-white">{projectTitle}</p>
-        )}
         {episode?.title && (
           <p className="mt-0.5 text-xs text-white/50">{episode.title}</p>
         )}
@@ -134,8 +131,8 @@ export function ScriptReviewPanel({
       {/* Dialogue lines */}
       {editableLines.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-white/40">
-            Dialogue — click any line to edit
+          <h3 className="text-sm font-semibold text-white/70">
+            Review your script — click any line to edit
           </h3>
           {editableLines.map((line, idx) => (
             <div
@@ -184,15 +181,14 @@ export function ScriptReviewPanel({
             "Looks Good — Generate Videos"
           )}
         </Button>
-        <Button
+        <button
           type="button"
-          variant="outline"
-          className="border-white/20 text-white/70 hover:bg-white/10"
           disabled={isSaving}
+          className="border border-white/60 text-white text-sm px-4 py-2 rounded hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onStartOver}
         >
           Start Over
-        </Button>
+        </button>
       </div>
     </div>
   );
