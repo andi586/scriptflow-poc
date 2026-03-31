@@ -30,7 +30,7 @@ const CARD_META: Record<
 > = {
   character: {
     title: "Who is the main character?",
-    subtitle: "主角是谁？（可点选或自填）",
+    subtitle: "",
     chips: [
       "A young woman who works as a pastry chef",
       "A cold CEO with a hidden soft side",
@@ -39,7 +39,7 @@ const CARD_META: Record<
   },
   conflict: {
     title: "What's the central conflict?",
-    subtitle: "核心矛盾是什么？",
+    subtitle: "",
     chips: [
       "A family secret threatens their relationship",
       "They must work together but trust no one",
@@ -48,7 +48,7 @@ const CARD_META: Record<
   },
   ending: {
     title: "How does it end?",
-    subtitle: "结局走向？",
+    subtitle: "",
     chips: [
       "They confess and choose each other",
       "A twist reveals the real villain",
@@ -103,7 +103,7 @@ export function InspirationFollowUpCards({
           className="rounded-xl border border-emerald-500/35 bg-emerald-950/25 p-4"
         >
           <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-400/90">
-            已作答 · {dim}
+            Answered · {dim}
           </p>
           <h3 className="mt-1 text-sm font-semibold text-white">{saved.question}</h3>
           <p className="mt-2 text-xs leading-relaxed text-white/80">{saved.answer}</p>
@@ -140,7 +140,7 @@ export function InspirationFollowUpCards({
               setOpenCustom((o) => (o === dim ? null : dim))
             }
           >
-            自定义一句…
+            Custom...
           </button>
         </div>
         {openCustom === dim && (
@@ -169,7 +169,7 @@ export function InspirationFollowUpCards({
                 if (v) submit(dim, v);
               }}
             >
-              保存回答
+              Save
             </button>
           </div>
         )}
@@ -188,11 +188,11 @@ export function InspirationFollowUpCards({
       aria-label="Story follow-up prompts"
     >
       <p className="text-xs font-medium text-amber-200/90">
-        追问与回答单独保存，不会写入上方输入框；生成时会一并提交。
+        Follow-up answers are saved separately and submitted together when you generate.
       </p>
       {showLengthHint && (
         <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-white/55">
-          还可把核心灵感写长一些（约 50 字以上更利于分镜）。
+          Tip: A longer idea (50+ characters) helps generate better scene breakdowns.
         </p>
       )}
       {rows.length > 0 && (
