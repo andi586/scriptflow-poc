@@ -41,7 +41,7 @@ function derivePixabayGenre(scriptRaw: any): string {
 async function fetchPixabayBGM(genre: string = 'cinematic'): Promise<string | null> {
   const key = process.env.PIXABAY_API_KEY
   if (!key) return null
-  const url = `https://pixabay.com/api/videos/music/?key=${key}&genre=${genre}&per_page=10`
+  const url = `https://pixabay.com/api/music/?key=${key}&q=${genre}&per_page=10`
   const res = await fetch(url)
   if (!res.ok) return null
   const data = await res.json() as { hits?: Array<{ audio?: string; url?: string }> }
@@ -268,7 +268,12 @@ export async function POST(request: NextRequest) {
       throw new Error(mergeData.error ?? 'Railway merge failed')
     }
 
-    return NextResponse.json({ success: true, finalVideoUrl: mergeData.finalVideoUrl })
+    return NextResponse.json({
+      success: true,
+      finalVideoUrl: mergeData.finalVideoUrl,
+      bgmUrl: bgmUrl ?? null,
+      bgmApplied: !!bgmUrl,
+    })
 
   } catch (error) {
     console.error('[pipeline/finalize]', error)
