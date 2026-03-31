@@ -21,52 +21,18 @@ const CHARACTER_VOICE_ENV_MAP: Record<string, string> = {
   narrator: 'ELEVENLABS_VOICE_ID_NARRATOR',
 }
 
-/** Derive a Pixabay music genre keyword from the script's genre/mood field. */
-function derivePixabayGenre(scriptRaw: any): string {
-  const genre = (
-    scriptRaw?.structure?.genre ??
-    scriptRaw?.genre ??
-    scriptRaw?.mood ??
-    ''
-  ).toLowerCase()
-  if (/romance|love|drama/.test(genre)) return 'romantic'
-  if (/action|fight|thriller/.test(genre)) return 'action'
-  if (/comedy|funny|humor/.test(genre)) return 'happy'
-  if (/horror|dark|mystery/.test(genre)) return 'dark'
-  if (/fantasy|epic|adventure/.test(genre)) return 'epic'
-  return 'cinematic'
-}
+const CURATED_BGM_TRACKS = [
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+]
 
-/** Fetch a random BGM track URL from Pixabay music API. */
-async function fetchPixabayBGM(genre: string = 'cinematic'): Promise<string | null> {
-  const key = process.env.PIXABAY_API_KEY
-  if (!key) {
-    console.log('[finalize] BGM: no API key')
-    return null
-  }
-  const url = `https://pixabay.com/api/music/?key=${key}&q=${genre}&per_page=10`
-  console.log('[finalize] BGM fetching URL:', url.replace(key, 'REDACTED'))
-  const res = await fetch(url)
-  console.log('[finalize] BGM response status:', res.status, res.statusText)
-  const text = await res.text()
-  console.log('[finalize] BGM response body:', text.slice(0, 300))
-  if (!res.ok) return null
-  const data = JSON.parse(text) as { hits?: Array<{ audio?: string; url?: string }> }
-  console.log('[finalize] BGM hits count:', data.hits?.length ?? 0)
-  if (!data.hits || data.hits.length === 0) return null
-  const track = data.hits[Math.floor(Math.random() * data.hits.length)]
-  console.log('[finalize] BGM track:', JSON.stringify(track).slice(0, 200))
-  return track.audio ?? track.url ?? null
-}
-
-/** Select BGM from Pixabay based on script genre, with fallback to 'cinematic'. */
-async function selectBgmFromPixabay(scriptRaw: any): Promise<string | null> {
-  const genre = derivePixabayGenre(scriptRaw)
-  let bgm = await fetchPixabayBGM(genre)
-  if (!bgm && genre !== 'cinematic') {
-    bgm = await fetchPixabayBGM('cinematic')
-  }
-  return bgm
+function selectBgmFromPixabay(_scriptRaw: any): Promise<string | null> {
+  const track = CURATED_BGM_TRACKS[Math.floor(Math.random() * CURATED_BGM_TRACKS.length)]
+  console.log('[finalize] BGM selected (hardcoded):', track)
+  return Promise.resolve(track)
 }
 
 export async function POST(request: NextRequest) {
