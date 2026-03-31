@@ -21,6 +21,46 @@ const CHARACTER_VOICE_ENV_MAP: Record<string, string> = {
   narrator: 'ELEVENLABS_VOICE_ID_NARRATOR',
 }
 
+/** Derive a Pixabay music genre keyword from the script's genre/mood field. */
+function derivePixabayGenre(scriptRaw: any): string {
+  const genre = (
+    scriptRaw?.structure?.genre ??
+    scriptRaw?.genre ??
+    scriptRaw?.mood ??
+    ''
+  ).toLowerCase()
+  if (/romance|love|drama/.test(genre)) return 'romantic'
+  if (/action|fight|thriller/.test(genre)) return 'action'
+  if (/comedy|funny|humor/.test(genre)) return 'happy'
+  if (/horror|dark|mystery/.test(genre)) return 'dark'
+  if (/fantasy|epic|adventure/.test(genre)) return 'epic'
+  return 'cinematic'
+}
+
+/** Fetch a random BGM track URL from Pixabay music API. */
+async function fetchPixabayBGM(genre: string = 'cinematic'): Promise<string | null> {
+  const key = process.env.PIXABAY_API_KEY
+  if (!key) return null
+  const url = `https://pixabay.com/api/videos/music/?key=${key}&genre=${genre}&per_page=10`
+  const res = await fetch(url)
+  if (!res.ok) return null
+  const data = await res.json() as { hits?: Array<{ audio?: string; url?: string }> }
+  const hits = data.hits
+  if (!hits || hits.length === 0) return null
+  const track = hits[Math.floor(Math.random() * hits.length)]
+  return track.audio ?? track.url ?? null
+}
+
+/** Select BGM from Pixabay based on script genre, with fallback to 'cinematic'. */
+async function selectBgmFromPixabay(scriptRaw: any): Promise<string | null> {
+  const genre = derivePixabayGenre(scriptRaw)
+  let bgm = await fetchPixabayBGM(genre)
+  if (!bgm && genre !== 'cinematic') {
+    bgm = await fetchPixabayBGM('cinematic')
+  }
+  return bgm
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -194,7 +234,20 @@ export async function POST(request: NextRequest) {
     const episodeTitle: string = episodes[0]?.title ?? ''
     const projectTitle: string = (project as any).title ?? 'ScriptFlow'
 
-    // 调用Railway合并
+    // 从 Pixabay 自动选 BGM
+    let bgmUrl: string | null = null
+    try {
+      bgmUrl = await selectBgmFromPixabay(scriptRaw)
+      if (bgmUrl) {
+        console.log(`[finalize] BGM selected: ${bgmUrl}`)
+      } else {
+        console.log('[finalize] No BGM found from Pixabay — proceeding without BGM')
+      }
+    } catch (bgmErr) {
+      console.warn('[finalize] BGM selection failed (skipping):', bgmErr instanceof Error ? bgmErr.message : bgmErr)
+    }
+
+    // 调用Railway合并（三轨：视频 + 对白音频 + BGM）
     const mergeRes = await fetch(RAILWAY_MERGE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -206,6 +259,7 @@ export async function POST(request: NextRequest) {
         projectTitle,
         episodeNum: 1,
         episodeTitle,
+        bgmUrl: bgmUrl ?? undefined,
       }),
     })
 
