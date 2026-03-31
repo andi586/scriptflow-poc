@@ -29,10 +29,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdminClient()
 
-    // 从 projects 表读取 script_raw
+    // 从 projects 表读取 script_raw 和 title
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('script_raw')
+      .select('script_raw, title')
       .eq('id', projectId)
       .single()
 
@@ -166,6 +166,10 @@ export async function POST(request: NextRequest) {
       console.log(`[finalize] No dialogue — calling Railway merge with empty audio/srt for project ${projectId}`)
     }
 
+    // 读取 episode 标题（用于片尾字幕卡）
+    const episodeTitle: string = episodes[0]?.title ?? ''
+    const projectTitle: string = (project as any).title ?? 'ScriptFlow'
+
     // 调用Railway合并
     const mergeRes = await fetch(RAILWAY_MERGE_URL, {
       method: 'POST',
@@ -175,6 +179,9 @@ export async function POST(request: NextRequest) {
         videoUrls,
         audioUrls: audioList.map(a => a.audioUrl),
         srtContent: srtChunks.join('\n\n'),
+        projectTitle,
+        episodeNum: 1,
+        episodeTitle,
       }),
     })
 
