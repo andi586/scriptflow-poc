@@ -888,7 +888,7 @@ export default function Home() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="shrink-0 border-amber-500/45 text-amber-100 hover:bg-amber-500/15"
+                  className="shrink-0 border-white/40 bg-white/10 text-white hover:bg-white/20 hover:border-white/60"
                   onClick={startNewLazySession}
                 >
                   Start new project
@@ -1195,27 +1195,23 @@ export default function Home() {
             {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate My Drama"}
           </Button>
 
-          {/* Director Mode button */}
-          {!pipelineRunning && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mt-2 w-full border-white/20 text-xs text-white/60 hover:bg-white/5 hover:text-white/80"
-              onPointerDown={() => {
-                const el = storyIdeaTextareaRef.current;
-                if (el && el.value !== storyIdea) {
-                  flushSync(() => setStoryIdea(el.value));
-                }
-              }}
-              onClick={() => void runDirectorModePipeline()}
-            >
-              Director Mode — Review Each Step
-            </Button>
-          )}
-          {pipelineRunning && directorModeActive && (
-            <p className="mt-2 text-center text-xs text-amber-200/70">Working on it…</p>
-          )}
+          {/* Director Mode button — always visible below main button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-2 w-full border-white/30 text-xs text-white hover:bg-white/10 hover:border-white/50"
+            disabled={pipelineRunning}
+            onPointerDown={() => {
+              const el = storyIdeaTextareaRef.current;
+              if (el && el.value !== storyIdea) {
+                flushSync(() => setStoryIdea(el.value));
+              }
+            }}
+            onClick={() => void runDirectorModePipeline()}
+          >
+            {pipelineRunning && directorModeActive ? "Working on it…" : "Director Mode — Review Each Step"}
+          </Button>
           {!canRunDramaLive && !pipelineRunning && (
             <p className="mt-2 text-center text-xs text-white/40">
               Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
