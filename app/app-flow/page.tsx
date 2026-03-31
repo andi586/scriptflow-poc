@@ -131,9 +131,9 @@ const PHASE_LABEL: Record<Exclude<PipelinePhase, "idle" | "error">, string> = {
   creating_project: "Creating project...",
   analyzing_story: "Analyzing story...",
   locking_characters: "Locking characters...",
-  generating_prompts: "Generating prompts...",
-  director_review: "Awaiting director review...",
-  submitting_kling: "Submitting to Kling...",
+  generating_prompts: "Preparing your scenes...",
+  director_review: "Awaiting your review...",
+  submitting_kling: "Generating your scenes...",
   done: "All set!",
 };
 
@@ -1248,8 +1248,8 @@ export default function Home() {
                   : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
               </p>
               <p className="text-center text-[11px] text-white/35">
-                Creating project → Analyzing story → Locking characters → Generating prompts →
-                Submitting to Kling
+                Creating project → Analyzing story → Locking characters → Preparing scenes →
+                Generating your scenes
               </p>
             </div>
           )}
