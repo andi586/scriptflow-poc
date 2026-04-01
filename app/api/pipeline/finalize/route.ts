@@ -90,38 +90,45 @@ async function generateAmbienceForScene(prompt: string): Promise<string | null> 
     }
 
     const json = await res.json()
-    const base64 = json.audio_base64
-    if (!base64) {
+    const audioBase64 = json.audio_base64
+    if (!audioBase64) {
       console.error('[ambience] error: response JSON missing audio_base64 field')
       console.log('[ambience] result url: FAILED')
       return null
     }
-    const audioBuffer = Buffer.from(base64, 'base64')
-    if (audioBuffer.length === 0) {
+    const buffer = Buffer.from(audioBase64, 'base64')
+    if (buffer.length === 0) {
       console.error('[ambience] error: empty audio buffer after base64 decode')
       console.log('[ambience] result url: FAILED')
       return null
     }
 
     // Upload to Supabase storage and return public URL
-    const supabase = getSupabaseAdminClient()
-    const storagePath = `ambience/${Date.now()}-scene0.mp3`
-    const { error: upErr } = await supabase.storage
-      .from(process.env.GENERATED_AUDIO_BUCKET ?? 'generated-audio')
-      .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+    try {
+      const supabase = getSupabaseAdminClient()
+      const storagePath = `ambience/${Date.now()}-scene0.mp3`
+      const bucket = process.env.GENERATED_AUDIO_BUCKET ?? 'generated-audio'
 
-    if (upErr) {
-      console.error('[ambience] error:', upErr.message)
+      console.log('[ambience] starting upload for role: scene0')
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(storagePath, buffer, { contentType: 'audio/mpeg', upsert: true })
+      console.log('[ambience] upload result:', uploadData, uploadError)
+
+      if (uploadError) {
+        console.error('[ambience] upload error:', uploadError)
+        console.log('[ambience] result url: FAILED')
+        return null
+      }
+
+      const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath)
+      console.log('[ambience] result url:', data.publicUrl)
+      return data.publicUrl
+    } catch (uploadErr) {
+      console.error('[ambience] upload error:', uploadErr instanceof Error ? uploadErr.message : uploadErr)
       console.log('[ambience] result url: FAILED')
       return null
     }
-
-    const { data } = supabase.storage
-      .from(process.env.GENERATED_AUDIO_BUCKET ?? 'generated-audio')
-      .getPublicUrl(storagePath)
-
-    console.log('[ambience] result url:', data.publicUrl)
-    return data.publicUrl
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[ambience] error:', msg)
