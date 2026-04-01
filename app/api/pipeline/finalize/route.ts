@@ -89,9 +89,16 @@ async function generateAmbienceForScene(prompt: string): Promise<string | null> 
       return null
     }
 
-    const audioBuffer = Buffer.from(await res.arrayBuffer())
+    const json = await res.json()
+    const base64 = json.audio_base64
+    if (!base64) {
+      console.error('[ambience] error: response JSON missing audio_base64 field')
+      console.log('[ambience] result url: FAILED')
+      return null
+    }
+    const audioBuffer = Buffer.from(base64, 'base64')
     if (audioBuffer.length === 0) {
-      console.error('[ambience] error: empty audio buffer returned')
+      console.error('[ambience] error: empty audio buffer after base64 decode')
       console.log('[ambience] result url: FAILED')
       return null
     }
