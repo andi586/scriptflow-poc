@@ -11,6 +11,7 @@ import {
   KLING_VIDEO_ASPECT_RATIO,
   stripHardcodedAspectRatioFromPrompt,
 } from "@/lib/kling-video";
+import { injectHumanFlavors } from "@/lib/human-flavor-injector";
 import { buildKlingVideoGenerationInput } from "@/lib/kling-piapi-payload";
 import { formatUnknownError } from "@/lib/format-error";
 import {
@@ -502,11 +503,13 @@ export async function generateKlingPromptsAction(input: {
       .map((item) => {
         const obj = item as Record<string, unknown>;
         const beatNumber = Number(obj.beat_number);
-        const prompt = typeof obj.prompt === "string" ? obj.prompt : "";
+        const rawPrompt = typeof obj.prompt === "string" ? obj.prompt : "";
         const normalizedBeat = Number.isFinite(beatNumber) ? beatNumber : 0;
+        const promptWithLocks = injectBeatLocks(rawPrompt, normalizedBeat, propRegistry, causalResultFrames);
+        const finalPrompt = injectHumanFlavors(promptWithLocks, { intensity: 'light', enableAll: true });
         return {
           beat_number: normalizedBeat,
-          prompt: injectBeatLocks(prompt, normalizedBeat, propRegistry, causalResultFrames),
+          prompt: finalPrompt,
         };
       })
       .filter((item) => item.beat_number > 0 && item.prompt.length > 0);
