@@ -134,6 +134,9 @@ export function ScriptReviewPanel({
           <h3 className="text-sm font-semibold text-white/70">
             Review your script — click any line to edit
           </h3>
+          <p className="text-xs text-yellow-400/70 text-center mt-1">
+            💡 Tip: Write dialogue in English for best voice results.
+          </p>
           {editableLines.map((line, idx) => (
             <div
               key={idx}
