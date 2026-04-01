@@ -310,23 +310,10 @@ export async function POST(request: NextRequest) {
     const episodeTitle: string = episodes[0]?.title ?? ''
     const projectTitle: string = (project as any).title ?? 'ScriptFlow'
 
-    // 从 Pixabay 自动选 BGM
-    let bgmUrl: string | null = null
-    try {
-      bgmUrl = await selectBgmFromPixabay(scriptRaw)
-      if (bgmUrl) {
-        console.log(`[finalize] BGM selected: ${bgmUrl}`)
-      } else {
-        console.log('[finalize] No BGM found from Pixabay — proceeding without BGM')
-      }
-    } catch (bgmErr) {
-      console.warn('[finalize] BGM selection failed (skipping):', bgmErr instanceof Error ? bgmErr.message : bgmErr)
-    }
-
-    // 生成第一个场景的环境音
+    // 生成第一个场景的环境音（在TTS完成后、BGM选曲前）
     let ambienceUrl: string | null = null
     try {
-      const firstSceneDesc = videoUrls[0] ?? episodes[0]?.summary ?? ''
+      const firstSceneDesc = episodes[0]?.summary ?? episodes[0]?.title ?? ''
       const ambiencePrompt = deriveSceneEnvironment(firstSceneDesc)
       console.log('[finalize] Generating ambience for scene 0:', ambiencePrompt)
       console.log('[ambience] ===== ABOUT TO CALL AMBIENCE =====')
@@ -338,6 +325,19 @@ export async function POST(request: NextRequest) {
       }
     } catch (ambErr) {
       console.warn('[finalize] Ambience generation error (skipping):', ambErr instanceof Error ? ambErr.message : ambErr)
+    }
+
+    // 从 Pixabay 自动选 BGM
+    let bgmUrl: string | null = null
+    try {
+      bgmUrl = await selectBgmFromPixabay(scriptRaw)
+      if (bgmUrl) {
+        console.log(`[finalize] BGM selected: ${bgmUrl}`)
+      } else {
+        console.log('[finalize] No BGM found from Pixabay — proceeding without BGM')
+      }
+    } catch (bgmErr) {
+      console.warn('[finalize] BGM selection failed (skipping):', bgmErr instanceof Error ? bgmErr.message : bgmErr)
     }
 
     // 调用Railway合并（四轨：视频 + 对白音频 + BGM + 环境音）
