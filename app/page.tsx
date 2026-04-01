@@ -1,207 +1,521 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ShieldCheck, Cpu, Coins, Lock, ArrowRight, CheckCircle2, Zap, Globe, Scale } from "lucide-react";
+"use client";
 
+import Link from "next/link";
+import { useEffect, useRef } from "react";
+
+// ─── Scroll-fade-up animation hook ───────────────────────────────────────────
+function useFadeUp() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add("opacity-100", "translate-y-0");
+          el.classList.remove("opacity-0", "translate-y-8");
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.12 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
+function FadeUp({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useFadeUp();
+  return (
+    <div
+      ref={ref}
+      className="opacity-0 translate-y-8 transition-all duration-700 ease-out"
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Reusable components ──────────────────────────────────────────────────────
+function GoldButton({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-block rounded-xl bg-[#D4A017] px-8 py-4 text-base font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-lg hover:shadow-[#D4A017]/30 active:scale-95"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function OutlineButton({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-2xl border border-[#D4A017]/20 bg-white/5 backdrop-blur-sm ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-purple-500/30">
-      <section className="relative overflow-hidden pt-20 pb-16 md:pt-32 md:pb-24">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-purple-600/10 blur-[120px] rounded-full -z-10" />
-        <div className="container mx-auto px-4 text-center">
-          <Badge className="mb-4 bg-purple-500/10 text-purple-400 border-purple-500/20 px-3 py-1">Creator Sovereignty Platform</Badge>
-          <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-500">
-            From one sentence to a <br />
-            <span className="text-purple-500">published short drama</span>
-          </h1>
-          <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-10">
-            The world's first AI production platform that respects <b>Creator Sovereignty</b>. Build your IP Empire with automated narrative engineering.
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button asChild size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 h-12 text-lg">
-              <a href="/app-flow">Start Creating Free <ArrowRight className="ml-2 h-5 w-5" /></a>
-            </Button>
-            <Button asChild size="lg" className="border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white h-12 text-lg">
-              <a href="/app-flow">View Showcase</a>
-            </Button>
+    <div
+      className="min-h-screen text-white"
+      style={{ backgroundColor: "#0A0A0B", fontFamily: "'Inter', sans-serif" }}
+    >
+      {/* ── Nav ── */}
+      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0A0A0B]/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <span
+            className="text-xl font-extrabold tracking-tight text-[#D4A017]"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            ScriptFlow
+          </span>
+          <div className="flex items-center gap-4">
+            <Link href="/app-flow" className="text-sm text-white/60 hover:text-white transition-colors">
+              Sign In
+            </Link>
+            <GoldButton href="/app-flow">Start Free</GoldButton>
           </div>
         </div>
-      </section>
+      </nav>
 
-      <section className="py-20 bg-zinc-900/50 border-y border-zinc-800">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-16">The ScriptFlow Moat</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-purple-500/50 transition-all group">
-              <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Cpu className="text-purple-500" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">NEL — Your Personal AI Director</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">Personalized style models that capture your unique narrative voice. Your DNA, your AI.</p>
-            </div>
-            <div className="p-8 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-purple-500/50 transition-all group">
-              <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Zap className="text-purple-500" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">HTS — Anti-AI Filter</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">8-rule human authenticity engine. Auto-blocks AI-flavored content before it kills your retention. Score below 6? We stop it before it goes live.</p>
-            </div>
-            <div className="p-8 rounded-2xl bg-zinc-950 border border-zinc-800 hover:border-purple-500/50 transition-all group">
-              <div className="w-12 h-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Lock className="text-purple-500" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">F80 — 99.9% Uptime Guaranteed</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed">99.9% uptime. $3.50 hard cap per episode. Auto-failover across Kling, Veo, and Runway. Your production never stops.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20">
-        <div className="container mx-auto px-4 max-w-4xl">
-          <h2 className="text-3xl font-bold text-center mb-4">Keep What You Earn</h2>
-          <p className="text-center text-zinc-400 mb-12">ScriptFlow offers the most aggressive revenue share in the industry.</p>
-          <div className="rounded-xl border border-zinc-800 overflow-hidden bg-zinc-950/50">
-            <Table>
-              <TableHeader className="bg-zinc-900">
-                <TableRow className="border-zinc-800 hover:bg-transparent">
-                  <TableHead className="text-zinc-300">Platform</TableHead>
-                  <TableHead className="text-zinc-300">Creator Share</TableHead>
-                  <TableHead className="text-zinc-300">Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow className="border-zinc-800 bg-purple-500/5">
-                  <TableCell className="font-bold text-purple-400 text-lg">ScriptFlow</TableCell>
-                  <TableCell className="font-bold text-purple-400 text-lg">65%</TableCell>
-                  <TableCell className="text-zinc-300">Industry Leading</TableCell>
-                </TableRow>
-                <TableRow className="border-zinc-800">
-                  <TableCell className="text-zinc-400">YouTube</TableCell>
-                  <TableCell className="text-zinc-400">55%</TableCell>
-                  <TableCell className="text-zinc-500">Standard</TableCell>
-                </TableRow>
-                <TableRow className="border-transparent">
-                  <TableCell className="text-zinc-400">TikTok</TableCell>
-                  <TableCell className="text-zinc-400">~30%</TableCell>
-                  <TableCell className="text-zinc-500">Ad-Hoc</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-12 bg-zinc-900/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-                <Scale className="text-purple-500" /> Creator Sovereignty
-              </h2>
-              <div className="space-y-6">
+      {/* ── 1. Hero ── */}
+      <section className="mx-auto max-w-6xl px-6 py-20 lg:py-28">
+        <div className="grid items-center gap-12 lg:grid-cols-2">
+          {/* Left */}
+          <div className="space-y-8">
+            <FadeUp>
+              <h1
+                className="text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                Build Your IP Empire{" "}
+                <span className="text-[#D4A017]">with One Sentence.</span>
+              </h1>
+            </FadeUp>
+            <FadeUp delay={100}>
+              <p className="text-lg leading-relaxed text-white/65">
+                Stop renting your creativity to platforms.
+                <br />
+                Script, voices, music, subtitles — all automated.
+                <br />
+                You keep <span className="font-bold text-[#D4A017]">100% of your IP</span> and{" "}
+                <span className="font-bold text-[#D4A017]">65% of revenue</span>.
+              </p>
+            </FadeUp>
+            {/* Stats */}
+            <FadeUp delay={200}>
+              <div className="flex flex-wrap gap-8">
                 {[
-                  "ScriptFlow never claims ownership of your content.",
-                  "Irrevocable right to export all IP bundles (JSON/MP4/PDF).",
-                  "No training on your data for third-party sales without consent.",
-                  "Wyoming-based legal protection for global creators.",
-                  "Transparent algorithm scoring with full audit rights."
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-4">
-                    <CheckCircle2 className="text-purple-500 shrink-0 h-6 w-6" />
-                    <span className="text-zinc-300 font-medium">{item}</span>
+                  { value: "65%", label: "Revenue to you" },
+                  { value: "0", label: "Technical skills needed" },
+                  { value: "100%", label: "IP ownership" },
+                ].map((s) => (
+                  <div key={s.label}>
+                    <p
+                      className="text-3xl font-extrabold text-[#D4A017]"
+                      style={{ fontFamily: "'Montserrat', sans-serif" }}
+                    >
+                      {s.value}
+                    </p>
+                    <p className="text-xs text-white/50">{s.label}</p>
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl shadow-2xl relative">
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-purple-500/20 blur-2xl rounded-full" />
-              <pre className="text-xs font-mono text-zinc-500 overflow-hidden">{`{
-  "contract_v": "3.1-WY",
-  "jurisdiction": "Wyoming, USA",
-  "creator_ownership": true,
-  "revenue_share": 0.65,
-  "data_portability": "Guaranteed"
-}`}</pre>
-              <div className="mt-6 pt-6 border-t border-zinc-800 italic text-sm text-zinc-400">
-                "Our legal code is as robust as our software code."
+            </FadeUp>
+            <FadeUp delay={300}>
+              <div className="flex flex-wrap gap-4">
+                <GoldButton href="/app-flow">Start Building Your Empire — Free</GoldButton>
+                <OutlineButton href="/app-flow">Watch Demo</OutlineButton>
+              </div>
+            </FadeUp>
+          </div>
+
+          {/* Right: 9:16 video placeholder */}
+          <FadeUp delay={150}>
+            <div className="mx-auto w-full max-w-[280px] lg:max-w-none">
+              <div
+                className="relative w-full overflow-hidden rounded-2xl border-2 border-[#D4A017]/50 bg-white/5"
+                style={{ aspectRatio: "9/16" }}
+              >
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#D4A017]/60 bg-[#D4A017]/10">
+                    <svg className="h-7 w-7 text-[#D4A017]" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                  <p className="text-xs text-white/40">Your drama, generated in minutes</p>
+                </div>
               </div>
             </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── 2. How It Works ── */}
+      <section className="border-t border-white/5 py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <FadeUp>
+            <h2
+              className="mb-12 text-center text-3xl font-extrabold sm:text-4xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              How It Works
+            </h2>
+          </FadeUp>
+          <div className="grid gap-6 sm:grid-cols-3">
+            {[
+              { num: "01", title: "Type one sentence", desc: "Your story idea — as short as a tweet. ScriptFlow handles the rest." },
+              { num: "02", title: "ScriptFlow builds everything", desc: "Script, AI video, voice acting, BGM, subtitles — fully automated in minutes." },
+              { num: "03", title: "You publish & earn 65%", desc: "Post to any platform. Keep your IP. Earn the majority of every dollar." },
+            ].map((step, i) => (
+              <FadeUp key={step.num} delay={i * 100}>
+                <GlassCard className="p-8 h-full">
+                  <p
+                    className="mb-4 text-5xl font-extrabold text-[#D4A017]/30"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    {step.num}
+                  </p>
+                  <h3 className="mb-2 text-lg font-bold text-white">{step.title}</h3>
+                  <p className="text-sm leading-relaxed text-white/55">{step.desc}</p>
+                </GlassCard>
+              </FadeUp>
+            ))}
           </div>
         </div>
       </section>
 
-      <section className="py-12">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-16">Choose Your Production Tier</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="bg-zinc-900 border-zinc-800">
-              <CardHeader>
-                <CardTitle>Basic</CardTitle>
-                <CardDescription>Perfect for hobbyists</CardDescription>
-                <div className="mt-4 text-4xl font-bold text-white">$29<span className="text-sm text-zinc-500">/mo</span></div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> 100 Monthly Credits</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Standard Generation Speed</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Basic Asset Access</div>
-              </CardContent>
-              <CardFooter><Button asChild className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white"><a href="/app-flow">Get Started</a></Button></CardFooter>
-            </Card>
-            <Card className="bg-zinc-900 border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.15)] scale-105">
-              <CardHeader className="relative">
-                <Badge className="absolute -top-3 right-4 bg-purple-600">Most Popular</Badge>
-                <CardTitle>Professional</CardTitle>
-                <CardDescription>For growing creators</CardDescription>
-                <div className="mt-4 text-4xl font-bold text-white">$59<span className="text-sm text-zinc-500">/mo</span></div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> 500 Monthly Credits</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Priority Generation</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> NEL Custom Model Training</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Advanced Analytics</div>
-              </CardContent>
-              <CardFooter><Button asChild className="w-full bg-purple-600 hover:bg-purple-700"><a href="/app-flow">Go Pro</a></Button></CardFooter>
-            </Card>
-            <Card className="bg-zinc-900 border-zinc-800">
-              <CardHeader>
-                <CardTitle>Studio</CardTitle>
-                <CardDescription>Production-ready teams</CardDescription>
-                <div className="mt-4 text-4xl font-bold text-white">$99<span className="text-sm text-zinc-500">/mo</span></div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Unlimited Credits</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Multiple NEL Profiles</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> Team Collaboration</div>
-                <div className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-purple-500" /> 24/7 Priority Support</div>
-              </CardContent>
-              <CardFooter><Button asChild className="w-full border border-zinc-600 text-zinc-300 hover:bg-zinc-800 hover:text-white"><a href="/app-flow">Contact Sales</a></Button></CardFooter>
-            </Card>
+      {/* ── 3. Demo Video ── */}
+      <section className="py-20">
+        <div className="mx-auto max-w-4xl px-6">
+          <FadeUp>
+            <h2
+              className="mb-8 text-center text-3xl font-extrabold sm:text-4xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Watch a film made with ScriptFlow
+            </h2>
+          </FadeUp>
+          <FadeUp delay={100}>
+            <div
+              className="relative w-full overflow-hidden rounded-2xl border border-[#D4A017]/30 bg-white/5"
+              style={{ aspectRatio: "16/9" }}
+            >
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[#D4A017]/60 bg-[#D4A017]/10">
+                  <svg className="h-9 w-9 text-[#D4A017]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-white/40">Demo video coming soon</p>
+              </div>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── 4. Revenue Comparison ── */}
+      <section className="border-t border-white/5 py-20">
+        <div className="mx-auto max-w-3xl px-6">
+          <FadeUp>
+            <h2
+              className="mb-10 text-center text-3xl font-extrabold sm:text-4xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              You Earn More Here
+            </h2>
+          </FadeUp>
+          <FadeUp delay={100}>
+            <GlassCard className="overflow-hidden">
+              {[
+                { platform: "ScriptFlow", pct: "65%", highlight: true },
+                { platform: "YouTube", pct: "55%", highlight: false },
+                { platform: "TikTok", pct: "30%", highlight: false },
+              ].map((row, i) => (
+                <div
+                  key={row.platform}
+                  className={`flex items-center justify-between px-8 py-5 ${
+                    i < 2 ? "border-b border-white/5" : ""
+                  } ${row.highlight ? "bg-[#D4A017]/10" : ""}`}
+                >
+                  <span
+                    className={`text-base font-semibold ${row.highlight ? "text-[#D4A017]" : "text-white/70"}`}
+                  >
+                    {row.platform}
+                  </span>
+                  <span
+                    className={`text-2xl font-extrabold ${row.highlight ? "text-[#D4A017]" : "text-white/40"}`}
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    {row.pct}
+                  </span>
+                </div>
+              ))}
+            </GlassCard>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── 5. Creator Sovereignty ── */}
+      <section className="py-20">
+        <div className="mx-auto max-w-3xl px-6">
+          <FadeUp>
+            <h2
+              className="mb-10 text-center text-3xl font-extrabold sm:text-4xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Creator Sovereignty
+            </h2>
+          </FadeUp>
+          <FadeUp delay={100}>
+            <GlassCard className="p-8">
+              <ul className="space-y-4">
+                {[
+                  "You own every script, every frame, every character — forever.",
+                  "No platform can demonetize or delete your IP.",
+                  "Publish anywhere: YouTube, TikTok, Instagram, your own site.",
+                  "Your audience data stays yours — no lock-in.",
+                  "Build a catalog of IP that compounds in value over time.",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span className="mt-0.5 shrink-0 text-[#D4A017]">✦</span>
+                    <span className="text-sm leading-relaxed text-white/70">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </GlassCard>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── 6. Why This Is Different ── */}
+      <section className="border-t border-white/5 py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <FadeUp>
+            <h2
+              className="mb-12 text-center text-3xl font-extrabold sm:text-4xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Why This Is Different
+            </h2>
+          </FadeUp>
+          <div className="grid gap-6 sm:grid-cols-3">
+            {[
+              {
+                icon: "🎬",
+                title: "Your AI Director",
+                subtitle: "NEL Engine",
+                desc: "Our Narrative Engine Layer understands story structure, character arcs, and cinematic language — not just text-to-video.",
+              },
+              {
+                icon: "🛡️",
+                title: "AI-Slop Filter",
+                subtitle: "HTS Quality Guard",
+                desc: "Human Taste Score automatically rejects generic AI output. Every scene passes a quality bar before it reaches you.",
+              },
+              {
+                icon: "⚡",
+                title: "24/7 Production Studio",
+                subtitle: "F80 Pipeline",
+                desc: "Script → video → voice → music → subtitles → final cut. Fully automated. No editors, no studios, no waiting.",
+              },
+            ].map((card, i) => (
+              <FadeUp key={card.title} delay={i * 100}>
+                <GlassCard className="p-8 h-full">
+                  <div className="mb-4 text-4xl">{card.icon}</div>
+                  <h3 className="mb-1 text-lg font-bold text-white">{card.title}</h3>
+                  <p className="mb-3 text-xs font-semibold text-[#D4A017]/70">{card.subtitle}</p>
+                  <p className="text-sm leading-relaxed text-white/55">{card.desc}</p>
+                </GlassCard>
+              </FadeUp>
+            ))}
           </div>
         </div>
       </section>
 
-      <section className="py-24 text-center bg-zinc-950 relative overflow-hidden">
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50" />
-        <h2 className="text-4xl font-bold mb-8">Ready to own your future?</h2>
-        <Button asChild size="lg" className="bg-purple-600 hover:bg-purple-700 px-12 h-14 text-xl font-bold rounded-full">
-          <a href="/app-flow">Start Creating Free</a>
-        </Button>
-        <div className="mt-12 text-zinc-600 text-sm flex flex-col items-center gap-4">
-          <div className="flex justify-center gap-8 items-center">
-            <span className="flex items-center gap-1"><Globe className="h-4 w-4" /> Wyoming-Governed</span>
-            <span className="flex items-center gap-1"><Coins className="h-4 w-4" /> Stripe Integrated</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-4 w-4" /> EU AI Act Compliant</span>
-          </div>
-          <div className="flex gap-4 text-zinc-500">
-            <a href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy Policy</a>
-            <span>|</span>
-            <a href="/terms" className="hover:text-zinc-300 transition-colors">Terms of Service</a>
+      {/* ── 7. Pricing ── */}
+      <section className="py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <FadeUp>
+            <h2
+              className="mb-4 text-center text-3xl font-extrabold sm:text-4xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Simple Pricing
+            </h2>
+            <p className="mb-12 text-center text-sm text-white/50">No hidden fees. Cancel anytime.</p>
+          </FadeUp>
+          <div className="grid gap-6 sm:grid-cols-3">
+            {[
+              {
+                name: "Basic",
+                price: "$29",
+                tagline: "Perfect for your first drama series.",
+                features: ["5 episodes/month", "AI voice acting", "Auto subtitles", "65% revenue share"],
+                highlight: false,
+              },
+              {
+                name: "Professional",
+                price: "$59",
+                tagline: "For creators building a real IP catalog.",
+                features: ["20 episodes/month", "BGM library", "Director Mode", "Priority rendering", "65% revenue share"],
+                highlight: true,
+              },
+              {
+                name: "Studio",
+                price: "$99",
+                tagline: "Run a full production studio, solo.",
+                features: ["Unlimited episodes", "Custom characters", "White-label export", "API access", "65% revenue share"],
+                highlight: false,
+              },
+            ].map((plan, i) => (
+              <FadeUp key={plan.name} delay={i * 100}>
+                <div
+                  className={`relative h-full rounded-2xl border p-8 ${
+                    plan.highlight
+                      ? "border-[#D4A017] bg-[#D4A017]/10"
+                      : "border-[#D4A017]/20 bg-white/5"
+                  }`}
+                >
+                  {plan.highlight && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#D4A017] px-4 py-1 text-xs font-bold text-black">
+                      Most Popular
+                    </div>
+                  )}
+                  <h3
+                    className="mb-1 text-xl font-extrabold text-white"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    {plan.name}
+                  </h3>
+                  <p className="mb-1 text-xs text-white/50">{plan.tagline}</p>
+                  <p
+                    className="mb-6 text-4xl font-extrabold text-[#D4A017]"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    {plan.price}
+                    <span className="text-base font-normal text-white/40">/mo</span>
+                  </p>
+                  <ul className="mb-8 space-y-2">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2 text-sm text-white/70">
+                        <span className="text-[#D4A017]">✓</span> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/app-flow"
+                    className={`block w-full rounded-xl py-3 text-center text-sm font-bold transition-all ${
+                      plan.highlight
+                        ? "bg-[#D4A017] text-black hover:bg-[#e8b520]"
+                        : "border border-[#D4A017]/50 text-[#D4A017] hover:bg-[#D4A017]/10"
+                    }`}
+                  >
+                    Get Started
+                  </Link>
+                </div>
+              </FadeUp>
+            ))}
           </div>
         </div>
       </section>
+
+      {/* ── 8. FAQ ── */}
+      <section className="border-t border-white/5 py-20">
+        <div className="mx-auto max-w-3xl px-6">
+          <FadeUp>
+            <h2
+              className="mb-12 text-center text-3xl font-extrabold sm:text-4xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Frequently Asked Questions
+            </h2>
+          </FadeUp>
+          <div className="space-y-4">
+            {[
+              {
+                q: "Do I need any video editing or coding skills?",
+                a: "Zero. Type your idea, click generate. ScriptFlow handles everything from script to final cut.",
+              },
+              {
+                q: "Who owns the content I create?",
+                a: "You do. 100%. Every script, character, and frame belongs to you — forever. We never claim ownership of your IP.",
+              },
+              {
+                q: "How does the 65% revenue share work?",
+                a: "When you monetize through ScriptFlow's distribution network, you keep 65% of all revenue. Publish anywhere else and keep 100%.",
+              },
+              {
+                q: "How long does it take to generate a drama episode?",
+                a: "Typically 5–15 minutes from idea to finished episode, depending on length and rendering queue.",
+              },
+              {
+                q: "Can I use my own characters and voice actors?",
+                a: "Yes. Upload reference photos for custom characters. Professional plan and above includes custom voice cloning.",
+              },
+            ].map((faq, i) => (
+              <FadeUp key={i} delay={i * 60}>
+                <GlassCard className="p-6">
+                  <h3 className="mb-2 text-sm font-bold text-white">{faq.q}</h3>
+                  <p className="text-sm leading-relaxed text-white/55">{faq.a}</p>
+                </GlassCard>
+              </FadeUp>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 9. Final CTA ── */}
+      <section className="py-24">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <FadeUp>
+            <h2
+              className="mb-6 text-4xl font-extrabold leading-tight sm:text-5xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Your Empire Starts with{" "}
+              <span className="text-[#D4A017]">One Sentence.</span>
+            </h2>
+          </FadeUp>
+          <FadeUp delay={100}>
+            <p className="mb-10 text-lg text-white/60">
+              Join thousands of creators building IP they own, on their terms.
+            </p>
+          </FadeUp>
+          <FadeUp delay={200}>
+            <GoldButton href="/app-flow">
+              Build My First Drama Now — It&apos;s Free
+            </GoldButton>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="border-t border-white/5 py-8">
+        <div className="mx-auto max-w-6xl px-6 text-center">
+          <p className="text-xs text-white/30">
+            © 2025 ScriptFlow. All rights reserved. Your IP, your rules.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
