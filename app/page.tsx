@@ -199,19 +199,21 @@ export default function LandingPage() {
             <FadeUp delay={300}>
               <div className="flex flex-wrap gap-4">
                 <GoldButton href="/app-flow">Start Building Your Empire — Free</GoldButton>
-                {/* Desktop: open modal; Mobile: scroll to demo section */}
+                {/* Desktop: open modal; Mobile: open TikTok */}
                 <button
-                  onClick={() => {
-                    if (window.innerWidth >= 768) {
-                      setShowModal(true);
-                    } else {
-                      document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
-                    }
-                  }}
-                  className="inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
+                  className="hidden md:inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
+                  onClick={() => setShowModal(true)}
                 >
                   Watch Demo
                 </button>
+                <a
+                  href="https://www.tiktok.com/@wolfemperorai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="md:hidden inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
+                >
+                  Watch on TikTok →
+                </a>
               </div>
             </FadeUp>
           </div>

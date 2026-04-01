@@ -26,13 +26,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Empty response from upstream' }, { status: 502 })
     }
 
+    const responseHeaders: Record<string, string> = {
+      'Content-Type': 'video/mp4',
+      'Content-Disposition': 'attachment; filename="scriptflow-episode.mp4"',
+      'Cache-Control': 'no-store',
+      'Accept-Ranges': 'bytes',
+    }
+
+    // Forward Content-Length from upstream so the browser knows the full file size
+    const contentLength = upstream.headers.get('content-length')
+    if (contentLength) {
+      responseHeaders['Content-Length'] = contentLength
+    }
+
+    // Forward Content-Range if upstream returned a partial response
+    const contentRange = upstream.headers.get('content-range')
+    if (contentRange) {
+      responseHeaders['Content-Range'] = contentRange
+    }
+
     return new NextResponse(body as ReadableStream, {
-      status: 200,
-      headers: {
-        'Content-Type': 'video/mp4',
-        'Content-Disposition': 'attachment; filename="scriptflow-episode.mp4"',
-        'Cache-Control': 'no-store',
-      },
+      status: upstream.status === 206 ? 206 : 200,
+      headers: responseHeaders,
     })
   } catch (err) {
     console.error('[api/download]', err)
