@@ -143,6 +143,7 @@ async function generateAmbienceForScene(prompt: string): Promise<string | null> 
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[finalize] ENTER v2', new Date().toISOString())
   try {
     const body = await request.json()
     const projectId = body.projectId?.trim()
