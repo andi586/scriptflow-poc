@@ -151,10 +151,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdminClient()
 
-    // 从 projects 表读取 script_raw 和 title
+    // 从 projects 表读取 script_raw、title 和 episode_number
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('script_raw, title')
+      .select('script_raw, title, episode_number')
       .eq('id', projectId)
       .single()
 
@@ -348,6 +348,9 @@ export async function POST(request: NextRequest) {
       console.warn('[finalize] BGM selection failed (skipping):', bgmErr instanceof Error ? bgmErr.message : bgmErr)
     }
 
+    // 读取 episode_number（如果 projects 表有该字段）
+    const episodeNum: number = (project as any).episode_number ?? 1
+
     // 调用Railway合并（四轨：视频 + 对白音频 + BGM + 环境音）
     const mergeBody = {
       projectId,
@@ -355,7 +358,7 @@ export async function POST(request: NextRequest) {
       audioUrls: audioList.map(a => a.audioUrl),
       srtContent: srtChunks.join('\n\n'),
       projectTitle,
-      episodeNum: 1,
+      episodeNum,
       episodeTitle,
       bgmUrl: bgmUrl ?? undefined,
       ambienceUrl: ambienceUrl ?? undefined,
