@@ -217,16 +217,54 @@ export default function LandingPage() {
                 >
                   Watch Demo
                 </button>
-                <a
-                  href="https://www.tiktok.com/@wolfemperorai"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
                   className="md:hidden w-full inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95 text-center"
+                  onClick={() => {
+                    document.getElementById("hero-mobile-video-card")?.scrollIntoView({ behavior: "smooth" });
+                  }}
                 >
-                  Watch on TikTok →
-                </a>
+                  Watch Demo
+                </button>
               </div>
             </FadeUp>
+
+            {/* Mobile video preview card */}
+            <div id="hero-mobile-video-card" className="md:hidden mt-6">
+              <div
+                className="relative rounded-xl overflow-hidden cursor-pointer"
+                onClick={() => {
+                  const v = document.getElementById("hero-mobile-video") as HTMLVideoElement;
+                  if (v) {
+                    v.muted = false;
+                    v.volume = 1.0;
+                    v.play();
+                    document.getElementById("hero-mobile-cover")?.classList.add("hidden");
+                  }
+                }}
+              >
+                {/* Cover overlay (shown before play) */}
+                <div
+                  id="hero-mobile-cover"
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 z-10"
+                >
+                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                    <span className="text-white text-2xl ml-1">▶</span>
+                  </div>
+                  <p className="absolute bottom-4 text-white/80 text-sm">
+                    Watch Wolf Emperor EP3
+                  </p>
+                </div>
+                {/* Video */}
+                <video
+                  id="hero-mobile-video"
+                  src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775036682376.mp4"
+                  playsInline
+                  muted
+                  className="w-full object-cover"
+                  style={{ aspectRatio: "9/16" }}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Right: 9:16 real video — desktop only */}
