@@ -127,6 +127,7 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
+  const demoVideoRef = useRef<HTMLVideoElement>(null);
 
   return (
     <div
@@ -205,6 +206,11 @@ export default function LandingPage() {
                       setShowModal(true);
                     } else {
                       document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
+                      if (demoVideoRef.current) {
+                        demoVideoRef.current.muted = false;
+                        demoVideoRef.current.volume = 1.0;
+                        demoVideoRef.current.play().catch(() => {});
+                      }
                     }
                   }}
                   className="inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
@@ -279,6 +285,7 @@ export default function LandingPage() {
           </FadeUp>
           <FadeUp delay={100}>
             <video
+              ref={demoVideoRef}
               src={DEMO_VIDEO_URL}
               controls
               playsInline
