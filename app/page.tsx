@@ -14,10 +14,13 @@ function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     const v = videoRef.current;
     if (!v) return;
     if (open) {
+      v.muted = false;
+      v.volume = 1.0;
       v.currentTime = 0;
       v.play().catch(() => {});
     } else {
       v.pause();
+      v.currentTime = 0;
     }
   }, [open]);
 
@@ -269,12 +272,9 @@ export default function LandingPage() {
           </FadeUp>
           <FadeUp delay={100}>
             <video
-              src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775004647765.mp4"
-              autoPlay
-              muted
-              loop
-              playsInline
+              src={DEMO_VIDEO_URL}
               controls
+              playsInline
               className="w-full rounded-2xl border border-[#D4A017]/30"
             />
           </FadeUp>
