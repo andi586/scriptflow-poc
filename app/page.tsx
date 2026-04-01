@@ -186,7 +186,7 @@ export default function LandingPage() {
                 ].map((s) => (
                   <div key={s.label}>
                     <p
-                      className="text-3xl font-extrabold text-[#D4A017]"
+                      className="text-2xl font-bold text-[#D4A017]"
                       style={{ fontFamily: "'Montserrat', sans-serif" }}
                     >
                       {s.value}
@@ -200,7 +200,7 @@ export default function LandingPage() {
               <div className="flex flex-wrap gap-4">
                 <Link
                   href="/app-flow"
-                  className="inline-block rounded-xl bg-[#D4A017] px-8 py-4 text-base font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-lg hover:shadow-[#D4A017]/30 active:scale-95 md:hidden"
+                  className="w-full md:w-auto inline-block rounded-xl bg-[#D4A017] px-8 py-4 text-base font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-lg hover:shadow-[#D4A017]/30 active:scale-95 md:hidden text-center"
                 >
                   Build Your Empire — Free
                 </Link>
@@ -221,7 +221,7 @@ export default function LandingPage() {
                   href="https://www.tiktok.com/@wolfemperorai"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="md:hidden inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
+                  className="md:hidden w-full inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95 text-center"
                 >
                   Watch on TikTok →
                 </a>
