@@ -329,6 +329,7 @@ export async function POST(request: NextRequest) {
       const firstSceneDesc = videoUrls[0] ?? episodes[0]?.summary ?? ''
       const ambiencePrompt = deriveSceneEnvironment(firstSceneDesc)
       console.log('[finalize] Generating ambience for scene 0:', ambiencePrompt)
+      console.log('[ambience] ===== ABOUT TO CALL AMBIENCE =====')
       ambienceUrl = await generateAmbienceForScene(ambiencePrompt)
       if (ambienceUrl) {
         console.log('[finalize] Ambience URL:', ambienceUrl)
