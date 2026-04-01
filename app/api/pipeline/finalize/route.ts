@@ -312,6 +312,8 @@ export async function POST(request: NextRequest) {
       console.log(`[finalize] No dialogue — calling Railway merge with empty audio/srt for project ${projectId}`)
     }
 
+    console.log('[finalize] TTS loop done, proceeding to ambience...')
+
     // 读取 episode 标题（用于片尾字幕卡）
     const episodeTitle: string = episodes[0]?.title ?? ''
     const projectTitle: string = (project as any).title ?? 'ScriptFlow'
