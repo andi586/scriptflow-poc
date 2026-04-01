@@ -222,22 +222,27 @@ export async function POST(request: NextRequest) {
     }
 
     // 调用Railway合并（三轨：视频 + 对白音频 + BGM）
+    const mergeBody = {
+      projectId,
+      videoUrls,
+      audioUrls: audioList.map(a => a.audioUrl),
+      srtContent: srtChunks.join('\n\n'),
+      projectTitle,
+      episodeNum: 1,
+      episodeTitle,
+      bgmUrl: bgmUrl ?? undefined,
+    }
+    console.log('[railway-request] url:', RAILWAY_MERGE_URL)
+    console.log('[railway-request] body:', JSON.stringify(mergeBody, null, 2))
+
     const mergeRes = await fetch(RAILWAY_MERGE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        projectId,
-        videoUrls,
-        audioUrls: audioList.map(a => a.audioUrl),
-        srtContent: srtChunks.join('\n\n'),
-        projectTitle,
-        episodeNum: 1,
-        episodeTitle,
-        bgmUrl: bgmUrl ?? undefined,
-      }),
+      body: JSON.stringify(mergeBody),
     })
 
     const mergeData = await mergeRes.json()
+    console.log('[railway-response]', JSON.stringify(mergeData, null, 2))
     if (!mergeData.success || !mergeData.finalVideoUrl) {
       throw new Error(mergeData.error ?? 'Railway merge failed')
     }
