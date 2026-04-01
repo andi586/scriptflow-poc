@@ -35,6 +35,79 @@ function selectBgmFromPixabay(_scriptRaw: any): Promise<string | null> {
   return Promise.resolve(track)
 }
 
+/** Derive an ambient sound description from a scene prompt */
+function deriveSceneEnvironment(sceneDescription: string): string {
+  const s = (sceneDescription ?? '').toLowerCase()
+  if (/office|work|desk|meeting/.test(s)) {
+    return 'quiet office ambient, AC hum, distant keyboard clicks'
+  }
+  if (/hospital|medical|doctor/.test(s)) {
+    return 'hospital corridor ambient, distant beeps, quiet footsteps'
+  }
+  if (/street|city|outdoor|road/.test(s)) {
+    return 'urban outdoor ambient, distant traffic, city air'
+  }
+  if (/night|dark|quiet/.test(s)) {
+    return 'quiet night ambient, gentle wind, distant crickets'
+  }
+  if (/fight|action|battle/.test(s)) {
+    return 'tense ambient, low rumble, distant tension'
+  }
+  return 'soft indoor ambient, gentle room tone'
+}
+
+/** Call ElevenLabs Sound Effects API to generate ambience audio; returns public URL or null */
+async function generateAmbienceForScene(prompt: string): Promise<string | null> {
+  try {
+    const apiKey = process.env.ELEVENLABS_API_KEY
+    if (!apiKey) return null
+
+    const res = await fetch('https://api.elevenlabs.io/v1/sound-generation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        text: prompt,
+        duration_seconds: 8,
+        output_format: 'mp3_44100_128',
+      }),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text()
+      console.warn('[finalize] ElevenLabs sound-generation failed:', res.status, errText.slice(0, 200))
+      return null
+    }
+
+    const audioBuffer = Buffer.from(await res.arrayBuffer())
+    if (audioBuffer.length === 0) return null
+
+    // Upload to Supabase storage and return public URL
+    const supabase = getSupabaseAdminClient()
+    const storagePath = `ambience/${Date.now()}-scene0.mp3`
+    const { error: upErr } = await supabase.storage
+      .from(process.env.GENERATED_AUDIO_BUCKET ?? 'generated-audio')
+      .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+
+    if (upErr) {
+      console.warn('[finalize] Ambience upload failed:', upErr.message)
+      return null
+    }
+
+    const { data } = supabase.storage
+      .from(process.env.GENERATED_AUDIO_BUCKET ?? 'generated-audio')
+      .getPublicUrl(storagePath)
+
+    console.log('[finalize] Ambience generated and uploaded:', data.publicUrl)
+    return data.publicUrl
+  } catch (err) {
+    console.warn('[finalize] generateAmbienceForScene error:', err instanceof Error ? err.message : err)
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -221,7 +294,23 @@ export async function POST(request: NextRequest) {
       console.warn('[finalize] BGM selection failed (skipping):', bgmErr instanceof Error ? bgmErr.message : bgmErr)
     }
 
-    // 调用Railway合并（三轨：视频 + 对白音频 + BGM）
+    // 生成第一个场景的环境音
+    let ambienceUrl: string | null = null
+    try {
+      const firstSceneDesc = videoUrls[0] ?? episodes[0]?.summary ?? ''
+      const ambiencePrompt = deriveSceneEnvironment(firstSceneDesc)
+      console.log('[finalize] Generating ambience for scene 0:', ambiencePrompt)
+      ambienceUrl = await generateAmbienceForScene(ambiencePrompt)
+      if (ambienceUrl) {
+        console.log('[finalize] Ambience URL:', ambienceUrl)
+      } else {
+        console.log('[finalize] Ambience generation skipped or failed — proceeding without ambience')
+      }
+    } catch (ambErr) {
+      console.warn('[finalize] Ambience generation error (skipping):', ambErr instanceof Error ? ambErr.message : ambErr)
+    }
+
+    // 调用Railway合并（四轨：视频 + 对白音频 + BGM + 环境音）
     const mergeBody = {
       projectId,
       videoUrls,
@@ -231,6 +320,7 @@ export async function POST(request: NextRequest) {
       episodeNum: 1,
       episodeTitle,
       bgmUrl: bgmUrl ?? undefined,
+      ambienceUrl: ambienceUrl ?? undefined,
     }
     console.log('[railway-request] url:', RAILWAY_MERGE_URL)
     console.log('[railway-request] body:', JSON.stringify(mergeBody, null, 2))
