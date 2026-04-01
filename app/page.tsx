@@ -198,8 +198,15 @@ export default function LandingPage() {
             <FadeUp delay={300}>
               <div className="flex flex-wrap gap-4">
                 <GoldButton href="/app-flow">Start Building Your Empire — Free</GoldButton>
+                {/* Desktop: open modal; Mobile: scroll to demo section */}
                 <button
-                  onClick={() => setShowModal(true)}
+                  onClick={() => {
+                    if (window.innerWidth >= 768) {
+                      setShowModal(true);
+                    } else {
+                      document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
                   className="inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
                 >
                   Watch Demo
@@ -208,9 +215,9 @@ export default function LandingPage() {
             </FadeUp>
           </div>
 
-          {/* Right: 9:16 real video */}
+          {/* Right: 9:16 real video — desktop only */}
           <FadeUp delay={150}>
-            <div className="mx-auto w-full max-w-[280px] lg:max-w-none">
+            <div className="hidden md:block mx-auto w-full max-w-[280px] lg:max-w-none">
               <video
                 src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775004647765.mp4"
                 autoPlay
@@ -260,7 +267,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── 3. Demo Video ── */}
-      <section className="py-20">
+      <section id="demo" className="py-20">
         <div className="mx-auto max-w-4xl px-6">
           <FadeUp>
             <h2
