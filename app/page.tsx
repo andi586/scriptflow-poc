@@ -148,22 +148,18 @@ export default function LandingPage() {
             </FadeUp>
           </div>
 
-          {/* Right: 9:16 video placeholder */}
+          {/* Right: 9:16 real video */}
           <FadeUp delay={150}>
             <div className="mx-auto w-full max-w-[280px] lg:max-w-none">
-              <div
-                className="relative w-full overflow-hidden rounded-2xl border-2 border-[#D4A017]/50 bg-white/5"
-                style={{ aspectRatio: "9/16" }}
-              >
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#D4A017]/60 bg-[#D4A017]/10">
-                    <svg className="h-7 w-7 text-[#D4A017]" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                  <p className="text-xs text-white/40">Your drama, generated in minutes</p>
-                </div>
-              </div>
+              <video
+                src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775004647765.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full rounded-2xl border-2 border-[#D4A017]/50"
+                style={{ aspectRatio: "9/16", objectFit: "cover" }}
+              />
             </div>
           </FadeUp>
         </div>
@@ -215,19 +211,15 @@ export default function LandingPage() {
             </h2>
           </FadeUp>
           <FadeUp delay={100}>
-            <div
-              className="relative w-full overflow-hidden rounded-2xl border border-[#D4A017]/30 bg-white/5"
-              style={{ aspectRatio: "16/9" }}
-            >
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[#D4A017]/60 bg-[#D4A017]/10">
-                  <svg className="h-9 w-9 text-[#D4A017]" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-white/40">Demo video coming soon</p>
-              </div>
-            </div>
+            <video
+              src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775004647765.mp4"
+              autoPlay
+              muted
+              loop
+              playsInline
+              controls
+              className="w-full rounded-2xl border border-[#D4A017]/30"
+            />
           </FadeUp>
         </div>
       </section>
@@ -363,13 +355,13 @@ export default function LandingPage() {
             </h2>
             <p className="mb-12 text-center text-sm text-white/50">No hidden fees. Cancel anytime.</p>
           </FadeUp>
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-3 items-stretch">
             {[
               {
                 name: "Basic",
                 price: "$29",
                 tagline: "Perfect for your first drama series.",
-                features: ["5 episodes/month", "AI voice acting", "Auto subtitles", "65% revenue share"],
+                features: ["5 episodes/month", "AI voice acting", "Auto subtitles", "BGM included", "65% revenue share"],
                 highlight: false,
               },
               {
@@ -389,7 +381,7 @@ export default function LandingPage() {
             ].map((plan, i) => (
               <FadeUp key={plan.name} delay={i * 100}>
                 <div
-                  className={`relative h-full rounded-2xl border p-8 ${
+                  className={`relative flex h-full flex-col rounded-2xl border p-8 ${
                     plan.highlight
                       ? "border-[#D4A017] bg-[#D4A017]/10"
                       : "border-[#D4A017]/20 bg-white/5"
@@ -414,7 +406,7 @@ export default function LandingPage() {
                     {plan.price}
                     <span className="text-base font-normal text-white/40">/mo</span>
                   </p>
-                  <ul className="mb-8 space-y-2">
+                  <ul className="mb-8 flex-1 space-y-2">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm text-white/70">
                         <span className="text-[#D4A017]">✓</span> {f}
@@ -423,7 +415,7 @@ export default function LandingPage() {
                   </ul>
                   <Link
                     href="/app-flow"
-                    className={`block w-full rounded-xl py-3 text-center text-sm font-bold transition-all ${
+                    className={`mt-auto block w-full rounded-xl py-3 text-center text-sm font-bold transition-all ${
                       plan.highlight
                         ? "bg-[#D4A017] text-black hover:bg-[#e8b520]"
                         : "border border-[#D4A017]/50 text-[#D4A017] hover:bg-[#D4A017]/10"
@@ -497,7 +489,7 @@ export default function LandingPage() {
           </FadeUp>
           <FadeUp delay={100}>
             <p className="mb-10 text-lg text-white/60">
-              Join thousands of creators building IP they own, on their terms.
+              Be among the first creators to own their IP empire.
             </p>
           </FadeUp>
           <FadeUp delay={200}>
