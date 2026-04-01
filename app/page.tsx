@@ -159,7 +159,7 @@ export default function LandingPage() {
           <div className="space-y-8">
             <FadeUp>
               <h1
-                className="text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl"
+                className="text-3xl font-extrabold leading-tight sm:text-5xl lg:text-6xl"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
                 Build Your IP Empire{" "}
@@ -167,7 +167,7 @@ export default function LandingPage() {
               </h1>
             </FadeUp>
             <FadeUp delay={100}>
-              <p className="text-lg leading-relaxed text-white/65">
+              <p className="text-lg leading-snug text-white/65">
                 Stop renting your creativity to platforms.
                 <br />
                 Script, voices, music, subtitles — all automated.
@@ -178,10 +178,10 @@ export default function LandingPage() {
             </FadeUp>
             {/* Stats */}
             <FadeUp delay={200}>
-              <div className="flex flex-wrap gap-8">
+              <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-6">
                 {[
                   { value: "65%", label: "Revenue to you" },
-                  { value: "0", label: "Technical skills needed" },
+                  { value: "Zero", label: "No Code Needed" },
                   { value: "100%", label: "IP ownership" },
                 ].map((s) => (
                   <div key={s.label}>
@@ -198,7 +198,18 @@ export default function LandingPage() {
             </FadeUp>
             <FadeUp delay={300}>
               <div className="flex flex-wrap gap-4">
-                <GoldButton href="/app-flow">Start Building Your Empire — Free</GoldButton>
+                <Link
+                  href="/app-flow"
+                  className="inline-block rounded-xl bg-[#D4A017] px-8 py-4 text-base font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-lg hover:shadow-[#D4A017]/30 active:scale-95 md:hidden"
+                >
+                  Build Your Empire — Free
+                </Link>
+                <Link
+                  href="/app-flow"
+                  className="hidden md:inline-block rounded-xl bg-[#D4A017] px-8 py-4 text-base font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-lg hover:shadow-[#D4A017]/30 active:scale-95"
+                >
+                  Start Building Your Empire — Free
+                </Link>
                 {/* Desktop: open modal; Mobile: open TikTok */}
                 <button
                   className="hidden md:inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
