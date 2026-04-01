@@ -206,11 +206,6 @@ export default function LandingPage() {
                       setShowModal(true);
                     } else {
                       document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
-                      if (demoVideoRef.current) {
-                        demoVideoRef.current.muted = false;
-                        demoVideoRef.current.volume = 1.0;
-                        demoVideoRef.current.play().catch(() => {});
-                      }
                     }
                   }}
                   className="inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
@@ -284,6 +279,9 @@ export default function LandingPage() {
             </h2>
           </FadeUp>
           <FadeUp delay={100}>
+            <p className="text-center text-sm text-white/60 mb-2 md:hidden">
+              👆 Tap the video to play with sound
+            </p>
             <video
               ref={demoVideoRef}
               src={DEMO_VIDEO_URL}
