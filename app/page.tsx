@@ -1,7 +1,57 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const DEMO_VIDEO_URL =
+  "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775004647765.mp4";
+
+// ─── Video Modal ──────────────────────────────────────────────────────────────
+function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (open) {
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute -right-3 -top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+        <video
+          ref={videoRef}
+          src={DEMO_VIDEO_URL}
+          controls
+          playsInline
+          className="w-full rounded-2xl border border-[#D4A017]/40"
+          style={{ aspectRatio: "9/16", objectFit: "cover" }}
+        />
+      </div>
+    </div>
+  );
+}
 
 // ─── Scroll-fade-up animation hook ───────────────────────────────────────────
 function useFadeUp() {
@@ -73,6 +123,8 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
+  const [showModal, setShowModal] = useState(false);
+
   return (
     <div
       className="min-h-screen text-white"
@@ -143,7 +195,12 @@ export default function LandingPage() {
             <FadeUp delay={300}>
               <div className="flex flex-wrap gap-4">
                 <GoldButton href="/app-flow">Start Building Your Empire — Free</GoldButton>
-                <OutlineButton href="/app-flow">Watch Demo</OutlineButton>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="inline-block rounded-xl border border-[#D4A017]/60 px-8 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
+                >
+                  Watch Demo
+                </button>
               </div>
             </FadeUp>
           </div>
@@ -499,6 +556,9 @@ export default function LandingPage() {
           </FadeUp>
         </div>
       </section>
+
+      {/* ── Video Modal ── */}
+      <VideoModal open={showModal} onClose={() => setShowModal(false)} />
 
       {/* ── Footer ── */}
       <footer className="border-t border-white/5 py-8">
