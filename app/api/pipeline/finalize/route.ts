@@ -360,6 +360,7 @@ export async function POST(request: NextRequest) {
       bgmUrl: bgmUrl ?? undefined,
       ambienceUrl: ambienceUrl ?? undefined,
     }
+    console.log('[finalize] about to call Railway, ambienceUrl=', ambienceUrl)
     console.log('[railway-request] url:', RAILWAY_MERGE_URL)
     console.log('[railway-request] body:', JSON.stringify(mergeBody, null, 2))
 
@@ -383,7 +384,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('[pipeline/finalize]', error)
+    console.error('[pipeline/finalize] catch triggered:', error instanceof Error ? error.message : error)
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
   }
 }
