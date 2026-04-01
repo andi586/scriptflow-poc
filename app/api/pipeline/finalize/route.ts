@@ -58,9 +58,14 @@ function deriveSceneEnvironment(sceneDescription: string): string {
 
 /** Call ElevenLabs Sound Effects API to generate ambience audio; returns public URL or null */
 async function generateAmbienceForScene(prompt: string): Promise<string | null> {
+  console.log('[ambience] calling ElevenLabs sound generation...')
+  console.log('[ambience] prompt:', prompt)
   try {
     const apiKey = process.env.ELEVENLABS_API_KEY
-    if (!apiKey) return null
+    if (!apiKey) {
+      console.error('[ambience] error: ELEVENLABS_API_KEY is not set')
+      return null
+    }
 
     const res = await fetch('https://api.elevenlabs.io/v1/sound-generation', {
       method: 'POST',
@@ -75,14 +80,21 @@ async function generateAmbienceForScene(prompt: string): Promise<string | null> 
       }),
     })
 
+    console.log('[ambience] response status:', res.status)
+
     if (!res.ok) {
       const errText = await res.text()
-      console.warn('[finalize] ElevenLabs sound-generation failed:', res.status, errText.slice(0, 200))
+      console.error('[ambience] error:', `HTTP ${res.status} - ${errText.slice(0, 300)}`)
+      console.log('[ambience] result url: FAILED')
       return null
     }
 
     const audioBuffer = Buffer.from(await res.arrayBuffer())
-    if (audioBuffer.length === 0) return null
+    if (audioBuffer.length === 0) {
+      console.error('[ambience] error: empty audio buffer returned')
+      console.log('[ambience] result url: FAILED')
+      return null
+    }
 
     // Upload to Supabase storage and return public URL
     const supabase = getSupabaseAdminClient()
@@ -92,7 +104,8 @@ async function generateAmbienceForScene(prompt: string): Promise<string | null> 
       .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
 
     if (upErr) {
-      console.warn('[finalize] Ambience upload failed:', upErr.message)
+      console.error('[ambience] error:', upErr.message)
+      console.log('[ambience] result url: FAILED')
       return null
     }
 
@@ -100,10 +113,12 @@ async function generateAmbienceForScene(prompt: string): Promise<string | null> 
       .from(process.env.GENERATED_AUDIO_BUCKET ?? 'generated-audio')
       .getPublicUrl(storagePath)
 
-    console.log('[finalize] Ambience generated and uploaded:', data.publicUrl)
+    console.log('[ambience] result url:', data.publicUrl)
     return data.publicUrl
   } catch (err) {
-    console.warn('[finalize] generateAmbienceForScene error:', err instanceof Error ? err.message : err)
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[ambience] error:', msg)
+    console.log('[ambience] result url: FAILED')
     return null
   }
 }
