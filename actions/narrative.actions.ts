@@ -520,34 +520,23 @@ export async function generateKlingPromptsAction(input: {
 
     // F81 v2: 从blueprint提取对白写入script_raw
     // 先用Claude从原始剧本提取每场景的角色对白
-    const dialogueExtractionPrompt = `
-You are a dialogue extraction expert.
+    // Truncate each prompt to 200 chars to keep total payload under 4000 chars
+    const truncatedPromptSummary = prompts
+      .map((p, i) => `Scene ${i + 1}: ${p.prompt.slice(0, 200)}`)
+      .join('\n')
+      .slice(0, 3800);
+
+    const dialogueExtractionPrompt = `You are a dialogue extraction expert.
 Based on the following Kling video prompt sequence, infer and generate character dialogue for each scene.
-Characters: Caius (wolf emperor/CEO, male, deep authoritative voice), Luna (female lead, intelligent sensitive), Marcus (antagonist, cold), Narrator (narration).
+Characters: Caius (wolf emperor/CEO, male), Luna (female lead), Marcus (antagonist), Narrator.
 
 Kling prompts:
-${prompts.map((p, i) => `Scene ${i + 1}: ${p.prompt}`).join('\n')}
+${truncatedPromptSummary}
 
-Return strict JSON format with no other text:
-{
-  "episodes": [
-    {
-      "episode": 1,
-      "lines": [
-        {"character": "narrator", "text": "Narration content"},
-        {"character": "caius", "text": "Dialogue content"},
-        {"character": "luna", "text": "Dialogue content"}
-      ]
-    }
-  ]
-}
+Return strict JSON only:
+{"episodes":[{"episode":1,"lines":[{"character":"narrator","text":"..."},{"character":"caius","text":"..."},{"character":"luna","text":"..."}]}]}
 
-Requirements:
-- Each scene should have 2-4 dialogue lines
-- Dialogue must match scene emotion
-- character must be one of: caius / luna / marcus / narrator (lowercase)
-- Dialogue in English
-`;
+Rules: 2-4 lines per scene, character must be: caius/luna/marcus/narrator (lowercase), English only.`;
 
     let scriptRaw;
     try {
