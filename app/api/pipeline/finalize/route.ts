@@ -298,12 +298,27 @@ export async function POST(request: NextRequest) {
         })
 
         const rawText = await res.text()
-        console.error("[ElevenLabs raw text]", rawText.substring(0,300))
+        console.log('[elevenlabs] raw response:', rawText.slice(0, 500))
         const data = JSON.parse(rawText)
-        console.error("[ElevenLabs raw]", JSON.stringify(data).substring(0,200))
-        if (!data.audio_base64) throw new Error('ElevenLabs missing audio_base64')
+        console.log('[elevenlabs] parsed keys:', Object.keys(data))
+        console.log('[elevenlabs] http status:', res.status)
 
-        const audioBuffer = Buffer.from(data.audio_base64, 'base64')
+        // Handle API errors (e.g. quota_exceeded, invalid_api_key, etc.)
+        if (!res.ok || data.detail) {
+          const errDetail = typeof data.detail === 'object'
+            ? JSON.stringify(data.detail)
+            : String(data.detail ?? `HTTP ${res.status}`)
+          throw new Error(`ElevenLabs API error: ${errDetail}`)
+        }
+
+        // audio_base64 is at the top level per ElevenLabs with-timestamps API
+        const audioBase64 = data.audio_base64
+        if (!audioBase64) {
+          console.error('[elevenlabs] full response:', JSON.stringify(data).slice(0, 1000))
+          throw new Error(`ElevenLabs missing audio_base64 — keys found: ${Object.keys(data).join(', ')}`)
+        }
+
+        const audioBuffer = Buffer.from(audioBase64, 'base64')
         const alignment = data.normalized_alignment ?? data.alignment
         const duration = Math.max(0, ...alignment.character_end_times_seconds)
 
