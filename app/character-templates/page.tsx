@@ -235,7 +235,7 @@ export default function CharacterTemplatesPage() {
           href="/"
           className="text-sm font-semibold text-amber-400/90 underline-offset-4 hover:text-amber-300 hover:underline"
         >
-          ← ScriptFlow
+          ← Heaven Cinema
         </Link>
         <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-white">
           Character <span className="text-amber-400">Templates</span>
