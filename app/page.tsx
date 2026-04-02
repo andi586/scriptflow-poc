@@ -83,7 +83,7 @@ export default function HomePage() {
           <a href="#vault" className="hover:text-white transition">Vault</a>
         </div>
         <Link href="/app-flow" className="bg-[#D4A017] text-black text-sm font-bold px-4 py-2 rounded-full hover:bg-[#e6b520] transition">
-          Enter the Cinema
+          Start Directing
         </Link>
       </nav>
 
@@ -114,7 +114,7 @@ export default function HomePage() {
           <FadeUp delay={200}>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/app-flow" className="bg-[#D4A017] text-black font-bold px-8 py-4 rounded-full text-lg hover:bg-[#e6b520] transition w-full sm:w-auto text-center">
-                Enter the Cinema
+                Start Directing
               </Link>
               <button onClick={() => setShowModal(true)} className="border border-white/30 text-white px-8 py-4 rounded-full text-lg hover:border-white/60 transition w-full sm:w-auto">
                 Watch Demo
