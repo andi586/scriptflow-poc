@@ -105,7 +105,7 @@ export default function HomePage() {
               <span className="text-[#D4A017]">Heaven.</span>
             </h1>
             <p className="text-xl text-white/70 mb-4 max-w-2xl mx-auto">
-              Here is Heaven Cinema. Today's film is yours to direct.
+              ScriptFlow turns one idea into a finished AI short drama — script, voice, video, subtitles, and final cut.
             </p>
             <p className="text-sm text-white/40 mb-10">
               One sentence → script → video → voice → music → subtitles → final cut. Fully automated.
