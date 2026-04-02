@@ -257,7 +257,7 @@ export default function LandingPage() {
                 {/* Video */}
                 <video
                   id="hero-mobile-video"
-                  src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775106772939.mp4"
+                  src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775130226625.mp4"
                   playsInline
                   muted
                   className="w-full object-cover"
@@ -271,7 +271,7 @@ export default function LandingPage() {
           <FadeUp delay={150}>
             <div className="hidden md:block mx-auto w-full max-w-[280px] lg:max-w-none">
               <video
-                src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775106772939.mp4"
+                src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775130226625.mp4"
                 autoPlay
                 muted
                 loop
