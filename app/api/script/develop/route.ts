@@ -3,6 +3,8 @@ import { z } from "zod";
 import { callClaudeForScript } from "@/lib/ai/claude-script";
 import { safeParseJSON } from "@/lib/utils/parse-json";
 
+export const maxDuration = 300;
+
 const ExploreRequestSchema = z.object({
   mode: z.literal("explore"),
   idea: z.string().min(5),

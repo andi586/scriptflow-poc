@@ -5,6 +5,8 @@ import { safeParseJSON } from "@/lib/utils/parse-json";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { submitKlingVideoTask } from "@/lib/kling-video";
 
+export const maxDuration = 300;
+
 // ========================
 // Zod Schemas
 // ========================

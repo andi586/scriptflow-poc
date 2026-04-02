@@ -3,6 +3,8 @@ import { z } from "zod";
 import { callClaudeForScript } from "@/lib/ai/claude-script";
 import { safeParseJSON } from "@/lib/utils/parse-json";
 
+export const maxDuration = 300;
+
 const StructureRequestSchema = z.object({
   title: z.string(),
   logline: z.string(),
