@@ -16,12 +16,21 @@ export async function createProjectAction(input: {
     );
     const supabase = createClient();
 
+    // Auto-calculate episode_number: COUNT existing projects for this user + 1
+    const { count: existingCount } = await supabase
+      .from("projects")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", input.userId);
+    const episodeNumber = (existingCount ?? 0) + 1;
+    console.log("[CREATE PROJECT] auto episode_number:", episodeNumber, "for user:", input.userId);
+
     const { data, error } = await supabase
       .from("projects")
       .insert({
         user_id: input.userId,
         title: input.title,
         language: input.language ?? "en",
+        episode_number: episodeNumber,
       })
       .select("id")
       .single();
