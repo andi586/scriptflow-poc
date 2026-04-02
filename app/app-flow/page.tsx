@@ -235,6 +235,7 @@ export default function Home() {
   const castUploadPickTargetIdRef = useRef<string | null>(null);
 
   const startNewLazySession = useCallback(() => {
+    console.log("[ScriptFlow] startNewLazySession triggered");
     clearLazySessionFromStorage();
     setRestoredLazySessionId(null);
     setProjectId("");
