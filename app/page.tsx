@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const DEMO_VIDEO_URL =
-  "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775004647765.mp4";
+  "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775130226625.mp4";
 
 // ─── Video Modal ──────────────────────────────────────────────────────────────
 function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
