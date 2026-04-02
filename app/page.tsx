@@ -257,7 +257,7 @@ export default function LandingPage() {
                 {/* Video */}
                 <video
                   id="hero-mobile-video"
-                  src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775036682376.mp4"
+                  src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775106772939.mp4"
                   playsInline
                   muted
                   className="w-full object-cover"
@@ -271,7 +271,7 @@ export default function LandingPage() {
           <FadeUp delay={150}>
             <div className="hidden md:block mx-auto w-full max-w-[280px] lg:max-w-none">
               <video
-                src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4d922d10-38a2-485c-a2c0-ba184f4b17dd/final-1775004647765.mp4"
+                src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775106772939.mp4"
                 autoPlay
                 muted
                 loop
@@ -315,32 +315,6 @@ export default function LandingPage() {
               </FadeUp>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ── 3. Demo Video ── */}
-      <section id="demo" className="py-20">
-        <div className="mx-auto max-w-4xl px-6">
-          <FadeUp>
-            <h2
-              className="mb-8 text-center text-3xl font-extrabold sm:text-4xl"
-              style={{ fontFamily: "'Montserrat', sans-serif" }}
-            >
-              Watch a film made with ScriptFlow
-            </h2>
-          </FadeUp>
-          <FadeUp delay={100}>
-            <p className="text-center text-sm text-white/60 mb-2 md:hidden">
-              👆 Tap the video to play with sound
-            </p>
-            <video
-              ref={demoVideoRef}
-              src={DEMO_VIDEO_URL}
-              controls
-              playsInline
-              className="w-full rounded-2xl border border-[#D4A017]/30"
-            />
-          </FadeUp>
         </div>
       </section>
 

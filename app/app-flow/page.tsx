@@ -744,31 +744,15 @@ export default function Home() {
   }, [projectId, templates]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      setLazyStorageChecked(true);
-      return;
-    }
-    console.log(
-      "[init] localStorage projectId:",
-      window.localStorage.getItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY),
-    );
-    const rawPrimary = window.localStorage.getItem(SCRIPTFLOW_SESSION_STORAGE_KEY);
-    const id = readLazySessionIdFromStorage();
-    console.log("[init] sessionId:", id ?? null);
-    // #17 debug: confirm mount read + key (check DevTools → Console)
-    console.log("[ScriptFlow] session restore (mount)", {
-      storageKey: SCRIPTFLOW_SESSION_STORAGE_KEY,
-      rawPrimary,
-      restoredSessionId: id,
-    });
-    if (id) {
-      setRestoredLazySessionId(id);
-      setProjectId(id);
-    } else {
-      const saved = window.localStorage.getItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY)?.trim();
-      if (saved) {
-        setProjectId(saved);
-      }
+    // Fix: Always clear localStorage session on mount so users always see the
+    // fresh input form when they navigate to /app-flow. Session restore was
+    // causing mobile users to land directly on the "Previous session restored"
+    // view instead of the Landing page experience.
+    if (typeof window !== "undefined") {
+      clearLazySessionFromStorage();
+      try {
+        window.localStorage.removeItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY);
+      } catch {}
     }
     setLazyStorageChecked(true);
   }, []);

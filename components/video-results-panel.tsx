@@ -12,6 +12,7 @@ import {
   type KlingTaskItem,
 } from "@/actions/narrative.actions";
 import { readKlingTaskSnapshotFromStorage } from "@/lib/lazy-session-storage";
+import { VideoDownloadButton } from "@/components/VideoDownloadButton";
 
 export type VideoResultsPanelProps = {
   /** Supabase `projects.id` — scopes `kling_tasks` rows. */
@@ -863,7 +864,7 @@ export function VideoResultsPanel({
         {cloudMergedVideoUrl && (
           <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-4 space-y-3">
             <h4 className="text-sm font-semibold text-sky-300">🎬 Final Episode Ready</h4>
-            {/* Video player — on iOS, long-press this video to Save to Photos */}
+            {/* Single video player */}
             <video
               src={cloudMergedVideoUrl}
               controls
@@ -871,32 +872,13 @@ export function VideoResultsPanel({
               playsInline
               className="w-full rounded-lg border border-white/10 bg-black"
             />
-            {/* iOS: open in new tab → Share → Save to Photos */}
-            <div className="md:hidden space-y-2">
-              <button
-                type="button"
-                onClick={() => window.open(cloudMergedVideoUrl, "_blank")}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20 active:scale-95"
-              >
-                <Download className="size-4" aria-hidden />
-                Open Video to Save
-              </button>
-              <p className="text-[11px] text-white/45 text-center">
-                Tap above to open video, then tap Share → Save to Photos
-              </p>
-            </div>
-            {/* Desktop download button */}
-            <div className="hidden md:block">
-              <a
-                href={`/api/download?url=${encodeURIComponent(cloudMergedVideoUrl)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
-              >
-                <Download className="size-4" aria-hidden />
-                Download Final Episode
-              </a>
-            </div>
+            {/* VideoDownloadButton — handles iOS (Web Share API) and Android/Desktop (anchor download) */}
+            <VideoDownloadButton
+              videoUrl={cloudMergedVideoUrl}
+              filename="episode.mp4"
+              iosLabel="Save to iPhone 📱"
+              defaultLabel="Download Episode ⬇️"
+            />
           </div>
         )}
       </div>
