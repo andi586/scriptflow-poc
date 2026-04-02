@@ -491,13 +491,14 @@ export function VideoResultsPanel({
             type="button"
             className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/20 transition-all"
             onClick={() => {
-              // Clear session so user can start fresh
-              if (typeof window !== "undefined") {
+              // Clear session so user can start fresh — no API call, just clear localStorage and reload
+              try {
                 window.localStorage.removeItem("scriptflow_session_id");
                 window.localStorage.removeItem("scriptflow_lazy_session_id");
                 window.localStorage.removeItem("scriptflow_kling_task_snapshot");
-                window.location.reload();
-              }
+                window.localStorage.removeItem("scriptflow_project_id");
+              } catch {}
+              window.location.href = "/app-flow";
             }}
           >
             Start New Project
