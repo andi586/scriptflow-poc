@@ -625,9 +625,14 @@ export default function LandingPage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-white/5 py-8">
-        <div className="mx-auto max-w-6xl px-6 text-center">
+        <div className="mx-auto max-w-6xl px-6 text-center space-y-2">
           <p className="text-xs text-white/30">
             © 2025 ScriptFlow. All rights reserved. Your IP, your rules.
+          </p>
+          <p className="text-xs text-white/30">
+            <Link href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</Link>
+            {" · "}
+            <Link href="/terms" className="hover:text-white/60 transition-colors">Terms of Service</Link>
           </p>
         </div>
       </footer>
