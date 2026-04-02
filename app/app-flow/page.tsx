@@ -836,7 +836,7 @@ export default function Home() {
           className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-6 py-3"
           aria-label="Primary"
         >
-          <div className="min-w-0 shrink text-xl font-extrabold tracking-tight">ScriptFlow</div>
+          <a href="/" className="min-w-0 shrink text-xl font-extrabold tracking-tight text-white hover:text-[#D4A017] transition-colors flex items-center gap-2">← Heaven Cinema</a>
           <MyProjectsPanel onStartNew={startNewLazySession} />
         </nav>
       </header>
