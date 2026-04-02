@@ -130,7 +130,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MODULE 2: SCREENING HALL ── */}
-      <section id="screening" className="py-24 px-6">
+      <section id="screening" className="py-14 md:py-24 px-6">
         <div className="max-w-4xl mx-auto">
           <FadeUp>
             <div className="text-[#D4A017] text-xs font-mono tracking-[4px] uppercase mb-4">Now Playing</div>
@@ -157,7 +157,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MODULE 3: DIRECTOR'S CALL ── */}
-      <section id="director" className="py-24 px-6 border-t border-white/5">
+      <section id="director" className="py-14 md:py-24 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto">
           <FadeUp>
             <div className="text-[#D4A017] text-xs font-mono tracking-[4px] uppercase mb-4">The Engine</div>
@@ -190,7 +190,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MODULE 4: CINEMA MARKET ── */}
-      <section id="market" className="py-24 px-6 border-t border-white/5">
+      <section id="market" className="py-14 md:py-24 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto">
           <FadeUp>
             <div className="text-[#D4A017] text-xs font-mono tracking-[4px] uppercase mb-4">Cinema Bazaar</div>
@@ -216,7 +216,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MODULE 5: SOVEREIGNTY ── */}
-      <section id="vault" className="py-24 px-6 border-t border-white/5">
+      <section id="vault" className="py-16 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto">
           <FadeUp>
             <div className="text-[#D4A017] text-xs font-mono tracking-[4px] uppercase mb-4">Creator Sovereignty</div>
@@ -228,7 +228,7 @@ export default function HomePage() {
               "Your characters are yours. Forever.",
               "Your worlds are yours. Forever.",
               "Zero platform cut on your TikTok or YouTube earnings.",
-              "Wyoming legal framework in progress (April 6, 2026).",
+              "Wyoming LLC filing in progress — completing this week.",
             ].map((item, i) => (
               <FadeUp key={i} delay={i * 80}>
                 <div className="flex items-center gap-4 py-4 border-b border-white/5">
@@ -242,7 +242,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MODULE 6: FOUNDER STORY ── */}
-      <section className="py-24 px-6 border-t border-white/5">
+      <section className="py-14 md:py-24 px-6 border-t border-white/5">
         <div className="max-w-2xl mx-auto text-center">
           <FadeUp>
             <div className="text-[#D4A017] text-xs font-mono tracking-[4px] uppercase mb-6">The Founder</div>
@@ -256,7 +256,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MODULE 7: PRICING ── */}
-      <section className="py-24 px-6 border-t border-white/5">
+      <section className="py-14 md:py-24 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto">
           <FadeUp>
             <div className="text-[#D4A017] text-xs font-mono tracking-[4px] uppercase mb-4">Choose Your Pass</div>
@@ -314,7 +314,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MODULE 8: FIRST 5 ── */}
-      <section className="py-24 px-6 border-t border-white/5">
+      <section className="py-14 md:py-24 px-6 border-t border-white/5">
         <div className="max-w-2xl mx-auto text-center">
           <FadeUp>
             <div className="text-[#D4A017] text-xs font-mono tracking-[4px] uppercase mb-6">Limited Access</div>
