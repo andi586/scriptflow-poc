@@ -1,0 +1,772 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+
+const DEMO_VIDEO_URL =
+  "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775168349344.mp4";
+
+// ─── Video Modal ──────────────────────────────────────────────────────────────
+function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (open) {
+      v.muted = false;
+      v.volume = 1.0;
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+      v.currentTime = 0;
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -right-3 -top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+        <video
+          ref={videoRef}
+          src={DEMO_VIDEO_URL}
+          controls
+          playsInline
+          className="w-full rounded-2xl border border-[#D4A017]/40"
+          style={{ aspectRatio: "9/16", objectFit: "cover" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Scroll-fade-up animation ─────────────────────────────────────────────────
+function useFadeUp() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add("opacity-100", "translate-y-0");
+          el.classList.remove("opacity-0", "translate-y-8");
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
+function FadeUp({
+  children,
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+}) {
+  const ref = useFadeUp();
+  return (
+    <div
+      ref={ref}
+      className="opacity-0 translate-y-8 transition-all duration-700 ease-out"
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-[#D4A017]/20 bg-white/5 backdrop-blur-sm ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const [showModal, setShowModal] = useState(false);
+
+  return (
+    <div
+      className="min-h-screen text-white overflow-x-hidden"
+      style={{ backgroundColor: "#0A0A0B", fontFamily: "'Inter', sans-serif" }}
+    >
+      {/* ══════════════════════════════════════════════════════════════════════
+          NAV
+      ══════════════════════════════════════════════════════════════════════ */}
+      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0A0A0B]/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          {/* Logo */}
+          <Link
+            href="/"
+            className="text-xl font-extrabold tracking-tight text-[#D4A017]"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            Heaven Cinema
+          </Link>
+
+          {/* Center links — hidden on mobile */}
+          <div className="hidden md:flex items-center gap-8">
+            {["Watch", "Direct", "Market", "Vault"].map((item) => (
+              <a
+                key={item}
+                href={`#${item.toLowerCase()}`}
+                className="text-sm text-white/55 hover:text-white transition-colors tracking-wide"
+              >
+                {item}
+              </a>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <Link
+            href="/app-flow"
+            className="rounded-xl bg-[#D4A017] px-5 py-2.5 text-sm font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-lg hover:shadow-[#D4A017]/30 active:scale-95"
+          >
+            Enter the Cinema
+          </Link>
+        </div>
+      </nav>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 1 · HERO — Full-screen background video
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section
+        id="watch"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden"
+      >
+        {/* Background video */}
+        <video
+          src={DEMO_VIDEO_URL}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ filter: "brightness(0.28)" }}
+        />
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0B]/60 via-transparent to-[#0A0A0B]" />
+
+        {/* Content */}
+        <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
+          <FadeUp>
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.3em] text-[#D4A017]/70">
+              Heaven Cinema · Est. 2026
+            </p>
+          </FadeUp>
+          <FadeUp delay={100}>
+            <h1
+              className="mb-6 text-5xl font-extrabold leading-tight sm:text-7xl lg:text-8xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Direct Your{" "}
+              <span className="text-[#D4A017]">Heaven.</span>
+            </h1>
+          </FadeUp>
+          <FadeUp delay={200}>
+            <p className="mb-10 text-lg leading-relaxed text-white/65 sm:text-xl max-w-2xl mx-auto">
+              Here is Heaven Cinema. Today&apos;s film is yours to direct.
+            </p>
+          </FadeUp>
+          <FadeUp delay={300}>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/app-flow"
+                className="w-full sm:w-auto rounded-xl bg-[#D4A017] px-10 py-4 text-base font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-xl hover:shadow-[#D4A017]/30 active:scale-95"
+              >
+                Enter the Cinema
+              </Link>
+              <button
+                onClick={() => setShowModal(true)}
+                className="w-full sm:w-auto rounded-xl border border-[#D4A017]/50 px-10 py-4 text-base font-semibold text-[#D4A017] transition-all hover:bg-[#D4A017]/10 active:scale-95"
+              >
+                ▶ Watch Demo
+              </button>
+            </div>
+          </FadeUp>
+          <FadeUp delay={450}>
+            <p className="mt-8 text-xs text-white/30 italic">
+              Built in 22 days by a retired lawyer who told AI what he wanted.
+            </p>
+          </FadeUp>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/30">
+          <span className="text-xs tracking-widest uppercase">Scroll</span>
+          <div className="h-8 w-px bg-gradient-to-b from-white/30 to-transparent" />
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 2 · SCREENING HALL — What's Playing Tonight
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section id="direct" className="py-24 border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-6">
+          <FadeUp>
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.3em] text-[#D4A017]/60">
+              Screening Hall
+            </p>
+            <h2
+              className="mb-16 text-center text-3xl font-extrabold sm:text-5xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              What&apos;s Playing Tonight
+            </h2>
+          </FadeUp>
+
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            {/* Video card */}
+            <FadeUp delay={100} key="screening-video">
+              <div className="w-full max-w-[280px] mx-auto lg:mx-0 shrink-0">
+                <div className="relative rounded-2xl overflow-hidden border-2 border-[#D4A017]/40 shadow-2xl shadow-[#D4A017]/10">
+                  <video
+                    src={DEMO_VIDEO_URL}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full object-cover"
+                    style={{ aspectRatio: "9/16" }}
+                  />
+                  {/* Badge */}
+                  <div className="absolute top-3 left-3 rounded-full bg-[#D4A017] px-3 py-1 text-xs font-bold text-black">
+                    EP4 · Wolf Emperor
+                  </div>
+                </div>
+              </div>
+            </FadeUp>
+
+            {/* Text */}
+            <FadeUp delay={200} key="screening-text">
+              <div className="space-y-6 text-center lg:text-left">
+                <h3
+                  className="text-2xl font-extrabold sm:text-3xl"
+                  style={{ fontFamily: "'Montserrat', sans-serif" }}
+                >
+                  Wolf Emperor · Episode 4
+                </h3>
+                <p className="text-white/60 leading-relaxed max-w-md">
+                  A retired general returns from exile. The empire trembles.
+                  Every frame, every voice, every cut — directed by one person
+                  with no film school, no crew, no budget.
+                </p>
+                <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+                  <span className="rounded-full border border-[#D4A017]/30 px-4 py-1.5 text-xs text-[#D4A017]/80">
+                    AI Video
+                  </span>
+                  <span className="rounded-full border border-[#D4A017]/30 px-4 py-1.5 text-xs text-[#D4A017]/80">
+                    Voice Acting
+                  </span>
+                  <span className="rounded-full border border-[#D4A017]/30 px-4 py-1.5 text-xs text-[#D4A017]/80">
+                    Cinematic BGM
+                  </span>
+                  <span className="rounded-full border border-[#D4A017]/30 px-4 py-1.5 text-xs text-[#D4A017]/80">
+                    Auto Subtitles
+                  </span>
+                </div>
+                <Link
+                  href="/app-flow"
+                  className="inline-block rounded-xl bg-[#D4A017] px-8 py-3.5 text-sm font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-lg hover:shadow-[#D4A017]/30 active:scale-95"
+                >
+                  Direct a scene like this →
+                </Link>
+              </div>
+            </FadeUp>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 3 · DIRECTOR'S CALL — Technology brands
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-24 border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-6">
+          <FadeUp>
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.3em] text-[#D4A017]/60">
+              Director&apos;s Call
+            </p>
+            <h2
+              className="mb-4 text-center text-3xl font-extrabold sm:text-5xl max-w-3xl mx-auto leading-tight"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              The director&apos;s chair is empty.
+              <br />
+              <span className="text-[#D4A017]">Will you take it?</span>
+            </h2>
+            <p className="mb-16 text-center text-white/50 max-w-xl mx-auto">
+              Four proprietary engines. One seamless production pipeline.
+            </p>
+          </FadeUp>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                brand: "NEL™",
+                full: "Narrative Engine Layer",
+                effect:
+                  "Turns a single sentence into a full cinematic script with character arcs, scene beats, and emotional pacing.",
+              },
+              {
+                brand: "HumanTouch Engine™",
+                full: "Quality Intelligence",
+                effect:
+                  "Filters out AI-slop before it reaches you. Every frame passes a human taste threshold — or gets regenerated.",
+              },
+              {
+                brand: "SyncCore™",
+                full: "Audio-Visual Sync",
+                effect:
+                  "Lips move when characters speak. Music swells at the right moment. Silence lands exactly where it should.",
+              },
+              {
+                brand: "Immersive Sound Layer™",
+                full: "Cinematic Audio",
+                effect:
+                  "Voice acting, ambient sound, and BGM mixed like a real film — not a slideshow with background music.",
+              },
+            ].map((tech, i) => (
+              <FadeUp key={tech.brand} delay={i * 80}>
+                <GlassCard className="p-6 h-full flex flex-col">
+                  <div className="mb-1">
+                    <span
+                      className="text-lg font-extrabold text-[#D4A017]"
+                      style={{ fontFamily: "'Montserrat', sans-serif" }}
+                    >
+                      {tech.brand}
+                    </span>
+                  </div>
+                  <p className="mb-4 text-xs text-white/40 font-medium">
+                    {tech.full}
+                  </p>
+                  <p className="text-sm leading-relaxed text-white/60 flex-1">
+                    {tech.effect}
+                  </p>
+                </GlassCard>
+              </FadeUp>
+            ))}
+          </div>
+
+          <FadeUp delay={400}>
+            <div className="mt-12 text-center">
+              <Link
+                href="/app-flow"
+                className="inline-block rounded-xl bg-[#D4A017] px-10 py-4 text-base font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-xl hover:shadow-[#D4A017]/30 active:scale-95"
+              >
+                Start Directing
+              </Link>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 4 · CINEMA MARKET
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section id="market" className="py-24 border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-6">
+          <FadeUp>
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.3em] text-[#D4A017]/60">
+              Cinema Market
+            </p>
+            <h2
+              className="mb-4 text-center text-3xl font-extrabold sm:text-4xl max-w-3xl mx-auto leading-tight"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Your creations don&apos;t disappear.
+              <br />
+              <span className="text-[#D4A017]">
+                They go to the Market and come back as money.
+              </span>
+            </h2>
+            <p className="mb-16 text-center text-white/50 max-w-xl mx-auto">
+              Creators keep{" "}
+              <span className="text-[#D4A017] font-bold">65%</span> of eligible
+              revenue inside the Cinema Market.
+            </p>
+          </FadeUp>
+
+          <div className="grid gap-6 sm:grid-cols-3">
+            {[
+              {
+                icon: "👤",
+                title: "Characters",
+                desc: "License your original characters to other directors. Every time someone uses your character, you earn.",
+                tag: "Royalty Stream",
+              },
+              {
+                icon: "🌱",
+                title: "Creative Seeds",
+                desc: "Sell your story concepts, world-building notes, and narrative frameworks as reusable IP assets.",
+                tag: "IP Asset",
+              },
+              {
+                icon: "🎬",
+                title: "Shot Templates",
+                desc: "Package your best cinematic setups — lighting, framing, pacing — and sell them as director presets.",
+                tag: "Director Preset",
+              },
+            ].map((item, i) => (
+              <FadeUp key={item.title} delay={i * 100}>
+                <GlassCard className="p-8 h-full flex flex-col">
+                  <div className="mb-4 text-4xl">{item.icon}</div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white">
+                      {item.title}
+                    </h3>
+                    <span className="rounded-full bg-[#D4A017]/15 px-2 py-0.5 text-xs text-[#D4A017]">
+                      {item.tag}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-white/55 flex-1">
+                    {item.desc}
+                  </p>
+                </GlassCard>
+              </FadeUp>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 5 · CREATOR SOVEREIGNTY
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-24 border-t border-white/5">
+        <div className="mx-auto max-w-3xl px-6">
+          <FadeUp>
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.3em] text-[#D4A017]/60">
+              Creator Sovereignty
+            </p>
+            <h2
+              className="mb-12 text-center text-3xl font-extrabold sm:text-5xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Own What You Make
+            </h2>
+          </FadeUp>
+
+          <FadeUp delay={100}>
+            <GlassCard className="p-8 sm:p-12">
+              <ul className="space-y-6">
+                {[
+                  "Your stories are yours.",
+                  "Your characters are yours.",
+                  "Your worlds are yours.",
+                  "Zero platform cut on external earnings.",
+                  "Wyoming legal framework in progress.",
+                ].map((promise, i) => (
+                  <li key={i} className="flex items-start gap-4">
+                    <span className="mt-0.5 shrink-0 text-[#D4A017] text-lg">
+                      ✦
+                    </span>
+                    <span className="text-base leading-relaxed text-white/80 font-medium">
+                      {promise}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </GlassCard>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 6 · FOUNDER STORY
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-24 border-t border-white/5">
+        <div className="mx-auto max-w-3xl px-6">
+          <FadeUp>
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.3em] text-[#D4A017]/60">
+              Founder Story
+            </p>
+            <h2
+              className="mb-12 text-center text-2xl font-extrabold sm:text-4xl leading-tight"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Built by a man who was never supposed to build this
+            </h2>
+          </FadeUp>
+
+          <FadeUp delay={100}>
+            <div className="relative rounded-2xl border border-[#D4A017]/30 bg-[#D4A017]/5 p-8 sm:p-12">
+              {/* Quote mark */}
+              <div
+                className="absolute -top-5 left-8 text-7xl text-[#D4A017]/20 leading-none select-none"
+                style={{ fontFamily: "Georgia, serif" }}
+              >
+                &ldquo;
+              </div>
+              <blockquote className="relative z-10">
+                <p className="text-lg sm:text-xl leading-relaxed text-white/80 italic mb-8">
+                  I&apos;m a retired lawyer with no coding skills. I told AI
+                  what I wanted. It built it. Now you can use it.
+                </p>
+                <footer className="flex items-center gap-4">
+                  <div className="h-px flex-1 bg-[#D4A017]/20" />
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-[#D4A017]">Jiming</p>
+                    <p className="text-xs text-white/40">
+                      Founder · Heaven Cinema
+                    </p>
+                  </div>
+                </footer>
+              </blockquote>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 7 · CHOOSE YOUR PASS
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section id="vault" className="py-24 border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-6">
+          <FadeUp>
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.3em] text-[#D4A017]/60">
+              Choose Your Pass
+            </p>
+            <h2
+              className="mb-4 text-center text-3xl font-extrabold sm:text-5xl"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Your Ticket to the Cinema
+            </h2>
+            <p className="mb-16 text-center text-sm text-white/40">
+              No hidden fees. Cancel anytime.
+            </p>
+          </FadeUp>
+
+          <div className="grid gap-6 sm:grid-cols-3 items-stretch">
+            {[
+              {
+                name: "Director Pass",
+                price: "$29",
+                tagline: "Your first film starts here.",
+                highlight: false,
+                features: [
+                  { text: "5 episodes / month", available: true },
+                  { text: "AI voice acting", available: true },
+                  { text: "Auto subtitles", available: true },
+                  { text: "BGM included", available: true },
+                  { text: "Cinema Market access", available: false, tag: "Coming Q2" },
+                ],
+              },
+              {
+                name: "Market Pass",
+                price: "$59",
+                tagline: "Build your IP catalog.",
+                highlight: true,
+                features: [
+                  { text: "20 episodes / month", available: true },
+                  { text: "Cinema Market — sell IP", available: true },
+                  { text: "Director Mode", available: true },
+                  { text: "Priority rendering", available: true },
+                  { text: "Character licensing", available: false, tag: "Coming Q2" },
+                ],
+              },
+              {
+                name: "World Builder Pass",
+                price: "$99",
+                tagline: "Run a full production studio, solo.",
+                highlight: false,
+                features: [
+                  { text: "Unlimited episodes", available: true },
+                  { text: "Custom characters", available: true },
+                  { text: "White-label export", available: true },
+                  { text: "API access", available: false, tag: "Coming Q2" },
+                  { text: "World licensing vault", available: false, tag: "Coming Q2" },
+                ],
+              },
+            ].map((plan, i) => (
+              <FadeUp key={plan.name} delay={i * 100}>
+                <div
+                  className={`relative flex h-full flex-col rounded-2xl border p-8 ${
+                    plan.highlight
+                      ? "border-[#D4A017] bg-[#D4A017]/10"
+                      : "border-[#D4A017]/20 bg-white/5"
+                  }`}
+                >
+                  {plan.highlight && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#D4A017] px-4 py-1 text-xs font-bold text-black whitespace-nowrap">
+                      Most Popular
+                    </div>
+                  )}
+                  <h3
+                    className="mb-1 text-xl font-extrabold text-white"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    {plan.name}
+                  </h3>
+                  <p className="mb-1 text-xs text-white/40">{plan.tagline}</p>
+                  <p
+                    className="mb-6 text-4xl font-extrabold text-[#D4A017]"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    {plan.price}
+                    <span className="text-base font-normal text-white/40">
+                      /mo
+                    </span>
+                  </p>
+                  <ul className="mb-8 flex-1 space-y-3">
+                    {plan.features.map((f, fi) => (
+                      <li
+                        key={fi}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        {f.available ? (
+                          <span className="text-[#D4A017]">✓</span>
+                        ) : (
+                          <span className="text-white/20">○</span>
+                        )}
+                        <span
+                          className={f.available ? "text-white/70" : "text-white/30"}
+                        >
+                          {f.text}
+                        </span>
+                        {f.tag && (
+                          <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/40">
+                            {f.tag}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/app-flow"
+                    className={`mt-auto block w-full rounded-xl py-3 text-center text-sm font-bold transition-all ${
+                      plan.highlight
+                        ? "bg-[#D4A017] text-black hover:bg-[#e8b520]"
+                        : "border border-[#D4A017]/50 text-[#D4A017] hover:bg-[#D4A017]/10"
+                    }`}
+                  >
+                    Get Your Pass
+                  </Link>
+                </div>
+              </FadeUp>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 8 · THE FIRST 5 DIRECTORS
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-28 border-t border-white/5">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <FadeUp>
+            {/* 5 golden seat icons */}
+            <div className="mb-8 flex justify-center gap-3">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-10 w-10 rounded-full border-2 border-[#D4A017] bg-[#D4A017]/10 flex items-center justify-center text-[#D4A017] text-lg"
+                >
+                  ★
+                </div>
+              ))}
+            </div>
+          </FadeUp>
+          <FadeUp delay={100}>
+            <h2
+              className="mb-4 text-3xl font-extrabold sm:text-5xl leading-tight"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Only 5 golden seats left
+              <br />
+              <span className="text-[#D4A017]">in the front row.</span>
+            </h2>
+          </FadeUp>
+          <FadeUp delay={200}>
+            <p className="mb-10 text-white/50 text-lg">
+              The first 5 directors get lifetime access, founding credits, and
+              their name in the Heaven Cinema opening reel.
+            </p>
+          </FadeUp>
+          <FadeUp delay={300}>
+            <Link
+              href="/app-flow"
+              className="inline-block rounded-xl bg-[#D4A017] px-12 py-5 text-lg font-bold text-black transition-all hover:bg-[#e8b520] hover:shadow-2xl hover:shadow-[#D4A017]/40 active:scale-95"
+            >
+              Reserve My Golden Seat
+            </Link>
+          </FadeUp>
+          <FadeUp delay={400}>
+            <p className="mt-8 text-xs text-white/25">
+              getscriptflow.com · @wolfemperorai
+            </p>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── Video Modal ── */}
+      <VideoModal open={showModal} onClose={() => setShowModal(false)} />
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          FOOTER
+      ══════════════════════════════════════════════════════════════════════ */}
+      <footer className="border-t border-white/5 py-10">
+        <div className="mx-auto max-w-6xl px-6 text-center space-y-3">
+          <p
+            className="text-sm font-bold text-[#D4A017]"
+            style={{ fontFamily: "'Montserrat', sans-serif" }}
+          >
+            Heaven Cinema
+          </p>
+          <p className="text-xs text-white/30">
+            © 2026 ScriptFlow LLC · Wyoming USA
+          </p>
+          <p className="text-xs text-white/25">
+            <Link
+              href="/privacy"
+              className="hover:text-white/50 transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            {" · "}
+            <Link
+              href="/terms"
+              className="hover:text-white/50 transition-colors"
+            >
+              Terms of Service
+            </Link>
+            {" · "}
+            <span>heavencinema.ai</span>
+          </p>
+          <p className="text-xs text-white/20 italic">Your IP, your rules.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
