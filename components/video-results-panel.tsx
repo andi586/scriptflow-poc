@@ -871,11 +871,19 @@ export function VideoResultsPanel({
               playsInline
               className="w-full rounded-lg border border-white/10 bg-black"
             />
-            {/* iOS save hint — shown only on mobile */}
-            <div className="md:hidden rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 space-y-0.5">
-              <p className="text-xs font-semibold text-amber-200">📱 保存到手机相册</p>
-              <p className="text-[11px] text-amber-200/80">长按上方视频 → 存储到照片</p>
-              <p className="text-[11px] text-white/50">Long press video above → Save to Photos</p>
+            {/* iOS: open in new tab → Share → Save to Photos */}
+            <div className="md:hidden space-y-2">
+              <button
+                type="button"
+                onClick={() => window.open(cloudMergedVideoUrl, "_blank")}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20 active:scale-95"
+              >
+                <Download className="size-4" aria-hidden />
+                Open Video to Save
+              </button>
+              <p className="text-[11px] text-white/45 text-center">
+                Tap above to open video, then tap Share → Save to Photos
+              </p>
             </div>
             {/* Desktop download button */}
             <div className="hidden md:block">
