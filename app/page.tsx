@@ -137,11 +137,18 @@ export default function HomePage() {
             <h2 className="text-4xl font-black mb-12">What&apos;s Playing Tonight</h2>
           </FadeUp>
           <FadeUp delay={100}>
-            <div className="relative rounded-2xl overflow-hidden border border-[#D4A017]/30 max-w-xs mx-auto">
-              <video src={HERO_VIDEO_URL} controls playsInline className="w-full" style={{ aspectRatio: "9/16" }} />
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
-                <p className="text-xs text-[#D4A017] font-mono">Wolf Emperor · EP4</p>
-                <p className="text-sm font-bold">The Enemy Within</p>
+            <div className="grid grid-cols-3 gap-6 my-8">
+              <div className="text-center">
+                <div className="text-4xl font-black text-[#D4A017]">1</div>
+                <div className="text-xs text-white/50 mt-1">sentence in</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-black text-[#D4A017]">0</div>
+                <div className="text-xs text-white/50 mt-1">manual steps</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-black text-[#D4A017]">100%</div>
+                <div className="text-xs text-white/50 mt-1">your IP</div>
               </div>
             </div>
           </FadeUp>
