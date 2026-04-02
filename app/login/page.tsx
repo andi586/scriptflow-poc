@@ -30,7 +30,7 @@ export default function AuthPage() {
       toast.error(error.message);
     } else {
       toast.success(isLogin ? "欢迎回来" : "注册成功，请查收邮件");
-      if (isLogin) router.push("/dashboard");
+      if (isLogin) router.push("/app-flow");
     }
     setLoading(false);
   };

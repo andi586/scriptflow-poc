@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function CreateEntryPage() {
-  redirect("/en/create");
+  redirect("/app-flow");
 }

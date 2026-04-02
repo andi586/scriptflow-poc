@@ -8,13 +8,9 @@ export default async function ProjectPage({
   const { id } = await params;
 
   if (!id || id === "undefined") {
-    redirect("/en/dashboard");
+    redirect("/app-flow");
   }
 
-  try {
-    return redirect(`/en/project/${id.trim()}`);
-  } catch {
-    redirect("/en/dashboard");
-  }
+  redirect("/app-flow");
 }
 
