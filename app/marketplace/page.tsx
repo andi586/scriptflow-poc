@@ -71,6 +71,7 @@ export default function MarketplacePage() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-7xl px-6 py-12">
+        <a href="/" className="text-sm font-semibold text-amber-400/90 hover:text-amber-300 flex items-center gap-1 mb-6">← Heaven Cinema</a>
         <h1 className="text-3xl font-bold">Asset Marketplace</h1>
         <p className="mt-2 text-white/60">
           Browse and purchase assets for your projects
