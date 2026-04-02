@@ -66,6 +66,11 @@ export function MyProjectsPanel({ onStartNew }: MyProjectsPanelProps) {
     setError(null);
     try {
       const res = await fetch("/api/projects/list");
+      if (res.status === 401) {
+        // Not logged in — show empty list gracefully, no error
+        setProjects([]);
+        return;
+      }
       const data = (await res.json()) as { success: boolean; projects?: ProjectItem[]; error?: string };
       if (!data.success) throw new Error(data.error ?? "Failed to load projects");
       setProjects(data.projects ?? []);

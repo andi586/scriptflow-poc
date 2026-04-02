@@ -10,6 +10,6 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return NextResponse.redirect(`${origin}/dashboard`);
+  return NextResponse.redirect(`${origin}/app-flow`);
 }
 

@@ -875,7 +875,9 @@ export default function Home() {
                   type="button"
                   variant="outline"
                   className="shrink-0 border-white/40 bg-white/10 text-white hover:bg-white/20 hover:border-white/60"
-                  onClick={startNewLazySession}
+                  onClick={() => {
+                    startNewLazySession();
+                  }}
                 >
                   Start new project
                 </Button>
