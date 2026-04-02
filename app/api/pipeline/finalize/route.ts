@@ -154,9 +154,16 @@ export async function POST(request: NextRequest) {
     // 从 projects 表读取 script_raw、title 和 episode_number
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('script_raw, title, episode_number')
+      .select('script_raw, title, episode_number, status')
       .eq('id', projectId)
       .single()
+
+    console.log('[finalize] project fields:', JSON.stringify({
+      id: projectId,
+      title: project?.title,
+      episode_number: (project as any)?.episode_number,
+      has_script_raw: !!(project as any)?.script_raw,
+    }))
 
     if (projectError || !project) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 })
