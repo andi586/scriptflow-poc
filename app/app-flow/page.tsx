@@ -869,19 +869,19 @@ export default function Home() {
                 <div>
                   <h2 className="text-sm font-semibold text-amber-400">Previous session restored</h2>
                   <p className="mt-1 max-w-xl text-xs text-white/50">
-                    Session saved locally. Pulling tasks from Supabase and polling for video status.
+                    Session ID: {restoredLazySessionId.slice(0, 8)}… · Pulling tasks from Supabase.
                   </p>
                 </div>
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  className="shrink-0 border-white/40 bg-white/10 text-white hover:bg-white/20 hover:border-white/60"
+                  className="shrink-0 rounded-xl border border-white/40 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 hover:border-white/60 active:scale-95 transition-all"
                   onClick={() => {
+                    console.log("[ScriptFlow] Start new project button clicked");
                     startNewLazySession();
                   }}
                 >
                   Start new project
-                </Button>
+                </button>
               </div>
             </section>
             <VideoResultsPanel

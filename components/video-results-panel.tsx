@@ -479,7 +479,18 @@ export function VideoResultsPanel({
     );
   }
 
-  if (effectiveIds.length === 0) return null;
+  if (effectiveIds.length === 0) {
+    return (
+      <div className={className}>
+        <div className="mt-8 space-y-2 border-t border-white/10 pt-6">
+          <p className="text-sm text-white/50">No scenes found for this session.</p>
+          <p className="text-xs text-white/35">
+            This project may not have any generated clips yet, or the session data was cleared.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
