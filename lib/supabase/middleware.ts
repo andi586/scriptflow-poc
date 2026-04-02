@@ -37,18 +37,18 @@ export const updateSession = async (request: NextRequest) => {
     pathname.startsWith('/register') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api') ||
+    pathname.startsWith('/app-flow') ||
     pathname.startsWith('/project/') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/terms') ||
     localeAuthPath.test(pathname)
 
   if (!user && !isPublicPath) {
-    if (pathname === '/' || localeRootPath.test(pathname)) {
-      return NextResponse.redirect(new URL('/en/login', request.url))
-    }
-    return NextResponse.redirect(new URL('/en/login', request.url))
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   if (user && (pathname === '/login' || pathname === '/register' || localeAuthPath.test(pathname))) {
-    return NextResponse.redirect(new URL('/en/dashboard', request.url))
+    return NextResponse.redirect(new URL('/app-flow', request.url))
   }
 
   return response
