@@ -482,11 +482,26 @@ export function VideoResultsPanel({
   if (effectiveIds.length === 0) {
     return (
       <div className={className}>
-        <div className="mt-8 space-y-2 border-t border-white/10 pt-6">
+        <div className="mt-8 space-y-4 border-t border-white/10 pt-6">
           <p className="text-sm text-white/50">No scenes found for this session.</p>
           <p className="text-xs text-white/35">
-            This project may not have any generated clips yet, or the session data was cleared.
+            This project may not have any generated clips yet. You can re-run the pipeline from the input box below, or start a new project.
           </p>
+          <button
+            type="button"
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 hover:bg-amber-500/20 transition-all"
+            onClick={() => {
+              // Clear session so user can start fresh
+              if (typeof window !== "undefined") {
+                window.localStorage.removeItem("scriptflow_session_id");
+                window.localStorage.removeItem("scriptflow_lazy_session_id");
+                window.localStorage.removeItem("scriptflow_kling_task_snapshot");
+                window.location.reload();
+              }
+            }}
+          >
+            Start New Project
+          </button>
         </div>
       </div>
     );
