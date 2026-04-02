@@ -767,7 +767,7 @@ export function VideoResultsPanel({
                       )}
                     </div>
 
-                    <div className="mt-2">
+                    <div className="mt-2 space-y-1">
                       <button
                         type="button"
                         aria-busy={downloadBusyTaskId === piTid}
@@ -794,8 +794,16 @@ export function VideoResultsPanel({
                                       beat_number: task.beat_number,
                                       taskIdKey: piTid,
                                     });
-                              const downloadUrl = `/api/download?url=${encodeURIComponent(url)}`;
-                              window.open(downloadUrl, "_blank");
+                              // iOS Safari doesn't support Content-Disposition download
+                              // Open direct URL in new tab so user can long-press to save
+                              const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                              if (isIOS) {
+                                window.open(url, "_blank");
+                              } else {
+                                const downloadUrl = `/api/download?url=${encodeURIComponent(url)}`;
+                                window.open(downloadUrl, "_blank");
+                              }
                             } catch (err) {
                               console.warn("[VideoResultsPanel] download resolve failed", {
                                 task_id_key: piTid,
@@ -827,6 +835,9 @@ export function VideoResultsPanel({
                         )}
                         Download
                       </button>
+                      <p className="text-[10px] text-white/35 md:hidden">
+                        iOS: tap Download → long-press video → Save to Photos
+                      </p>
                     </div>
                   </>
                 )}
@@ -859,15 +870,26 @@ export function VideoResultsPanel({
               playsInline
               className="w-full rounded-lg border border-white/10 bg-black"
             />
-            <a
-              href={`/api/download?url=${encodeURIComponent(cloudMergedVideoUrl)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
-            >
-              <Download className="size-4" aria-hidden />
-              Download Final Episode
-            </a>
+            <div className="space-y-1">
+              <a
+                href={
+                  typeof navigator !== "undefined" &&
+                  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
+                    ? cloudMergedVideoUrl
+                    : `/api/download?url=${encodeURIComponent(cloudMergedVideoUrl)}`
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
+              >
+                <Download className="size-4" aria-hidden />
+                Download Final Episode
+              </a>
+              <p className="text-[10px] text-white/35 md:hidden">
+                iOS: tap Download → long-press video → Save to Photos
+              </p>
+            </div>
           </div>
         )}
       </div>
