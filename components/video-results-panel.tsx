@@ -863,6 +863,7 @@ export function VideoResultsPanel({
         {cloudMergedVideoUrl && (
           <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-4 space-y-3">
             <h4 className="text-sm font-semibold text-sky-300">🎬 Final Episode Ready</h4>
+            {/* Video player — on iOS, long-press this video to Save to Photos */}
             <video
               src={cloudMergedVideoUrl}
               controls
@@ -870,15 +871,16 @@ export function VideoResultsPanel({
               playsInline
               className="w-full rounded-lg border border-white/10 bg-black"
             />
-            <div className="space-y-1">
+            {/* iOS save hint — shown only on mobile */}
+            <div className="md:hidden rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 space-y-0.5">
+              <p className="text-xs font-semibold text-amber-200">📱 保存到手机相册</p>
+              <p className="text-[11px] text-amber-200/80">长按上方视频 → 存储到照片</p>
+              <p className="text-[11px] text-white/50">Long press video above → Save to Photos</p>
+            </div>
+            {/* Desktop download button */}
+            <div className="hidden md:block">
               <a
-                href={
-                  typeof navigator !== "undefined" &&
-                  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
-                    ? cloudMergedVideoUrl
-                    : `/api/download?url=${encodeURIComponent(cloudMergedVideoUrl)}`
-                }
+                href={`/api/download?url=${encodeURIComponent(cloudMergedVideoUrl)}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
@@ -886,9 +888,6 @@ export function VideoResultsPanel({
                 <Download className="size-4" aria-hidden />
                 Download Final Episode
               </a>
-              <p className="text-[10px] text-white/35 md:hidden">
-                iOS: tap Download → long-press video → Save to Photos
-              </p>
             </div>
           </div>
         )}
