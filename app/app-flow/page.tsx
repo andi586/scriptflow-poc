@@ -22,6 +22,7 @@ import { VideoResultsPanel } from "@/components/video-results-panel";
 import { DirectorReviewPanel } from "@/components/director-review-panel";
 import { ScriptReviewPanel } from "@/components/script-review-panel";
 import { MyProjectsPanel } from "@/components/my-projects-panel";
+import { RenderJobProgress } from "@/components/render-job-progress";
 import { formatUnknownError } from "@/lib/format-error";
 import {
   clearLazySessionFromStorage,
@@ -223,6 +224,9 @@ export default function Home() {
   const [restoredLazySessionId, setRestoredLazySessionId] = useState<string | null>(null);
   const [lazyStorageChecked, setLazyStorageChecked] = useState(false);
 
+  /** Async render job state — set after POST /api/render-jobs succeeds */
+  const [activeRenderJobId, setActiveRenderJobId] = useState<string | null>(null);
+
   /** Read live DOM before pipeline — fixes first-click no-op when controlled state lags (IME / autofill / paste). */
   const storyIdeaTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   /** Scroll results into view after pipeline completes (single-page flow; no separate /results route). */
@@ -244,6 +248,7 @@ export default function Home() {
     setPipelineRunning(false);
     setClipsRefreshNonce(0);
     setLastSubmittedClipTaskIds([]);
+    setActiveRenderJobId(null);
     setCastConfirmations((prev) => {
       const next: Record<string, CastConfirmation> = {};
       for (const [id, v] of Object.entries(prev)) {
@@ -1298,6 +1303,27 @@ export default function Home() {
               taskIds={lastSubmittedClipTaskIds}
               refreshNonce={clipsRefreshNonce}
               title="Scenes"
+            />
+          </section>
+        )}
+
+        {/* Async render job progress panel */}
+        {activeRenderJobId && (
+          <section className="mt-6">
+            <RenderJobProgress
+              jobId={activeRenderJobId}
+              onComplete={(finalVideoUrl, taskIds) => {
+                if (taskIds.length > 0) {
+                  setLastSubmittedClipTaskIds(taskIds);
+                  setClipsRefreshNonce((n) => n + 1);
+                }
+                setPipelinePhase("done");
+              }}
+              onFailed={(error) => {
+                setPipelineError(error);
+                setPipelinePhase("error");
+              }}
+              onStartOver={startNewLazySession}
             />
           </section>
         )}

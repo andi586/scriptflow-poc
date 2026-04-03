@@ -29,7 +29,7 @@ function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-4" onClick={onClose}>
       <div className="relative w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm">✕ Close</button>
-        <video ref={videoRef} src={DEMO_VIDEO_URL} controls playsInline className="w-full rounded-2xl" style={{ aspectRatio: "9/16" }} />
+        <video ref={videoRef} src={DEMO_VIDEO_URL} controls playsInline crossOrigin="anonymous" className="w-full rounded-2xl" style={{ aspectRatio: "9/16" }} />
       </div>
     </div>
   );
