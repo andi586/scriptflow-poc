@@ -795,6 +795,7 @@ export default function Home() {
         try {
           window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, urlProjectId);
         } catch {}
+        setRestoredLazySessionId(urlProjectId);
       } else {
         // Fresh visit - clear session
         clearLazySessionFromStorage();
