@@ -786,10 +786,22 @@ export default function Home() {
     // causing mobile users to land directly on the "Previous session restored"
     // view instead of the Landing page experience.
     if (typeof window !== "undefined") {
-      clearLazySessionFromStorage();
-      try {
-        window.localStorage.removeItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY);
-      } catch {}
+      // Check if we're loading a specific project via URL param
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlProjectId = urlParams.get('projectId');
+      if (urlProjectId) {
+        // Loading a specific project - set session and don't clear
+        writeLazySessionIdToStorage(urlProjectId);
+        try {
+          window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, urlProjectId);
+        } catch {}
+      } else {
+        // Fresh visit - clear session
+        clearLazySessionFromStorage();
+        try {
+          window.localStorage.removeItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY);
+        } catch {}
+      }
     }
     // Restore active render job from localStorage
     if (typeof window !== "undefined") {
