@@ -397,6 +397,19 @@ export default function Home() {
       setProjectId(pid);
       setCurrentProjectId(pid);
       writeLazySessionIdToStorage(pid);
+
+      // Create async render job
+      try {
+        const jobRes = await fetch('/api/render-jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: pid }),
+        });
+        const jobData = await jobRes.json();
+        if (jobData.jobId) setActiveRenderJobId(jobData.jobId);
+      } catch (e) {
+        console.warn('[render-job] Failed to create job:', e);
+      }
       if (typeof window !== "undefined") {
         try { window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid); } catch {}
       }
@@ -554,6 +567,19 @@ export default function Home() {
       setProjectId(pid);
       setCurrentProjectId(pid);
       writeLazySessionIdToStorage(pid);
+
+      // Create async render job
+      try {
+        const jobRes = await fetch('/api/render-jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: pid }),
+        });
+        const jobData = await jobRes.json();
+        if (jobData.jobId) setActiveRenderJobId(jobData.jobId);
+      } catch (e) {
+        console.warn('[render-job] Failed to create job:', e);
+      }
       if (typeof window !== "undefined") {
         try {
           console.log("[project created] saving projectId to localStorage:", pid);
