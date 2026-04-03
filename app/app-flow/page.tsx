@@ -48,6 +48,7 @@ import { cn } from "@/lib/utils";
 import type { CharacterRole } from "@/types";
 import { prepareImageForUpload } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
+import { SellAsAssetButton } from "@/components/sell-as-asset-button";
 
 /** Pasted scripts at least this long skip idea→9-shot formatting and go straight to NEL. */
 const DIRECT_SCRIPT_MIN_CHARS = 50;
@@ -1398,6 +1399,9 @@ export default function Home() {
               refreshNonce={clipsRefreshNonce}
               title="Scenes"
             />
+
+            {/* Cinema Bazaar: Sell as Asset */}
+            <SellAsAssetButton projectId={projectId} />
           </section>
         )}
           </>
