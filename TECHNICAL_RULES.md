@@ -257,3 +257,8 @@ cat > TECHNICAL_RULES.md << 'EOF'
 **正确流程：**
 确认角色→弹出报价（预计credits/时间/费用）→用户确认→开始生成
 **永久规则：** 任何消耗credits的操作前必须显示报价弹框
+
+### 规则43：SSH端口被封时用443端口推送
+**症状：** ssh: connect to host github.com port 22: Undefined error
+**解决：** git push ssh://git@ssh.github.com:443/andi586/scriptflow-poc.git main
+**永久规则：** 泰国网络不稳定时用443端口绕过
