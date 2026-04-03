@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-const DEMO_VIDEO_URL =
+const FALLBACK_VIDEO_URL =
   "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775168349344.mp4";
-
-const HERO_VIDEO_URL = DEMO_VIDEO_URL;
 
 // ─── Video Modal ───────────────────────────────────────────────────────────────
 function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -29,7 +27,7 @@ function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-4" onClick={onClose}>
       <div className="relative w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm">✕ Close</button>
-        <video ref={videoRef} src={DEMO_VIDEO_URL} controls playsInline crossOrigin="anonymous" className="w-full rounded-2xl" style={{ aspectRatio: "9/16" }} />
+        <video ref={videoRef} src={heroVideoUrl} controls playsInline crossOrigin="anonymous" className="w-full rounded-2xl" style={{ aspectRatio: "9/16" }} />
       </div>
     </div>
   );
@@ -69,6 +67,15 @@ function FadeUp({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [showModal, setShowModal] = useState(false);
+  const [heroVideoUrl, setHeroVideoUrl] = useState(FALLBACK_VIDEO_URL);
+
+  useEffect(() => {
+    // Auto-fetch latest episode video
+    fetch('/api/latest-video')
+      .then(r => r.json())
+      .then(d => { if (d.url) setHeroVideoUrl(d.url); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-white">
@@ -91,7 +98,7 @@ export default function HomePage() {
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
         {/* Background video */}
         <video
-          src={HERO_VIDEO_URL}
+          src={heroVideoUrl}
           autoPlay muted loop playsInline
           className="absolute inset-0 w-full h-full object-cover opacity-30"
         />
