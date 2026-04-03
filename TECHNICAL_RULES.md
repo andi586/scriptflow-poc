@@ -221,3 +221,8 @@ cat > TECHNICAL_RULES.md << 'EOF'
 **规则：** 每发布新一集Wolf Emperor，更新app/page.tsx中的DEMO_VIDEO_URL和HERO_VIDEO_URL
 **命令：** sed -i '' 's|旧文件名.mp4|新文件名.mp4|g' app/page.tsx
 
+
+### 规则36：Landing页Hero视频自动从数据库读取
+**API：** /api/latest-video
+**逻辑：** 读取projects表最新的final_video_url
+**永久规则：** 不要再手动修改DEMO_VIDEO_URL，每次发新集自动更新
