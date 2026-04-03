@@ -406,7 +406,10 @@ export default function Home() {
           body: JSON.stringify({ projectId: pid }),
         });
         const jobData = await jobRes.json();
-        if (jobData.jobId) setActiveRenderJobId(jobData.jobId);
+        if (jobData.jobId) {
+        setActiveRenderJobId(jobData.jobId);
+        try { window.localStorage.setItem('scriptflow_active_job_id', jobData.jobId); } catch {}
+      }
       } catch (e) {
         console.warn('[render-job] Failed to create job:', e);
       }
@@ -576,7 +579,10 @@ export default function Home() {
           body: JSON.stringify({ projectId: pid }),
         });
         const jobData = await jobRes.json();
-        if (jobData.jobId) setActiveRenderJobId(jobData.jobId);
+        if (jobData.jobId) {
+        setActiveRenderJobId(jobData.jobId);
+        try { window.localStorage.setItem('scriptflow_active_job_id', jobData.jobId); } catch {}
+      }
       } catch (e) {
         console.warn('[render-job] Failed to create job:', e);
       }
@@ -783,6 +789,13 @@ export default function Home() {
       clearLazySessionFromStorage();
       try {
         window.localStorage.removeItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY);
+      } catch {}
+    }
+    // Restore active render job from localStorage
+    if (typeof window !== "undefined") {
+      try {
+        const savedJobId = window.localStorage.getItem('scriptflow_active_job_id');
+        if (savedJobId) setActiveRenderJobId(savedJobId);
       } catch {}
     }
     setLazyStorageChecked(true);
