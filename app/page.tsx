@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const DEMO_VIDEO_URL =
-  "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775168349344.mp4";
+  "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775175650753.mp4";
 
 const HERO_VIDEO_URL = DEMO_VIDEO_URL;
 
