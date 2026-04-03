@@ -238,3 +238,8 @@ cat > TECHNICAL_RULES.md << 'EOF'
 **视频：** eq=contrast=1.05:saturation=0.92
 **音频：** loudnorm=I=-16:LRA=11:TP=-1.5
 **永久规则：** noise和gblur会损坏视频不要加
+
+### 规则39：Cinema Bazaar数据表
+**market_assets表：** 存储所有上架资产
+**asset_purchases表：** 存储购买记录
+**永久规则：** 65%归卖家，Wyoming LLC完成后接入Stripe Connect结算
