@@ -1,0 +1,284 @@
+<html><head>
+<meta charset="utf-8">
+<style>
+body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+h1 { color: #D4A017; border-bottom: 2px solid #D4A017; padding-bottom: 10px; }
+h2 { color: #333; margin-top: 30px; border-left: 4px solid #D4A017; padding-left: 10px; }
+h3 { color: #555; }
+strong { color: #B8860B; }
+code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+hr { border: 1px solid #eee; }
+</style></head>
+<body><h1>ScriptFlow 永久技术规则文档</h1>
+
+<p>最后更新：2026-04-03</p>
+
+<h2>一、路由规则</h2>
+
+<h3>规则1：所有redirect必须指向实际存在的路径</h3>
+
+<p><strong>症状：</strong> 页面反复横跳，导航死循环
+<strong>根本原因：</strong> middleware.ts里redirect到了/en/xxx，但/en/目录不存在
+<strong>解决方案：</strong> 所有redirect统一指向/app-flow，不用/en/前缀
+<strong>涉及文件：</strong> lib/supabase/middleware.ts
+<strong>永久规则：</strong> 新增任何redirect前，先确认目标路径真实存在</p>
+
+<hr />
+
+<h2>二、数据库规则</h2>
+
+<h3>规则2：SUPABASE<em>SERVICE</em>ROLE_KEY用于内部API</h3>
+
+<p><strong>症状：</strong> 内部API调用Supabase返回权限错误
+<strong>根本原因：</strong> 用了anon key而不是service role key
+<strong>解决方案：</strong> 所有内部pipeline API必须用SUPABASE<em>SERVICE</em>ROLE_KEY
+<strong>永久规则：</strong> 内部API = service role key，前端 = anon key</p>
+
+<h3>规则3：Railway服务必须手动部署</h3>
+
+<p><strong>症状：</strong> 推送代码后Railway没有更新
+<strong>根本原因：</strong> Railway不会自动从GitHub部署
+<strong>解决方案：</strong> 每次修改Railway相关代码后必须执行railway up
+<strong>永久规则：</strong> railway up是必须的手动步骤</p>
+
+<h3>规则4：UPDATE返回"No rows returned"不代表失败</h3>
+
+<p><strong>症状：</strong> Supabase执行UPDATE显示No rows returned
+<strong>根本原因：</strong> Supabase SQL Editor对UPDATE不显示affected rows
+<strong>解决方案：</strong> 执行SELECT确认数据是否已更新
+<strong>永久规则：</strong> UPDATE​​​​​​​​​​​​​​​​</p>
+
+<p>cat &gt; TECHNICAL_RULES.md &lt;&lt; 'EOF'</p>
+
+<h1>ScriptFlow 永久技术规则文档</h1>
+
+<p>最后更新：2026-04-03</p>
+
+<h2>一、路由规则</h2>
+
+<h3>规则1：所有redirect必须指向实际存在的路径</h3>
+
+<p><strong>症状：</strong> 页面反复横跳，导航死循环
+<strong>根本原因：</strong> middleware.ts里redirect到了/en/xxx，但/en/目录不存在
+<strong>解决方案：</strong> 所有redirect统一指向/app-flow
+<strong>永久规则：</strong> 新增任何redirect前，先确认目标路径真实存在</p>
+
+<h2>二、数据库规则</h2>
+
+<h3>规则2：SUPABASE<em>SERVICE</em>ROLE_KEY用于内部API</h3>
+
+<p><strong>永久规则：</strong> 内部API = service role key，前端 = anon key</p>
+
+<h3>规则3：Railway服务必须手动部署</h3>
+
+<p><strong>永久规则：</strong> 每次修改Railway代码后必须执行railway up</p>
+
+<h3>规则4：UPDATE返回"No rows returned"不代表失败</h3>
+
+<p><strong>永久规则：</strong> UPDATE后必须SELECT验证</p>
+
+<h3>规则5：projects表status是枚举类型</h3>
+
+<p><strong>合法值：</strong> draft → analyzing → ready → generating → completed → archived</p>
+
+<h2>三、Pipeline规则</h2>
+
+<h3>规则6：script_raw存在于projects表</h3>
+
+<p><strong>永久规则：</strong> 剧本数据永远在projects.script_raw</p>
+
+<h3>规则7：kling_tasks.status成功值是"success"</h3>
+
+<p><strong>永久规则：</strong> Kling任务成功状态 = "success"</p>
+
+<h3>规则8：scene<em>index不是shot</em>index</h3>
+
+<p><strong>永久规则：</strong> 永远用scene_index</p>
+
+<h3>规则9：所有API路由必须设置maxDuration=300</h3>
+
+<p><strong>永久规则：</strong> 所有调用AI服务的API必须加maxDuration=300</p>
+
+<h3>规则10：Cloud merge显示失败先去Supabase找视频</h3>
+
+<p><strong>永久规则：</strong> 看到Cloud merge failed先去Supabase Storage找视频</p>
+
+<h3>规则11：剧本生成阶段不能切换页面</h3>
+
+<p><strong>永久规则：</strong> 视频生成阶段可以切换，剧本生成阶段不能切换</p>
+
+<h2>四、ElevenLabs规则</h2>
+
+<h3>规则12：四个角色Voice ID</h3>
+
+<ul>
+<li>Caius：pNInz6obpgDQGcFmaJgB（Adam）</li>
+<li>Luna：cgSgspJ2msm6clMCkdW9（Jessica）</li>
+<li>Marcus：SOYHLrjzK2X1ezoPC6cr（Harry）</li>
+<li>Narrator：onwK4e9ZLuTAKqWW03F9（Daniel）
+<strong>永久规则：</strong> Voice ID必须先Add到My Voices才能调用</li>
+</ul>
+
+<h2>五、iOS规则</h2>
+
+<h3>规则13：iOS视频下载必须用Web Share API</h3>
+
+<p><strong>组件：</strong> components/VideoDownloadButton.tsx
+<strong>永久规则：</strong> iOS下载走Web Share API，Android/桌面走download属性</p>
+
+<h3>规则14：iOS Safari分享菜单没有TikTok</h3>
+
+<p><strong>永久规则：</strong> 指导用户保存到相册，再从TikTok上传</p>
+
+<h2>六、My Projects规则</h2>
+
+<h3>规则15：My Projects用URL参数传递项目ID</h3>
+
+<p><strong>永久规则：</strong> 跳转历史项目用/app-flow?projectId=xxx</p>
+
+<h3>规则16：app-flow初始化会清除localStorage</h3>
+
+<p><strong>永久规则：</strong> 修改session逻辑前先检查mount时的清除逻辑</p>
+
+<h2>七、环境变量规则</h2>
+
+<h3>规则17：Vercel环境变量修改后必须Redeploy</h3>
+
+<p><strong>永久规则：</strong> 改环境变量必须Redeploy才生效</p>
+
+<h3>规则18：关键环境变量清单</h3>
+
+<ul>
+<li>ELEVENLABS<em>API</em>KEY</li>
+<li>ELEVENLABS<em>VOICE</em>ID_CAIUS/LUNA/MARCUS/NARRATOR</li>
+<li>NEXT<em>PUBLIC</em>SUPABASE_URL</li>
+<li>NEXT<em>PUBLIC</em>SUPABASE<em>ANON</em>KEY</li>
+<li>SUPABASE<em>SERVICE</em>ROLE_KEY</li>
+<li>PIXABAY<em>API</em>KEY</li>
+</ul>
+
+<h2>八、品牌规则</h2>
+
+<h3>规则19：域名资产</h3>
+
+<ul>
+<li>产品工具：getscriptflow.com</li>
+<li>品牌情感：heavencinema.ai</li>
+</ul>
+
+<h3>规则20：广告语</h3>
+
+<ul>
+<li>中文：天堂电影院，你来当导演！</li>
+<li>英文：Direct Your Heaven.</li>
+</ul>
+
+<h2>九、历史Bug修复记录（从Git历史整理）</h2>
+
+<h3>规则21：/en/*路由全部是死路</h3>
+
+<p><strong>Commit：</strong> 4eee1c7
+<strong>症状：</strong> redirect到/en/xxx导致404死循环
+<strong>解决方案：</strong> 全部改成/app-flow
+<strong>永久规则：</strong> 永远不要新增/en/前缀的路由</p>
+
+<h3>规则22：My Projects 401要静默处理</h3>
+
+<p><strong>Commit：</strong> 25e7aeb
+<strong>症状：</strong> 未登录用户访问My Projects卡死
+<strong>解决方案：</strong> 401返回时显示空列表不抛错误
+<strong>永久规则：</strong> API返回401时前端静默处理</p>
+
+<h3>规则23：finalize的prompt必须截断到4000字符</h3>
+
+<p><strong>Commit：</strong> 069d890
+<strong>症状：</strong> finalize调用Claude超时
+<strong>解决方案：</strong> dialogue extraction prompt截断&lt;4000字符
+<strong>永久规则：</strong> 传给Claude的prompt必须控制在4000字符以内</p>
+
+<h3>规则24：视频下载必须buffer整个文件</h3>
+
+<p><strong>Commit：</strong> 6b9744d
+<strong>症状：</strong> 下载的视频缺少音轨
+<strong>解决方案：</strong> buffer整个文件再返回，不用stream
+<strong>永久规则：</strong> 视频下载必须完整buffer</p>
+
+<h3>规则25：episode_number从projects表读取传给Railway</h3>
+
+<p><strong>Commit：</strong> c30f175, df6696f
+<strong>症状：</strong> 片头字幕显示错误集数
+<strong>解决方案：</strong> 从projects.episode<em>number读取传给Railway
+<strong>永久规则：</strong> 集数编号永远从projects.episode</em>number读取</p>
+
+<h3>规则26：新建项目时自动设置episode_number</h3>
+
+<p><strong>Commit：</strong> 7c79b13
+<strong>症状：</strong> episode<em>number为null导致片头显示Episode 1
+<strong>解决方案：</strong> 创建项目时COUNT现有项目数+1自动写入
+<strong>永久规则：</strong> createProjectAction必须自动计算episode</em>number</p>
+
+<h3>规则27：ELEVENLABS<em>VOICE</em>ID未设置时跳过TTS</h3>
+
+<p><strong>Commit：</strong> ce76e51
+<strong>症状：</strong> Voice ID未设置时整个pipeline失败
+<strong>解决方案：</strong> 检测到无Voice ID时跳过TTS继续Railway merge
+<strong>永久规则：</strong> TTS失败不能阻断整个pipeline</p>
+
+<h3>规则28：iOS下载最终方案</h3>
+
+<p><strong>Commits：</strong> 0955472, f04fdf0, 25acf92
+<strong>症状：</strong> iOS无法下载视频到相册
+<strong>最终解决方案：</strong> VideoDownloadButton.tsx
+- iOS：fetch→Blob→File→navigator.share()
+- Android/桌面：直接download属性
+<strong>永久规则：</strong> 不要再尝试其他iOS下载方案</p>
+
+<h3>规则29：手机端middleware不能redirect到不存在的路径</h3>
+
+<p><strong>Commit：</strong> e711de5
+<strong>症状：</strong> 手机端新用户进来死循环
+<strong>根本原因：</strong> middleware redirect到/en/login和/en/dashboard
+<strong>解决方案：</strong> 改成/login和/app-flow
+<strong>永久规则：</strong> middleware的所有redirect目标必须真实存在</p>
+
+<h3>规则30：Start New Project必须清除localStorage再跳转</h3>
+
+<p><strong>Commits：</strong> 900b1d6, e944796
+<strong>症状：</strong> 点击新建后仍然恢复旧session
+<strong>解决方案：</strong> 清除localStorage四个key后window.location.href='/app-flow'
+<strong>永久规则：</strong> 新建项目前必须清除所有session localStorage</p>
+
+<h3>规则31：session restore空页面要显示友好提示</h3>
+
+<p><strong>Commit：</strong> 2b98091
+<strong>症状：</strong> 恢复session后页面空白
+<strong>解决方案：</strong> effectiveIds为空时显示"No scenes found"而不是null
+<strong>永久规则：</strong> 所有空状态必须显示友好提示，不能return null</p>
+
+<h3>规则32：My Projects点击项目用URL参数传递</h3>
+
+<p><strong>Commits：</strong> e0b5ad4, 45cc02d, af948fd
+<strong>症状：</strong> 点击历史项目后页面空白找不到项目
+<strong>解决方案：</strong> 跳转到/app-flow?projectId=xxx，页面读URL参数设置restoredLazySessionId
+<strong>永久规则：</strong> 历史项目跳转必须带URL参数，不依赖localStorage</p>
+
+<h3>规则33：video modal需要crossOrigin属性</h3>
+
+<p><strong>Commit：</strong> 3c306b4
+<strong>症状：</strong> Modal里的视频无法播放，播放按钮灰色
+<strong>解决方案：</strong> video标签加crossOrigin="anonymous"
+<strong>永久规则：</strong> 所有跨域视频标签必须加crossOrigin="anonymous"</p>
+
+<h3>规则34：异步架构render_jobs表</h3>
+
+<p><strong>Commits：</strong> 8b1c063, 08c5427, 4cfd9fa
+<strong>症状：</strong> 切换页面pipeline中断
+<strong>解决方案：</strong> 创建render<em>jobs表，提交任务后立刻返回jobId
+<strong>相关文件：</strong> app/api/render-jobs/route.ts, components/render-job-progress.tsx
+<strong>永久规则：</strong> 所有长任务必须走render</em>jobs异步架构</p>
+
+<h3>规则35：Landing页Hero视频随最新集更新</h3>
+
+<p><strong>规则：</strong> 每发布新一集Wolf Emperor，更新app/page.tsx中的DEMO<em>VIDEO</em>URL和HERO<em>VIDEO</em>URL
+<strong>命令：</strong> sed -i '' 's|旧文件名.mp4|新文件名.mp4|g' app/page.tsx</p>
+</body></html>
