@@ -106,7 +106,7 @@ export function MyProjectsPanel({ onStartNew }: MyProjectsPanelProps) {
       window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, project.id);
     } catch {}
     setOpen(false);
-    window.location.reload();
+    window.location.href = '/app-flow';
   }, []);
 
   const handleStartNew = useCallback(() => {
