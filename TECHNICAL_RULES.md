@@ -226,3 +226,15 @@ cat > TECHNICAL_RULES.md << 'EOF'
 **API：** /api/latest-video
 **逻辑：** 读取projects表最新的final_video_url
 **永久规则：** 不要再手动修改DEMO_VIDEO_URL，每次发新集自动更新
+
+### 规则37：F84质检只拦截三无产品
+**原则：** 保住底线，不追求完美
+**三无定义：**
+- 无影：无视频流或时长<5秒
+- 无声：无音频流
+**永久规则：** 质检不误杀正常视频
+
+### 规则38：HumanTouch Engine参数
+**视频：** eq=contrast=1.05:saturation=0.92
+**音频：** loudnorm=I=-16:LRA=11:TP=-1.5
+**永久规则：** noise和gblur会损坏视频不要加
