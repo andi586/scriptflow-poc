@@ -1224,6 +1224,16 @@ export default function Home() {
                 Creating project → Analyzing story → Locking characters → Preparing scenes →
                 Generating your scenes
               </p>
+              {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project") && (
+                <div className="mt-3 rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
+                  <p className="text-sm font-semibold text-orange-300">
+                    ⚠️ Keep this page open — generating your scenes...
+                  </p>
+                  <p className="mt-1 text-xs text-orange-200/70">
+                    Do not switch tabs or close this window.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
