@@ -53,6 +53,44 @@ import { SellAsAssetButton } from "@/components/sell-as-asset-button";
 /** Pasted scripts at least this long skip idea→9-shot formatting and go straight to NEL. */
 const DIRECT_SCRIPT_MIN_CHARS = 50;
 const SCRIPTFLOW_PROJECT_ID_STORAGE_KEY = "scriptflow_project_id";
+const LEGAL_CONSENT_STORAGE_KEY = "scriptflow_legal_consent_v1";
+
+// ─── Chaos Spark ideas pool ───────────────────────────────────────────────────
+const CHAOS_IDEAS = [
+  {
+    headline: "Your group chat is on alien trial",
+    sub: "Everyone gets exposed. Nobody survives.",
+  },
+  {
+    headline: "Your most innocent friend is the villain",
+    sub: "The betrayal was always in the group.",
+  },
+  {
+    headline: "You tried to enter Heaven, got rejected",
+    sub: "Even the angels are tired of your drama.",
+  },
+  {
+    headline: "Your friend is crowned King of Bad Decisions",
+    sub: "Global ceremony. Nobody vetoed it.",
+  },
+  {
+    headline: "Zombie outbreak. Your group are last survivors.",
+    sub: "The zombie was already in the group chat.",
+  },
+  {
+    headline: "Your squad accidentally started a cult",
+    sub: "Nobody meant to. Everyone stayed.",
+  },
+  {
+    headline: "Time loop. Only you remember.",
+    sub: "Your friends keep making the same mistake.",
+  },
+];
+
+function pickRandom3(arr: typeof CHAOS_IDEAS) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3);
+}
 
 type HealthPayload = {
   anthropic: "ok" | "error";
@@ -185,6 +223,301 @@ function HealthDot({
   );
 }
 
+// ─── Legal Consent Modal ──────────────────────────────────────────────────────
+function LegalConsentModal({
+  onAccept,
+  onClose,
+}: {
+  onAccept: () => void;
+  onClose: () => void;
+}) {
+  const [checked, setChecked] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm px-4 pb-4 sm:pb-0">
+      <div className="w-full max-w-md rounded-2xl border border-white/15 bg-zinc-900 p-6 shadow-2xl">
+        <h2 className="text-lg font-bold text-white mb-1">Before you upload 📋</h2>
+        <p className="text-xs text-white/50 mb-4">By uploading photos, you confirm:</p>
+
+        <ul className="space-y-3 mb-5">
+          {[
+            "You have the consent of every person whose photo you are uploading",
+            "For minors under 18, you are their parent or legal guardian",
+            "Photos used only to generate your video",
+            "Photos deleted after 7 days",
+            "No public figures or celebrities",
+            "Content not used to defame or harm anyone",
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-white/80">
+              <span className="mt-0.5 text-amber-400 shrink-0">☑</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+
+        <label className="flex items-center gap-3 cursor-pointer mb-5 p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => setChecked(e.target.checked)}
+            className="w-4 h-4 accent-amber-400"
+          />
+          <span className="text-sm font-medium text-white">I understand and agree</span>
+        </label>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 rounded-xl border border-white/20 text-sm text-white/60 hover:bg-white/5 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!checked}
+            onClick={() => {
+              if (!checked) return;
+              try { localStorage.setItem(LEGAL_CONSENT_STORAGE_KEY, "1"); } catch {}
+              onAccept();
+            }}
+            className={cn(
+              "flex-1 py-3 rounded-xl text-sm font-semibold transition-all",
+              checked
+                ? "bg-gradient-to-r from-amber-500 to-yellow-400 text-black hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30"
+                : "bg-white/10 text-white/30 cursor-not-allowed"
+            )}
+          >
+            Continue →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Squad Modal (after first photo upload) ───────────────────────────────────
+function SquadModal({
+  onAddFriends,
+  onJustMe,
+  onUseIdea,
+}: {
+  onAddFriends: () => void;
+  onJustMe: () => void;
+  onUseIdea: (idea: string) => void;
+}) {
+  const [ideas] = useState(() => pickRandom3(CHAOS_IDEAS));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm px-4 pb-4 sm:pb-0">
+      <div className="w-full max-w-md rounded-2xl border border-white/15 bg-zinc-900 p-6 shadow-2xl">
+        <h2 className="text-xl font-bold text-white mb-1">🔥 Want more chaos?</h2>
+        <p className="text-sm text-white/60 mb-5">
+          Add up to 4 more friends —<br />
+          we&apos;ll put them all in the movie.
+        </p>
+
+        <div className="space-y-3 mb-5">
+          {ideas.map((idea, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{idea.headline}</p>
+                <p className="text-xs text-white/50 mt-0.5">{idea.sub}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onUseIdea(idea.headline)}
+                className="shrink-0 rounded-lg border border-amber-500/60 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors whitespace-nowrap"
+              >
+                Use this →
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={onAddFriends}
+          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-sm mb-3 hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all"
+        >
+          + Add Friends 📸
+        </button>
+        <button
+          type="button"
+          onClick={onJustMe}
+          className="w-full py-2 text-xs text-white/40 hover:text-white/60 transition-colors"
+        >
+          No thanks, just me
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Chaos Spark Bottom Sheet ─────────────────────────────────────────────────
+function ChaosSparkSheet({
+  onClose,
+  onUseIdea,
+}: {
+  onClose: () => void;
+  onUseIdea: (idea: string) => void;
+}) {
+  const [ideas, setIdeas] = useState(() => pickRandom3(CHAOS_IDEAS));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-t-2xl border-t border-white/15 bg-zinc-900 p-6 pb-8 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-5" />
+        <h2 className="text-lg font-bold text-white mb-1">🔥 Pick your chaos</h2>
+        <p className="text-sm text-white/50 mb-5">Steal one. Start the prank.</p>
+
+        <div className="space-y-3 mb-5">
+          {ideas.map((idea, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white">{idea.headline}</p>
+                <p className="text-xs text-white/50 mt-0.5">{idea.sub}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onUseIdea(idea.headline);
+                  onClose();
+                }}
+                className="shrink-0 rounded-lg border border-amber-500/60 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors whitespace-nowrap"
+              >
+                Use this →
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIdeas(pickRandom3(CHAOS_IDEAS))}
+          className="w-full py-3 rounded-xl border border-white/20 text-sm font-medium text-white/70 hover:bg-white/5 transition-colors"
+        >
+          Shuffle ⚡
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Star Mode: photo upload slots ───────────────────────────────────────────
+type StarPhoto = {
+  file: File;
+  localUrl: string;
+};
+
+function StarModeUploader({
+  photos,
+  extraSlots,
+  onPhotoAdded,
+  onPhotoRemoved,
+  onProceed,
+  pipelineRunning,
+}: {
+  photos: StarPhoto[];
+  extraSlots: boolean;
+  onPhotoAdded: (file: File, index: number) => void;
+  onPhotoRemoved: (index: number) => void;
+  onProceed: () => void;
+  pipelineRunning: boolean;
+}) {
+  const totalSlots = extraSlots ? 5 : 1;
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+        {Array.from({ length: totalSlots }).map((_, i) => {
+          const photo = photos[i];
+          return (
+            <div key={i} className="relative aspect-[3/4]">
+              {photo ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.localUrl}
+                    alt={`Photo ${i + 1}`}
+                    className="w-full h-full object-cover rounded-xl border border-amber-500/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onPhotoRemoved(i)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-red-500/80 transition-colors"
+                  >
+                    ×
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRefs.current[i]?.click()}
+                    className={cn(
+                      "w-full h-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-colors",
+                      i === 0
+                        ? "border-amber-500/60 bg-amber-500/5 hover:bg-amber-500/10"
+                        : "border-white/20 bg-white/3 hover:bg-white/5"
+                    )}
+                  >
+                    <span className="text-2xl">{i === 0 ? "📸" : "+"}</span>
+                    <span className="text-[10px] text-white/40">
+                      {i === 0 ? "You" : `Friend ${i}`}
+                    </span>
+                  </button>
+                  <input
+                    ref={(el) => { fileInputRefs.current[i] = el; }}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp,image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file || !isJpgPngWebpFile(file)) return;
+                      onPhotoAdded(file, i);
+                    }}
+                  />
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {photos.length > 0 && (
+        <p className="text-xs text-white/40 text-center">
+          {photos.length === 1
+            ? "1 photo = just you"
+            : `${photos.length} photos = squad mode 🔥`}
+        </p>
+      )}
+
+      {photos.length > 0 && (
+        <button
+          type="button"
+          disabled={pipelineRunning}
+          onClick={onProceed}
+          className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {pipelineRunning ? "Working on it…" : "Generate My Movie ✨"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [projectId, setProjectId] = useState("");
   const [health, setHealth] = useState<HealthPayload | null>(null);
@@ -228,6 +561,25 @@ export default function Home() {
   /** Async render job state — set after POST /api/render-jobs succeeds */
   const [activeRenderJobId, setActiveRenderJobId] = useState<string | null>(null);
 
+  // ─── NEW UI STATE ──────────────────────────────────────────────────────────
+  /** Which top-level mode the user chose: null = not chosen yet */
+  const [entryMode, setEntryMode] = useState<"star" | "director" | null>(null);
+  /** Show legal consent modal */
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  /** Show squad upsell modal (after first photo) */
+  const [showSquadModal, setShowSquadModal] = useState(false);
+  /** Show chaos spark bottom sheet */
+  const [showChaosSheet, setShowChaosSheet] = useState(false);
+  /** Spark Chaos button flash animation */
+  const [sparkFlash, setSparkFlash] = useState(false);
+  /** Star mode photos */
+  const [starPhotos, setStarPhotos] = useState<StarPhoto[]>([]);
+  /** Whether to show extra 4 photo slots */
+  const [showExtraSlots, setShowExtraSlots] = useState(false);
+  /** Whether squad modal was already shown */
+  const squadModalShownRef = useRef(false);
+  // ──────────────────────────────────────────────────────────────────────────
+
   /** Read live DOM before pipeline — fixes first-click no-op when controlled state lags (IME / autofill / paste). */
   const storyIdeaTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   /** Scroll results into view after pipeline completes (single-page flow; no separate /results route). */
@@ -238,6 +590,23 @@ export default function Home() {
   const [castUploadForTemplateId, setCastUploadForTemplateId] = useState<string | null>(null);
   /** Survives re-renders so file onChange always knows the row (avoids stale closure vs. separate preview state). */
   const castUploadPickTargetIdRef = useRef<string | null>(null);
+
+  // Spark Chaos: flash button 2s after focus with no input
+  const sparkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleTextareaFocus = useCallback(() => {
+    if (sparkTimerRef.current) clearTimeout(sparkTimerRef.current);
+    sparkTimerRef.current = setTimeout(() => {
+      const val = storyIdeaTextareaRef.current?.value ?? "";
+      if (val.trim().length === 0) {
+        setSparkFlash(true);
+        setTimeout(() => setSparkFlash(false), 800);
+      }
+    }, 2000);
+  }, []);
+
+  const handleTextareaBlur = useCallback(() => {
+    if (sparkTimerRef.current) clearTimeout(sparkTimerRef.current);
+  }, []);
 
   const startNewLazySession = useCallback(() => {
     console.log("[ScriptFlow] startNewLazySession triggered");
@@ -250,6 +619,10 @@ export default function Home() {
     setClipsRefreshNonce(0);
     setLastSubmittedClipTaskIds([]);
     setActiveRenderJobId(null);
+    setEntryMode(null);
+    setStarPhotos([]);
+    setShowExtraSlots(false);
+    squadModalShownRef.current = false;
     setCastConfirmations((prev) => {
       const next: Record<string, CastConfirmation> = {};
       for (const [id, v] of Object.entries(prev)) {
@@ -887,8 +1260,95 @@ export default function Home() {
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
 
+  // ─── Star Mode: handle photo added ────────────────────────────────────────
+  const handleStarPhotoAdded = useCallback((file: File, index: number) => {
+    const localUrl = URL.createObjectURL(file);
+    setStarPhotos((prev) => {
+      const next = [...prev];
+      // Revoke old URL if replacing
+      if (next[index]?.localUrl) URL.revokeObjectURL(next[index].localUrl);
+      next[index] = { file, localUrl };
+      return next;
+    });
+
+    // After first photo, show squad modal once
+    if (index === 0 && !squadModalShownRef.current) {
+      squadModalShownRef.current = true;
+      setTimeout(() => setShowSquadModal(true), 400);
+    }
+  }, []);
+
+  const handleStarPhotoRemoved = useCallback((index: number) => {
+    setStarPhotos((prev) => {
+      const next = [...prev];
+      if (next[index]?.localUrl) URL.revokeObjectURL(next[index].localUrl);
+      next.splice(index, 1);
+      return next;
+    });
+  }, []);
+
+  // ─── Be the Star: check consent then proceed ───────────────────────────────
+  const handleBeTheStar = useCallback(() => {
+    try {
+      const consented = localStorage.getItem(LEGAL_CONSENT_STORAGE_KEY) === "1";
+      if (consented) {
+        setEntryMode("star");
+      } else {
+        setShowLegalModal(true);
+      }
+    } catch {
+      setShowLegalModal(true);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-black text-white">
+      {/* ─── Modals ─────────────────────────────────────────────────────────── */}
+      {showLegalModal && (
+        <LegalConsentModal
+          onAccept={() => {
+            setShowLegalModal(false);
+            setEntryMode("star");
+          }}
+          onClose={() => setShowLegalModal(false)}
+        />
+      )}
+
+      {showSquadModal && (
+        <SquadModal
+          onAddFriends={() => {
+            setShowSquadModal(false);
+            setShowExtraSlots(true);
+          }}
+          onJustMe={() => {
+            setShowSquadModal(false);
+          }}
+          onUseIdea={(idea) => {
+            setStoryIdea(idea);
+            if (storyIdeaTextareaRef.current) {
+              storyIdeaTextareaRef.current.value = idea;
+            }
+            setShowSquadModal(false);
+            setShowExtraSlots(true);
+          }}
+        />
+      )}
+
+      {showChaosSheet && (
+        <ChaosSparkSheet
+          onClose={() => setShowChaosSheet(false)}
+          onUseIdea={(idea) => {
+            setStoryIdea(idea);
+            if (storyIdeaTextareaRef.current) {
+              storyIdeaTextareaRef.current.value = idea;
+              adjustStoryIdeaTextareaHeight();
+            }
+            setStoryFieldTick((n) => n + 1);
+          }}
+        />
+      )}
+
+      {/* ─── Header ─────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-zinc-950/95 backdrop-blur-md">
         <nav
           className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-6 py-3"
@@ -899,8 +1359,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl px-6 py-8 sm:py-12">
-        <p className="text-sm text-white/60">From your idea to your short drama.</p>
+      <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:py-12">
 
         {!lazyStorageChecked ? (
           <p className="mt-10 text-center text-sm text-white/40">Restoring session…</p>
@@ -935,475 +1394,617 @@ export default function Home() {
           </>
         ) : (
           <>
-        {/* —— Main lazy flow —— */}
-        <section className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-sm font-semibold text-amber-400">Your story</h2>
-          <p className="mt-1 text-xs text-white/45">
-            Optional cast, then one tap — we handle the rest.
-          </p>
-
-          <div className="mt-4 space-y-4">
-            <label className="text-sm font-medium text-white/80" htmlFor="story-input">
-              Story
-            </label>
-            <textarea
-              id="story-input"
-              ref={storyIdeaTextareaRef}
-              value={storyIdea}
-              onChange={(e) => {
-                setStoryIdea(e.target.value);
-                requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
-              }}
-              onInput={() => setStoryFieldTick((n) => n + 1)}
-              onCompositionEnd={(e) => {
-                setStoryIdea(e.currentTarget.value);
-                setStoryFieldTick((n) => n + 1);
-              }}
-              rows={1}
-              placeholder="Describe your story, or paste your full script — any length works."
-              className="min-h-[120px] w-full resize-y overflow-hidden rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500 focus:ring-2 focus:ring-amber-500"
-            />
-            {showInspirationFollowUps && (
-              <InspirationFollowUpCards
-                storyIdeaRaw={storyIdea}
-                answers={inspirationFollowUpAnswers}
-                onSetAnswer={setInspirationFollowUpAnswer}
-              />
-            )}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-sm font-semibold text-amber-400">Cast (optional)</h2>
-          <p className="mt-1 text-xs text-white/45">
-            Choose look templates, then confirm each selected role before generating.
-          </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {templates.map((tpl) => {
-              const checked = selectedTemplateIds.includes(tpl.id);
-              return (
-                <label
-                  key={tpl.id}
-                  className={`cursor-pointer rounded-xl border p-3 text-sm ${
-                    checked ? "border-amber-500 bg-amber-500/10" : "border-white/10 bg-zinc-950/70"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={checked}
-                    onChange={(e) => {
-                      setSelectedTemplateIds((prev) =>
-                        e.target.checked ? [...prev, tpl.id] : prev.filter((id) => id !== tpl.id),
-                      );
-                    }}
-                  />
-                  {tpl.label}
-                </label>
-              );
-            })}
-          </div>
-          {selectedTemplates.length > 0 && (
-            <div className="mt-5 space-y-3">
-              <input
-                ref={castHomeFileInputRef}
-                type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp,image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  const templateId =
-                    castUploadPickTargetIdRef.current ?? castUploadForTemplateId;
-                  e.target.value = "";
-                  castUploadPickTargetIdRef.current = null;
-                  setCastUploadForTemplateId(null);
-                  if (!file || !templateId) return;
-                  if (!isJpgPngWebpFile(file)) return;
-
-                  const tpl = templates.find((t) => t.id === templateId);
-                  const isUuid =
-                    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-                      templateId,
-                    );
-                  setUploadingCastId(templateId);
-                  void (async () => {
-                    try {
-                      setCastConfirmations((prev) => {
-                        const prevEntry = prev[templateId];
-                        if (prevEntry?.localPreviewUrl) {
-                          URL.revokeObjectURL(prevEntry.localPreviewUrl);
-                        }
-                        const localPreviewUrl = URL.createObjectURL(file);
-                        return {
-                          ...prev,
-                          [templateId]: {
-                            choice: "upload",
-                            file,
-                            localPreviewUrl,
-                            remotePreviewUrl: prevEntry?.remotePreviewUrl,
-                            libraryTemplateId: templateId.trim(),
-                          },
-                        };
-                      });
-
-                      if (!isUuid) return;
-                      const { blob, contentType } = await prepareImageForUpload(file);
-                      const supabase = createClient();
-                      const objectName = storageObjectFileName(`reference.${file.name}`, contentType);
-                      const objectPath = `${templateId}/${objectName}`;
-                      const { error: uploadError } = await supabase.storage
-                        .from("character-images")
-                        .upload(objectPath, blob, {
-                          contentType,
-                          upsert: true,
-                        });
-                      if (uploadError) throw new Error(uploadError.message);
-                      const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
-                      const url = pub.publicUrl;
-                      if (!url) throw new Error("Could not get public URL for uploaded image");
-
-                      const patchRes = await fetch(`/api/character-templates/${templateId}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ reference_image_url: url }),
-                        cache: "no-store",
-                      });
-                      if (!patchRes.ok) {
-                        const body = (await patchRes.json().catch(() => ({}))) as { error?: string };
-                        throw new Error(body.error ?? `Update failed (${patchRes.status})`);
-                      }
-
-                      setTemplates((prev) =>
-                        prev.map((t) =>
-                          t.id === templateId ? { ...t, reference_image_url: url } : t,
-                        ),
-                      );
-                      setCastConfirmations((prev) => {
-                        const existing = prev[templateId];
-                        if (!existing) return prev;
-                        return {
-                          ...prev,
-                          [templateId]: {
-                            ...existing,
-                            choice: "upload",
-                            remotePreviewUrl: url,
-                          },
-                        };
-                      });
-                    } catch (err) {
-                      console.error("[ScriptFlow] immediate cast image persist failed", err);
-                    } finally {
-                      setUploadingCastId((prev) => (prev === templateId ? null : prev));
-                    }
-                  })();
-                }}
-              />
-              <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-xs text-amber-200">
-                  ⚠️ <strong>For best results:</strong> Use a close-up portrait (face and shoulders only). Full-body photos reduce character consistency in video generation.
-                </p>
-              </div>
-              <p className="text-xs text-amber-200/90">
-                Confirm each selected role: choose template look or upload your own photo.
+            {/* ═══════════════════════════════════════════════════════════════
+                STEP 1: Hero Title
+            ═══════════════════════════════════════════════════════════════ */}
+            <div className="text-center pt-4 pb-8">
+              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+                Direct Your Heaven.
+              </h1>
+              <p className="mt-3 text-base sm:text-lg text-white/50 font-light">
+                One sentence. Your movie.
               </p>
-              {selectedTemplates.map((tpl) => {
-                const c = castConfirmations[tpl.id];
-                const confirmed =
-                  !!c &&
-                  (c.choice === "template" ||
-                    (c.choice === "upload" && (!!c.file || !!c.remotePreviewUrl)));
-                const cardImageSrc =
-                  c?.choice === "upload" && c.localPreviewUrl
-                    ? c.localPreviewUrl
-                    : c?.choice === "upload" && c.remotePreviewUrl
-                      ? c.remotePreviewUrl
-                    : resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL);
-                return (
-                  <div
-                    key={`confirm-${tpl.id}`}
-                    className={cn(
-                      "rounded-xl border bg-zinc-950/70 p-3",
-                      confirmed ? "border-emerald-500/40" : "border-amber-500/40",
-                    )}
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        key={c?.localPreviewUrl ?? c?.remotePreviewUrl ?? `${tpl.id}-${c?.choice}-ref`}
-                        src={cardImageSrc}
-                        alt={tpl.label}
-                        className="h-28 w-24 rounded-lg border border-white/10 object-cover"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          if (img.dataset.fallbackApplied === "1") return;
-                          img.dataset.fallbackApplied = "1";
-                          img.src = "https://placehold.co/240x320?text=Image+Unavailable";
-                        }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-white">{tpl.label}</p>
-                        <p className="mt-1 text-xs text-white/50">
-                          {confirmed ? "Confirmed" : "Pending confirmation"}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            className={cn(
-                              "rounded-lg border px-3 py-1.5 text-xs font-medium",
-                              c?.choice === "template"
-                                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-200"
-                                : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
-                            )}
-                            onClick={() => {
-                              setCastConfirmations((prev) => {
-                                const cur = prev[tpl.id];
-                                if (cur?.localPreviewUrl) {
-                                  URL.revokeObjectURL(cur.localPreviewUrl);
-                                }
-                                return {
-                                  ...prev,
-                                  [tpl.id]: {
-                                    choice: "template",
-                                    libraryTemplateId: tpl.id.trim(),
-                                  },
-                                };
-                              });
-                            }}
-                          >
-                            Use this look
-                          </button>
-                          <button
-                            type="button"
-                            disabled={pipelineRunning || !!uploadingCastId}
-                            className={cn(
-                              "rounded-lg border px-3 py-1.5 text-xs font-medium",
-                              c?.choice === "upload"
-                                ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
-                                : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
-                              (pipelineRunning || !!uploadingCastId) && "cursor-not-allowed opacity-50",
-                            )}
-                            onClick={() => {
-                              if (pipelineRunning || uploadingCastId) return;
-                              castUploadPickTargetIdRef.current = tpl.id;
-                              requestAnimationFrame(() => castHomeFileInputRef.current?.click());
-                            }}
-                          >
-                            Upload my own photo
-                          </button>
-                        </div>
-                        {c?.choice === "upload" && (
-                          <p className="mt-2 text-xs text-white/55">
-                            {c.file ? `Uploaded: ${c.file.name}` : "Please upload a photo to confirm."}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
-          )}
-        </section>
 
-        <section className="mt-6 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-black/40 p-6">
-          <Button
-            type="button"
-            className={cn(
-              "h-12 w-full bg-amber-500 text-base font-semibold text-black transition-all hover:bg-amber-400",
-              inspirationGenerateReady &&
-                !pipelineRunning &&
-                "ring-2 ring-amber-200 ring-offset-2 ring-offset-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400",
-            )}
-            onPointerDown={() => {
-              const el = storyIdeaTextareaRef.current;
-              if (el && el.value !== storyIdea) {
-                flushSync(() => setStoryIdea(el.value));
-              }
-            }}
-            onClick={() => void runDramaPipeline()}
-          >
-            {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate My Drama"}
-          </Button>
+            {/* ═══════════════════════════════════════════════════════════════
+                STEP 2: Story Input with Spark Chaos button
+            ═══════════════════════════════════════════════════════════════ */}
+            <div className="relative mb-6">
+              <textarea
+                id="story-input"
+                ref={storyIdeaTextareaRef}
+                value={storyIdea}
+                onChange={(e) => {
+                  setStoryIdea(e.target.value);
+                  requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+                }}
+                onInput={() => setStoryFieldTick((n) => n + 1)}
+                onCompositionEnd={(e) => {
+                  setStoryIdea(e.currentTarget.value);
+                  setStoryFieldTick((n) => n + 1);
+                }}
+                onFocus={handleTextareaFocus}
+                onBlur={handleTextareaBlur}
+                rows={1}
+                placeholder="Describe your story in one sentence…"
+                className="min-h-[120px] w-full resize-none rounded-2xl border border-white/15 bg-zinc-950 px-4 py-4 pr-36 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
+              />
+              {/* Spark Chaos button — inset top-right */}
+              <button
+                type="button"
+                onClick={() => setShowChaosSheet(true)}
+                className={cn(
+                  "absolute top-3 right-3 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                  "border-amber-500/50 bg-black/60 text-amber-400/80 hover:border-amber-400 hover:text-amber-300 hover:bg-amber-500/10",
+                  sparkFlash && "animate-pulse border-amber-400 text-amber-300 shadow-md shadow-amber-500/40"
+                )}
+              >
+                Spark Chaos ⚡
+              </button>
 
-          {/* Director Mode button — always visible below main button */}
-          <button
-            type="button"
-            disabled={pipelineRunning}
-            className="w-full mt-2 py-3 border border-white text-white text-sm rounded-lg hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            onPointerDown={() => {
-              const el = storyIdeaTextareaRef.current;
-              if (el && el.value !== storyIdea) {
-                flushSync(() => setStoryIdea(el.value));
-              }
-            }}
-            onClick={() => void runDirectorModePipeline()}
-          >
-            {pipelineRunning && directorModeActive ? "Working on it…" : "🎬 Director Mode — Review Each Step"}
-          </button>
-          {!canRunDramaLive && !pipelineRunning && (
-            <p className="mt-2 text-center text-xs text-white/40">
-              Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
-              characters skips formatting and goes straight to analysis.
-            </p>
-          )}
-          {canRunDramaLive && hasSelectedCast && !allSelectedCastConfirmed && !pipelineRunning && (
-            <p className="mt-2 text-center text-xs text-amber-200/90">
-              Please confirm your cast first
-            </p>
-          )}
-          {canRunDramaLive && !pipelineRunning && (
-            <p
-              className={cn(
-                "mt-2 text-center text-xs",
-                inspirationGenerateReady ? "text-amber-200/90" : "text-white/35",
-              )}
-            >
-              {inspirationGenerateReady
-                ? "Your idea is rich enough — Generate is highlighted, ready to shoot."
-                : "Add ~50 characters including protagonist, conflict, and resolution cues to unlock the button."}
-            </p>
-          )}
-
-          {showProgress && (
-            <div className="mt-6 space-y-3">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-              <p className="text-center text-sm text-amber-200/95">
-                {pipelinePhase === "error"
-                  ? "Something went wrong"
-                  : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
-              </p>
-              <p className="text-center text-[11px] text-white/35">
-                Creating project → Analyzing story → Locking characters → Preparing scenes →
-                Generating your scenes
-              </p>
-              {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
-                <div className="mt-3 rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
-                  <p className="text-sm font-semibold text-orange-300">
-                    ⚠️ Keep this page open — generating your scenes...
-                  </p>
-                  <p className="mt-1 text-xs text-orange-200/70">
-                    Do not switch tabs or close this window.
-                  </p>
+              {showInspirationFollowUps && (
+                <div className="mt-3">
+                  <InspirationFollowUpCards
+                    storyIdeaRaw={storyIdea}
+                    answers={inspirationFollowUpAnswers}
+                    onSetAnswer={setInspirationFollowUpAnswer}
+                  />
                 </div>
               )}
             </div>
-          )}
 
-          {pipelineError && (
-            <p className="mt-4 text-center text-sm text-red-400" role="alert">
-              {pipelineError}
-            </p>
-          )}
+            {/* ═══════════════════════════════════════════════════════════════
+                STEP 3: Two Main Buttons
+            ═══════════════════════════════════════════════════════════════ */}
+            {entryMode === null && (
+              <div className="space-y-3 mb-8">
+                {/* Button 1: Be the Star */}
+                <button
+                  type="button"
+                  onClick={handleBeTheStar}
+                  className="group w-full rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30 hover:shadow-amber-500/50 transition-all active:scale-[0.99]"
+                >
+                  <div className="rounded-2xl bg-gradient-to-b from-amber-500/20 to-black/60 px-6 py-5 text-left">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-2xl">⭐</span>
+                      <span className="text-xl font-extrabold text-white tracking-tight">Be the Star</span>
+                    </div>
+                    <p className="text-sm text-amber-200/80 ml-9">Upload photos. Star in your story.</p>
+                    <p className="text-xs text-white/40 ml-9 mt-1">1 photo = just you &nbsp;/&nbsp; 2–5 = squad</p>
+                  </div>
+                </button>
 
-        </section>
+                {/* Button 2: Be the Director */}
+                <button
+                  type="button"
+                  onClick={() => setEntryMode("director")}
+                  className="w-full rounded-2xl border border-white/15 bg-zinc-900/80 px-6 py-5 text-left hover:bg-zinc-800/80 hover:border-white/25 transition-all active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-2xl">🎬</span>
+                    <span className="text-xl font-bold text-white tracking-tight">Be the Director</span>
+                  </div>
+                  <p className="text-sm text-white/50 ml-9">Write your story. Direct your vision.</p>
+                </button>
+              </div>
+            )}
 
-        {showDirectorReview && (
-          <section className="mt-6">
-            <DirectorReviewPanel
-              prompts={directorReviewPrompts}
-              onApprove={handleDirectorApprove}
-              onCancel={() => {
-                setShowDirectorReview(false);
-                setPipelinePhase("idle");
-              }}
-              isSubmitting={isSubmittingToKling}
-            />
-          </section>
-        )}
+            {/* ═══════════════════════════════════════════════════════════════
+                STAR MODE: Photo upload + pipeline
+            ═══════════════════════════════════════════════════════════════ */}
+            {entryMode === "star" && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-amber-400">⭐ Be the Star</h2>
+                    <p className="text-xs text-white/40 mt-0.5">Upload your photo to star in the movie</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode(null)}
+                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                  >
+                    ← Back
+                  </button>
+                </div>
 
-        {/* Director Mode: Script Review Panel */}
-        {showScriptReview && scriptReviewData && currentProjectId && (
-          <section className="mt-6">
-            <ScriptReviewPanel
-              projectId={currentProjectId}
-              projectTitle={scriptReviewData.projectTitle}
-              episode={scriptReviewData.episode}
-              characters={scriptReviewData.characters}
-              isSaving={isSavingLines || isSubmittingToKling}
-              onConfirm={(editedLines) => void handleScriptReviewConfirm(editedLines)}
-              onStartOver={() => {
-                setShowScriptReview(false);
-                setScriptReviewData(null);
-                setDirectorModeActive(false);
-                setPipelinePhase("idle");
-                setPipelineError(null);
-              }}
-            />
-          </section>
-        )}
+                <StarModeUploader
+                  photos={starPhotos}
+                  extraSlots={showExtraSlots}
+                  onPhotoAdded={handleStarPhotoAdded}
+                  onPhotoRemoved={handleStarPhotoRemoved}
+                  onProceed={() => void runDramaPipeline()}
+                  pipelineRunning={pipelineRunning}
+                />
 
-        {/* Director Mode: show clips after Kling submit */}
-        {directorModeActive && pipelinePhase === "done" && currentProjectId && (
-          <section
-            ref={clipsResultsSectionRef}
-            className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
-            aria-labelledby="director-clips-heading"
-          >
-            <h2 id="director-clips-heading" className="text-base font-semibold text-emerald-300">
-              Your clips
-            </h2>
-            <p className="mt-1 text-xs text-white/50">
-              Sit back and relax — we'll notify you when your episode is ready.
-            </p>
-            <VideoResultsPanel
-              sessionId={currentProjectId}
-              taskIds={lastSubmittedClipTaskIds}
-              refreshNonce={clipsRefreshNonce}
-              title="Scenes"
-            />
-          </section>
-        )}
+                {/* Progress */}
+                {showProgress && (
+                  <div className="mt-6 space-y-3">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                    <p className="text-center text-sm text-amber-200/95">
+                      {pipelinePhase === "error"
+                        ? "Something went wrong"
+                        : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
+                    </p>
+                    {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
+                      <div className="mt-3 rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
+                        <p className="text-sm font-semibold text-orange-300">
+                          ⚠️ Keep this page open — generating your scenes...
+                        </p>
+                        <p className="mt-1 text-xs text-orange-200/70">
+                          Do not switch tabs or close this window.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-        {/* Async render job progress panel */}
-        {activeRenderJobId && (
-          <section className="mt-6">
-            <RenderJobProgress
-              jobId={activeRenderJobId}
-              onComplete={(finalVideoUrl, taskIds) => {
-                if (taskIds.length > 0) {
-                  setLastSubmittedClipTaskIds(taskIds);
-                  setClipsRefreshNonce((n) => n + 1);
-                }
-                setPipelinePhase("done");
-              }}
-              onFailed={(error) => {
-                setPipelineError(error);
-                setPipelinePhase("error");
-              }}
-              onStartOver={startNewLazySession}
-            />
-          </section>
-        )}
+                {pipelineError && (
+                  <p className="mt-4 text-center text-sm text-red-400" role="alert">
+                    {pipelineError}
+                  </p>
+                )}
+              </div>
+            )}
 
-        {pipelinePhase === "done" && projectId.trim() && !directorModeActive && (
-          <section
-            ref={clipsResultsSectionRef}
-            className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
-            aria-labelledby="clips-results-heading"
-          >
-            <h2 id="clips-results-heading" className="text-base font-semibold text-emerald-300">
-              Your clips
-            </h2>
-            <p className="mt-1 text-xs text-white/50">
-              Sit back and relax — we'll notify you when your episode is ready.
-            </p>
-            <VideoResultsPanel
-              sessionId={projectId}
-              taskIds={lastSubmittedClipTaskIds}
-              refreshNonce={clipsRefreshNonce}
-              title="Scenes"
-            />
+            {/* ═══════════════════════════════════════════════════════════════
+                DIRECTOR MODE: Full existing flow (unchanged logic)
+            ═══════════════════════════════════════════════════════════════ */}
+            {entryMode === "director" && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-white">🎬 Be the Director</h2>
+                    <p className="text-xs text-white/40 mt-0.5">Write your story. Direct your vision.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode(null)}
+                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                  >
+                    ← Back
+                  </button>
+                </div>
 
-            {/* Cinema Bazaar: Sell as Asset */}
-            <SellAsAssetButton projectId={projectId} />
-          </section>
-        )}
+                {/* Cast section */}
+                <section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <h2 className="text-sm font-semibold text-amber-400">Cast (optional)</h2>
+                  <p className="mt-1 text-xs text-white/45">
+                    Choose look templates, then confirm each selected role before generating.
+                  </p>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {templates.map((tpl) => {
+                      const checked = selectedTemplateIds.includes(tpl.id);
+                      return (
+                        <label
+                          key={tpl.id}
+                          className={`cursor-pointer rounded-xl border p-3 text-sm ${
+                            checked ? "border-amber-500 bg-amber-500/10" : "border-white/10 bg-zinc-950/70"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mr-2"
+                            checked={checked}
+                            onChange={(e) => {
+                              setSelectedTemplateIds((prev) =>
+                                e.target.checked ? [...prev, tpl.id] : prev.filter((id) => id !== tpl.id),
+                              );
+                            }}
+                          />
+                          {tpl.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {selectedTemplates.length > 0 && (
+                    <div className="mt-5 space-y-3">
+                      <input
+                        ref={castHomeFileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp,image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          const templateId =
+                            castUploadPickTargetIdRef.current ?? castUploadForTemplateId;
+                          e.target.value = "";
+                          castUploadPickTargetIdRef.current = null;
+                          setCastUploadForTemplateId(null);
+                          if (!file || !templateId) return;
+                          if (!isJpgPngWebpFile(file)) return;
+
+                          const tpl = templates.find((t) => t.id === templateId);
+                          const isUuid =
+                            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+                              templateId,
+                            );
+                          setUploadingCastId(templateId);
+                          void (async () => {
+                            try {
+                              setCastConfirmations((prev) => {
+                                const prevEntry = prev[templateId];
+                                if (prevEntry?.localPreviewUrl) {
+                                  URL.revokeObjectURL(prevEntry.localPreviewUrl);
+                                }
+                                const localPreviewUrl = URL.createObjectURL(file);
+                                return {
+                                  ...prev,
+                                  [templateId]: {
+                                    choice: "upload",
+                                    file,
+                                    localPreviewUrl,
+                                    remotePreviewUrl: prevEntry?.remotePreviewUrl,
+                                    libraryTemplateId: templateId.trim(),
+                                  },
+                                };
+                              });
+
+                              if (!isUuid) return;
+                              const { blob, contentType } = await prepareImageForUpload(file);
+                              const supabase = createClient();
+                              const objectName = storageObjectFileName(`reference.${file.name}`, contentType);
+                              const objectPath = `${templateId}/${objectName}`;
+                              const { error: uploadError } = await supabase.storage
+                                .from("character-images")
+                                .upload(objectPath, blob, {
+                                  contentType,
+                                  upsert: true,
+                                });
+                              if (uploadError) throw new Error(uploadError.message);
+                              const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
+                              const url = pub.publicUrl;
+                              if (!url) throw new Error("Could not get public URL for uploaded image");
+
+                              const patchRes = await fetch(`/api/character-templates/${templateId}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ reference_image_url: url }),
+                                cache: "no-store",
+                              });
+                              if (!patchRes.ok) {
+                                const body = (await patchRes.json().catch(() => ({}))) as { error?: string };
+                                throw new Error(body.error ?? `Update failed (${patchRes.status})`);
+                              }
+
+                              setTemplates((prev) =>
+                                prev.map((t) =>
+                                  t.id === templateId ? { ...t, reference_image_url: url } : t,
+                                ),
+                              );
+                              setCastConfirmations((prev) => {
+                                const existing = prev[templateId];
+                                if (!existing) return prev;
+                                return {
+                                  ...prev,
+                                  [templateId]: {
+                                    ...existing,
+                                    choice: "upload",
+                                    remotePreviewUrl: url,
+                                  },
+                                };
+                              });
+                            } catch (err) {
+                              console.error("[ScriptFlow] immediate cast image persist failed", err);
+                            } finally {
+                              setUploadingCastId((prev) => (prev === templateId ? null : prev));
+                            }
+                          })();
+                        }}
+                      />
+                      <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                        <p className="text-xs text-amber-200">
+                          ⚠️ <strong>For best results:</strong> Use a close-up portrait (face and shoulders only). Full-body photos reduce character consistency in video generation.
+                        </p>
+                      </div>
+                      <p className="text-xs text-amber-200/90">
+                        Confirm each selected role: choose template look or upload your own photo.
+                      </p>
+                      {selectedTemplates.map((tpl) => {
+                        const c = castConfirmations[tpl.id];
+                        const confirmed =
+                          !!c &&
+                          (c.choice === "template" ||
+                            (c.choice === "upload" && (!!c.file || !!c.remotePreviewUrl)));
+                        const cardImageSrc =
+                          c?.choice === "upload" && c.localPreviewUrl
+                            ? c.localPreviewUrl
+                            : c?.choice === "upload" && c.remotePreviewUrl
+                              ? c.remotePreviewUrl
+                            : resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL);
+                        return (
+                          <div
+                            key={`confirm-${tpl.id}`}
+                            className={cn(
+                              "rounded-xl border bg-zinc-950/70 p-3",
+                              confirmed ? "border-emerald-500/40" : "border-amber-500/40",
+                            )}
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                key={c?.localPreviewUrl ?? c?.remotePreviewUrl ?? `${tpl.id}-${c?.choice}-ref`}
+                                src={cardImageSrc}
+                                alt={tpl.label}
+                                className="h-28 w-24 rounded-lg border border-white/10 object-cover"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  const img = e.currentTarget;
+                                  if (img.dataset.fallbackApplied === "1") return;
+                                  img.dataset.fallbackApplied = "1";
+                                  img.src = "https://placehold.co/240x320?text=Image+Unavailable";
+                                }}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-white">{tpl.label}</p>
+                                <p className="mt-1 text-xs text-white/50">
+                                  {confirmed ? "Confirmed" : "Pending confirmation"}
+                                </p>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                      "rounded-lg border px-3 py-1.5 text-xs font-medium",
+                                      c?.choice === "template"
+                                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-200"
+                                        : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
+                                    )}
+                                    onClick={() => {
+                                      setCastConfirmations((prev) => {
+                                        const cur = prev[tpl.id];
+                                        if (cur?.localPreviewUrl) {
+                                          URL.revokeObjectURL(cur.localPreviewUrl);
+                                        }
+                                        return {
+                                          ...prev,
+                                          [tpl.id]: {
+                                            choice: "template",
+                                            libraryTemplateId: tpl.id.trim(),
+                                          },
+                                        };
+                                      });
+                                    }}
+                                  >
+                                    Use this look
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={pipelineRunning || !!uploadingCastId}
+                                    className={cn(
+                                      "rounded-lg border px-3 py-1.5 text-xs font-medium",
+                                      c?.choice === "upload"
+                                        ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
+                                        : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
+                                      (pipelineRunning || !!uploadingCastId) && "cursor-not-allowed opacity-50",
+                                    )}
+                                    onClick={() => {
+                                      if (pipelineRunning || uploadingCastId) return;
+                                      castUploadPickTargetIdRef.current = tpl.id;
+                                      requestAnimationFrame(() => castHomeFileInputRef.current?.click());
+                                    }}
+                                  >
+                                    Upload my own photo
+                                  </button>
+                                </div>
+                                {c?.choice === "upload" && (
+                                  <p className="mt-2 text-xs text-white/55">
+                                    {c.file ? `Uploaded: ${c.file.name}` : "Please upload a photo to confirm."}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                {/* Generate buttons */}
+                <section className="mb-6 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-black/40 p-6">
+                  <Button
+                    type="button"
+                    className={cn(
+                      "h-12 w-full bg-amber-500 text-base font-semibold text-black transition-all hover:bg-amber-400",
+                      inspirationGenerateReady &&
+                        !pipelineRunning &&
+                        "ring-2 ring-amber-200 ring-offset-2 ring-offset-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400",
+                    )}
+                    onPointerDown={() => {
+                      const el = storyIdeaTextareaRef.current;
+                      if (el && el.value !== storyIdea) {
+                        flushSync(() => setStoryIdea(el.value));
+                      }
+                    }}
+                    onClick={() => void runDramaPipeline()}
+                  >
+                    {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate My Drama"}
+                  </Button>
+
+                  {/* Director Mode button — always visible below main button */}
+                  <button
+                    type="button"
+                    disabled={pipelineRunning}
+                    className="w-full mt-2 py-3 border border-white text-white text-sm rounded-lg hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    onPointerDown={() => {
+                      const el = storyIdeaTextareaRef.current;
+                      if (el && el.value !== storyIdea) {
+                        flushSync(() => setStoryIdea(el.value));
+                      }
+                    }}
+                    onClick={() => void runDirectorModePipeline()}
+                  >
+                    {pipelineRunning && directorModeActive ? "Working on it…" : "🎬 Director Mode — Review Each Step"}
+                  </button>
+                  {!canRunDramaLive && !pipelineRunning && (
+                    <p className="mt-2 text-center text-xs text-white/40">
+                      Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
+                      characters skips formatting and goes straight to analysis.
+                    </p>
+                  )}
+                  {canRunDramaLive && hasSelectedCast && !allSelectedCastConfirmed && !pipelineRunning && (
+                    <p className="mt-2 text-center text-xs text-amber-200/90">
+                      Please confirm your cast first
+                    </p>
+                  )}
+                  {canRunDramaLive && !pipelineRunning && (
+                    <p
+                      className={cn(
+                        "mt-2 text-center text-xs",
+                        inspirationGenerateReady ? "text-amber-200/90" : "text-white/35",
+                      )}
+                    >
+                      {inspirationGenerateReady
+                        ? "Your idea is rich enough — Generate is highlighted, ready to shoot."
+                        : "Add ~50 characters including protagonist, conflict, and resolution cues to unlock the button."}
+                    </p>
+                  )}
+
+                  {showProgress && (
+                    <div className="mt-6 space-y-3">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                      <p className="text-center text-sm text-amber-200/95">
+                        {pipelinePhase === "error"
+                          ? "Something went wrong"
+                          : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
+                      </p>
+                      <p className="text-center text-[11px] text-white/35">
+                        Creating project → Analyzing story → Locking characters → Preparing scenes →
+                        Generating your scenes
+                      </p>
+                      {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
+                        <div className="mt-3 rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
+                          <p className="text-sm font-semibold text-orange-300">
+                            ⚠️ Keep this page open — generating your scenes...
+                          </p>
+                          <p className="mt-1 text-xs text-orange-200/70">
+                            Do not switch tabs or close this window.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {pipelineError && (
+                    <p className="mt-4 text-center text-sm text-red-400" role="alert">
+                      {pipelineError}
+                    </p>
+                  )}
+                </section>
+
+                {showDirectorReview && (
+                  <section className="mt-6">
+                    <DirectorReviewPanel
+                      prompts={directorReviewPrompts}
+                      onApprove={handleDirectorApprove}
+                      onCancel={() => {
+                        setShowDirectorReview(false);
+                        setPipelinePhase("idle");
+                      }}
+                      isSubmitting={isSubmittingToKling}
+                    />
+                  </section>
+                )}
+
+                {/* Director Mode: Script Review Panel */}
+                {showScriptReview && scriptReviewData && currentProjectId && (
+                  <section className="mt-6">
+                    <ScriptReviewPanel
+                      projectId={currentProjectId}
+                      projectTitle={scriptReviewData.projectTitle}
+                      episode={scriptReviewData.episode}
+                      characters={scriptReviewData.characters}
+                      isSaving={isSavingLines || isSubmittingToKling}
+                      onConfirm={(editedLines) => void handleScriptReviewConfirm(editedLines)}
+                      onStartOver={() => {
+                        setShowScriptReview(false);
+                        setScriptReviewData(null);
+                        setDirectorModeActive(false);
+                        setPipelinePhase("idle");
+                        setPipelineError(null);
+                      }}
+                    />
+                  </section>
+                )}
+
+                {/* Director Mode: show clips after Kling submit */}
+                {directorModeActive && pipelinePhase === "done" && currentProjectId && (
+                  <section
+                    ref={clipsResultsSectionRef}
+                    className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
+                    aria-labelledby="director-clips-heading"
+                  >
+                    <h2 id="director-clips-heading" className="text-base font-semibold text-emerald-300">
+                      Your clips
+                    </h2>
+                    <p className="mt-1 text-xs text-white/50">
+                      Sit back and relax — we'll notify you when your episode is ready.
+                    </p>
+                    <VideoResultsPanel
+                      sessionId={currentProjectId}
+                      taskIds={lastSubmittedClipTaskIds}
+                      refreshNonce={clipsRefreshNonce}
+                      title="Scenes"
+                    />
+                  </section>
+                )}
+
+                {/* Async render job progress panel */}
+                {activeRenderJobId && (
+                  <section className="mt-6">
+                    <RenderJobProgress
+                      jobId={activeRenderJobId}
+                      onComplete={(finalVideoUrl, taskIds) => {
+                        if (taskIds.length > 0) {
+                          setLastSubmittedClipTaskIds(taskIds);
+                          setClipsRefreshNonce((n) => n + 1);
+                        }
+                        setPipelinePhase("done");
+                      }}
+                      onFailed={(error) => {
+                        setPipelineError(error);
+                        setPipelinePhase("error");
+                      }}
+                      onStartOver={startNewLazySession}
+                    />
+                  </section>
+                )}
+
+                {pipelinePhase === "done" && projectId.trim() && !directorModeActive && (
+                  <section
+                    ref={clipsResultsSectionRef}
+                    className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
+                    aria-labelledby="clips-results-heading"
+                  >
+                    <h2 id="clips-results-heading" className="text-base font-semibold text-emerald-300">
+                      Your clips
+                    </h2>
+                    <p className="mt-1 text-xs text-white/50">
+                      Sit back and relax — we'll notify you when your episode is ready.
+                    </p>
+                    <VideoResultsPanel
+                      sessionId={projectId}
+                      taskIds={lastSubmittedClipTaskIds}
+                      refreshNonce={clipsRefreshNonce}
+                      title="Scenes"
+                    />
+
+                    {/* Cinema Bazaar: Sell as Asset */}
+                    <SellAsAssetButton projectId={projectId} />
+                  </section>
+                )}
+              </>
+            )}
           </>
         )}
       </main>
