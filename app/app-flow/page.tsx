@@ -1480,6 +1480,7 @@ export default function Home() {
                   {entryMode === "star" && (
                     <div className="px-6 pb-6 space-y-4">
                       <p className="text-sm text-amber-200/70">Upload photos. Star in your story. &nbsp;<span className="text-white/30">1 photo = just you · 2–10 = squad</span></p>
+                      <p className="text-xs text-white/35 -mt-2">Add friends. Make it chaos.</p>
                       {/* Photo upload slots */}
                       <StarModeUploader
                         photos={starPhotos}
@@ -1507,7 +1508,7 @@ export default function Home() {
                           onFocus={handleTextareaFocus}
                           onBlur={handleTextareaBlur}
                           rows={3}
-                          placeholder={"Describe your story...\nUse #2 #3 to write their fate."}
+                          placeholder={"What happens to them?"}
                           className="min-h-[100px] w-full resize-none rounded-xl border border-amber-500/30 bg-black/60 px-4 py-3 pr-36 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
                         />
                         {/* Spark Chaos button — inset top-right */}
@@ -1545,7 +1546,7 @@ export default function Home() {
                         onClick={() => void runDramaPipeline()}
                         className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {pipelineRunning ? "Working on it…" : "Generate ✨"}
+                        {pipelineRunning ? "Working on it…" : "Make the Movie ✨"}
                       </button>
 
                       {starPhotos.length === 0 && (
@@ -1656,7 +1657,7 @@ export default function Home() {
 
                 {/* Cast section */}
                 <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                  <h2 className="text-sm font-semibold text-amber-400">Cast (optional)</h2>
+                  <h2 className="text-sm font-semibold text-amber-400">Cast your characters</h2>
                   <p className="mt-1 text-xs text-white/45">
                     Choose look templates, then confirm each selected role before generating.
                   </p>
@@ -1906,7 +1907,7 @@ export default function Home() {
                     }}
                     onClick={() => void runDramaPipeline()}
                   >
-                    {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate ✨"}
+                    {pipelineRunning && !directorModeActive ? "Working on it…" : "Make the Movie ✨"}
                   </Button>
 
                   {/* Director Mode button */}
