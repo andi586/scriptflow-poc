@@ -471,7 +471,15 @@ function StarModeUploader({
           const photo = photos[i];
           const { icon, label } = slotLabel(i);
           return (
-            <div key={i} className="relative aspect-[3/4]">
+            <div key={i} className="flex flex-col gap-1">
+              {/* Slot number label above the card */}
+              <p className={cn(
+                "text-[10px] font-medium tracking-wide truncate",
+                i === 0 ? "text-amber-300/70" : "text-white/30"
+              )}>
+                {i === 0 ? "#1 The Fate Writer ⭐" : `#${i + 1} Awaiting fate 🎭`}
+              </p>
+              <div className="relative aspect-[3/4]">
               {photo ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -501,9 +509,6 @@ function StarModeUploader({
                     )}
                   >
                     <span className="text-2xl">{icon}</span>
-                    <span className="text-[9px] text-white/40 text-center px-1 leading-tight">
-                      {label}
-                    </span>
                   </button>
                   <input
                     ref={(el) => { fileInputRefs.current[i] = el; }}
@@ -519,6 +524,7 @@ function StarModeUploader({
                   />
                 </>
               )}
+              </div>
             </div>
           );
         })}
