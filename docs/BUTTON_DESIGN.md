@@ -81,3 +81,45 @@ Use #2 to #10 to write their destiny."
 广告语：
 "You write the code.
 They live the story."
+
+---
+
+## 最终交互逻辑 V4.0
+日期：2026-04-04
+创始人决策
+
+### 核心改变
+输入框不再独立存在
+而是内嵌在身份按钮里
+
+### 页面结构
+Direct Your Heaven.
+
+[⭐ Be the Star]
+[🎬 Be the Director]
+
+点击Be the Star后展开：
+- 动态照片上传槽位
+  #1 The Fate Writer ⭐
+  #2 Awaiting fate 🎭
+  #3 Awaiting fate 🎭
+  ...永远多一个空位，最多10个
+- 故事输入框
+  "Describe your story...
+   Use #2 #3 to write their fate."
+- Spark Chaos ⚡（仅Star页面有）
+- Generate按钮
+
+点击Be the Director后展开：
+- 故事输入框
+  "Describe your story..."
+- Generate按钮
+（无Spark Chaos，干净专业）
+
+### Spark Chaos位置规则
+✅ 只在Be the Star里出现
+❌ 不在Be the Director里出现
+
+### 逻辑顺序
+先选身份 → 再输入故事
+不是先输入再选身份
