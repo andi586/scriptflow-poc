@@ -1448,7 +1448,7 @@ export default function Home() {
                           <span className="text-xl font-extrabold text-white tracking-tight">Be the Star</span>
                           <p className="text-sm text-amber-200/80 mt-0.5">Upload photos. Star in your story.</p>
                           {entryMode !== "star" && (
-                            <p className="text-xs text-white/40 mt-0.5">1 photo = just you &nbsp;/&nbsp; 2–5 = squad</p>
+                            <p className="text-xs text-white/40 mt-0.5">1 photo = just you &nbsp;/&nbsp; 2–10 = squad</p>
                           )}
                         </div>
                       </div>
