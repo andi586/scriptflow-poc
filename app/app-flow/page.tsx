@@ -413,6 +413,27 @@ function ChaosSparkSheet({
   );
 }
 
+// ─── Cinematic Loading Animation ─────────────────────────────────────────────
+function CinematicLoader() {
+  const [step, setStep] = useState(0);
+  const lines = ["Lights...", "Camera...", "Action..."];
+  useEffect(() => {
+    if (step >= lines.length) return;
+    const t = setTimeout(() => setStep((s) => s + 1), 900);
+    return () => clearTimeout(t);
+  }, [step]);
+  return (
+    <div className="flex flex-col items-center gap-1 py-2">
+      {lines.map((line, i) => (
+        <p key={line} className={cn(
+          "text-base font-bold tracking-widest transition-all duration-700",
+          i < step ? "opacity-100 translate-y-0 text-amber-300" : "opacity-0 translate-y-2"
+        )}>{line}</p>
+      ))}
+    </div>
+  );
+}
+
 // ─── Star Mode: photo upload slots ───────────────────────────────────────────
 type StarPhoto = {
   file: File;
@@ -573,7 +594,7 @@ export default function Home() {
 
   // ─── NEW UI STATE ──────────────────────────────────────────────────────────
   /** Which top-level mode the user chose: null = not chosen yet */
-  const [entryMode, setEntryMode] = useState<"star" | "director" | null>(null);
+  const [entryMode, setEntryMode] = useState<"star" | "director" | null>("star");
   /** Show legal consent modal */
   const [showLegalModal, setShowLegalModal] = useState(false);
   /** Show squad upsell modal (after first photo) */
@@ -1446,10 +1467,6 @@ export default function Home() {
                         <span className="text-2xl">⭐</span>
                         <div>
                           <span className="text-xl font-extrabold text-white tracking-tight">Be the Star</span>
-                          <p className="text-sm text-amber-200/80 mt-0.5">Upload photos. Star in your story.</p>
-                          {entryMode !== "star" && (
-                            <p className="text-xs text-white/40 mt-0.5">1 photo = just you &nbsp;/&nbsp; 2–10 = squad</p>
-                          )}
                         </div>
                       </div>
                       <span className={cn(
@@ -1462,6 +1479,7 @@ export default function Home() {
                   {/* Expanded content */}
                   {entryMode === "star" && (
                     <div className="px-6 pb-6 space-y-4">
+                      <p className="text-sm text-amber-200/70">Upload photos. Star in your story. &nbsp;<span className="text-white/30">1 photo = just you · 2–10 = squad</span></p>
                       {/* Photo upload slots */}
                       <StarModeUploader
                         photos={starPhotos}
@@ -1527,7 +1545,7 @@ export default function Home() {
                         onClick={() => void runDramaPipeline()}
                         className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {pipelineRunning ? "Working on it…" : "Generate My Movie ✨"}
+                        {pipelineRunning ? "Working on it…" : "Generate ✨"}
                       </button>
 
                       {starPhotos.length === 0 && (
@@ -1537,6 +1555,9 @@ export default function Home() {
                       {/* Progress */}
                       {showProgress && (
                         <div className="space-y-3">
+                          {pipelineRunning && pipelinePhase !== "error" && pipelinePhase !== "done" && (
+                            <CinematicLoader key={pipelinePhase} />
+                          )}
                           <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                             <div
                               className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
@@ -1590,7 +1611,6 @@ export default function Home() {
                       <span className="text-2xl">🎬</span>
                       <div>
                         <span className="text-xl font-bold text-white tracking-tight">Be the Director</span>
-                        <p className="text-sm text-slate-300/70 mt-0.5">Write your story. Direct your vision.</p>
                       </div>
                     </div>
                     <span className={cn(
@@ -1603,6 +1623,7 @@ export default function Home() {
                 {/* Expanded content */}
                 {entryMode === "director" && (
                   <div className="px-6 pb-6 space-y-4 border-t border-white/10 pt-4">
+                <p className="text-sm text-slate-300/60">Write your story. Direct your vision.</p>
 
                 {/* Story input — Director mode */}
                 <div className="relative">
@@ -1885,7 +1906,7 @@ export default function Home() {
                     }}
                     onClick={() => void runDramaPipeline()}
                   >
-                    {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate My Drama"}
+                    {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate ✨"}
                   </Button>
 
                   {/* Director Mode button */}
@@ -1925,6 +1946,9 @@ export default function Home() {
 
                 {showProgress && (
                   <div className="space-y-3">
+                    {pipelineRunning && pipelinePhase !== "error" && pipelinePhase !== "done" && (
+                      <CinematicLoader key={pipelinePhase} />
+                    )}
                     <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                       <div
                         className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
