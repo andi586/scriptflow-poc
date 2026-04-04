@@ -7,7 +7,7 @@ const FALLBACK_VIDEO_URL =
   "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/b9b5aaa4-72e5-4c3b-8811-f58d9ab70fe0/final-1775168349344.mp4";
 
 // ─── Video Modal ───────────────────────────────────────────────────────────────
-function VideoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function VideoModal({ open, onClose, heroVideoUrl }: { open: boolean; onClose: () => void; heroVideoUrl: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = videoRef.current;
@@ -353,7 +353,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      <VideoModal open={showModal} onClose={() => setShowModal(false)} />
+      <VideoModal open={showModal} onClose={() => setShowModal(false)} heroVideoUrl={heroVideoUrl} />
     </div>
   );
 }
