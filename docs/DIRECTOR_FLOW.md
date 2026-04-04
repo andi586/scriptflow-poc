@@ -78,3 +78,34 @@ AI writes their destiny."
 所有创意统一用编号：
 "#1 discovers #2 and #3 are secret agents.
 #4 is the villain. #5 has no idea."
+
+---
+
+## 参考图上传规格提示
+日期：2026-04-04
+
+### 点击Add a Photo后显示
+
+标题：📸 Best results:
+
+✅ Clear face, front or slight angle
+✅ Good lighting, no shadows
+✅ Simple background
+❌ No sunglasses or masks
+❌ No group photos
+
+Format: JPG or PNG
+Size: Under 5MB
+
+### 一句话简版
+"Clear face photo, good lighting. JPG/PNG under 5MB."
+
+### 质量检测
+≥85分：自动通过 ✅
+70-84分：AI Enhance建议
+<70分：友好提示重拍
+
+### 失败提示
+❌ 不说：Upload failed
+✅ 说：We couldn't see your face clearly 😅
+       Try better lighting or move closer
