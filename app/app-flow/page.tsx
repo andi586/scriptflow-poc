@@ -1419,14 +1419,14 @@ export default function Home() {
             {/* ═══════════════════════════════════════════════════════════════
                 STEP 2: Two Main Buttons (each expands inline with its own input)
             ═══════════════════════════════════════════════════════════════ */}
-            <div className="space-y-3 mb-8">
+            <div className="space-y-8 mb-8">
 
               {/* ── Button 1: Be the Star ─────────────────────────────────── */}
               <div className={cn(
-                "rounded-2xl transition-all",
+                "rounded-2xl transition-all duration-300",
                 entryMode === "star"
-                  ? "bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30"
-                  : "bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30 hover:shadow-amber-500/50"
+                  ? "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 p-[2px] shadow-2xl shadow-amber-500/50"
+                  : "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30 hover:shadow-2xl hover:shadow-amber-500/60"
               )}>
                 <div className="rounded-2xl bg-gradient-to-b from-amber-500/20 to-black/80">
                   {/* Header row — always visible, click to toggle */}
@@ -1573,11 +1573,12 @@ export default function Home() {
 
               {/* ── Button 2: Be the Director ─────────────────────────────── */}
               <div className={cn(
-                "rounded-2xl border transition-all",
+                "rounded-2xl transition-all duration-300",
                 entryMode === "director"
-                  ? "border-white/25 bg-zinc-900/90"
-                  : "border-white/15 bg-zinc-900/80 hover:bg-zinc-800/80 hover:border-white/25"
+                  ? "bg-gradient-to-r from-slate-400 via-blue-200 to-slate-500 p-[2px] shadow-2xl shadow-blue-400/40"
+                  : "bg-gradient-to-r from-slate-500 via-slate-300 to-slate-600 p-[2px] shadow-xl shadow-slate-500/25 hover:shadow-2xl hover:shadow-blue-300/40 hover:from-slate-400 hover:via-blue-200 hover:to-slate-500"
               )}>
+                <div className="rounded-2xl bg-gradient-to-b from-slate-700/40 to-black/80">
                 {/* Header row — always visible, click to toggle */}
                 <button
                   type="button"
@@ -1589,11 +1590,11 @@ export default function Home() {
                       <span className="text-2xl">🎬</span>
                       <div>
                         <span className="text-xl font-bold text-white tracking-tight">Be the Director</span>
-                        <p className="text-sm text-white/50 mt-0.5">Write your story. Direct your vision.</p>
+                        <p className="text-sm text-slate-300/70 mt-0.5">Write your story. Direct your vision.</p>
                       </div>
                     </div>
                     <span className={cn(
-                      "text-white/40 text-lg transition-transform duration-200",
+                      "text-slate-300/60 text-lg transition-transform duration-200",
                       entryMode === "director" ? "rotate-180" : ""
                     )}>▾</span>
                   </div>
@@ -1960,6 +1961,7 @@ export default function Home() {
 
                   </div>
                 )}
+                </div>
               </div>
 
             </div>
