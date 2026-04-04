@@ -56,3 +56,28 @@ By uploading photos, you confirm:
 "AI-generated content.
  For entertainment purposes only.
  Made with ScriptFlow."
+
+---
+
+## 编号命运系统最终定义
+日期：2026-04-04
+创始人更新
+
+#1 = The Fate Writer（命运编写者）
+#2-#10 = 命运接受者
+
+不是"听天由命"
+而是"听#1的命"
+
+上传界面：
+⭐ #1 — The Fate Writer. You hold the pen.
+🎭 #2 — Awaiting their fate
+🎭 #3 — Awaiting their fate
+
+输入框提示：
+"You are #1 — the Fate Writer.
+Use #2 to #10 to write their destiny."
+
+广告语：
+"You write the code.
+They live the story."
