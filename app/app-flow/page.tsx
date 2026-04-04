@@ -419,29 +419,36 @@ type StarPhoto = {
   localUrl: string;
 };
 
+const MAX_STAR_PHOTOS = 10;
+
 function StarModeUploader({
   photos,
-  extraSlots,
   onPhotoAdded,
   onPhotoRemoved,
   onProceed,
   pipelineRunning,
 }: {
   photos: StarPhoto[];
-  extraSlots: boolean;
   onPhotoAdded: (file: File, index: number) => void;
   onPhotoRemoved: (index: number) => void;
   onProceed: () => void;
   pipelineRunning: boolean;
 }) {
-  const totalSlots = extraSlots ? 5 : 1;
+  // Dynamic slots: always show photos.length + 1 empty slot, capped at MAX_STAR_PHOTOS
+  const totalSlots = Math.min(photos.length + 1, MAX_STAR_PHOTOS);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  const slotLabel = (i: number) => {
+    if (i === 0) return { icon: "📸", label: "#1 The Fate Writer ⭐" };
+    return { icon: "+", label: `#${i + 1} Awaiting fate 🎭` };
+  };
+
   return (
-    <div className="mt-6 space-y-4">
+    <div className="mt-2 space-y-4">
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
         {Array.from({ length: totalSlots }).map((_, i) => {
           const photo = photos[i];
+          const { icon, label } = slotLabel(i);
           return (
             <div key={i} className="relative aspect-[3/4]">
               {photo ? (
@@ -472,9 +479,9 @@ function StarModeUploader({
                         : "border-white/20 bg-white/3 hover:bg-white/5"
                     )}
                   >
-                    <span className="text-2xl">{i === 0 ? "📸" : "+"}</span>
-                    <span className="text-[10px] text-white/40">
-                      {i === 0 ? "You" : `Friend ${i}`}
+                    <span className="text-2xl">{icon}</span>
+                    <span className="text-[9px] text-white/40 text-center px-1 leading-tight">
+                      {label}
                     </span>
                   </button>
                   <input
@@ -501,6 +508,9 @@ function StarModeUploader({
           {photos.length === 1
             ? "1 photo = just you"
             : `${photos.length} photos = squad mode 🔥`}
+          {photos.length < MAX_STAR_PHOTOS && (
+            <span className="ml-1 text-white/25">· max {MAX_STAR_PHOTOS}</span>
+          )}
         </p>
       )}
 
@@ -1407,172 +1417,223 @@ export default function Home() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════
-                STEP 2: Story Input with Spark Chaos button
+                STEP 2: Two Main Buttons (each expands inline with its own input)
             ═══════════════════════════════════════════════════════════════ */}
-            <div className="relative mb-6">
-              <textarea
-                id="story-input"
-                ref={storyIdeaTextareaRef}
-                value={storyIdea}
-                onChange={(e) => {
-                  setStoryIdea(e.target.value);
-                  requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
-                }}
-                onInput={() => setStoryFieldTick((n) => n + 1)}
-                onCompositionEnd={(e) => {
-                  setStoryIdea(e.currentTarget.value);
-                  setStoryFieldTick((n) => n + 1);
-                }}
-                onFocus={handleTextareaFocus}
-                onBlur={handleTextareaBlur}
-                rows={1}
-                placeholder="Describe your story in one sentence…"
-                className="min-h-[120px] w-full resize-none rounded-2xl border border-white/15 bg-zinc-950 px-4 py-4 pr-36 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
-              />
-              {/* Spark Chaos button — inset top-right */}
-              <button
-                type="button"
-                onClick={() => setShowChaosSheet(true)}
-                className={cn(
-                  "absolute top-3 right-3 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                  "border-amber-500/50 bg-black/60 text-amber-400/80 hover:border-amber-400 hover:text-amber-300 hover:bg-amber-500/10",
-                  sparkFlash && "animate-pulse border-amber-400 text-amber-300 shadow-md shadow-amber-500/40"
-                )}
-              >
-                Spark Chaos ⚡
-              </button>
+            <div className="space-y-3 mb-8">
 
-              {showInspirationFollowUps && (
-                <div className="mt-3">
+              {/* ── Button 1: Be the Star ─────────────────────────────────── */}
+              <div className={cn(
+                "rounded-2xl transition-all",
+                entryMode === "star"
+                  ? "bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30"
+                  : "bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30 hover:shadow-amber-500/50"
+              )}>
+                <div className="rounded-2xl bg-gradient-to-b from-amber-500/20 to-black/80">
+                  {/* Header row — always visible, click to toggle */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (entryMode === "star") {
+                        setEntryMode(null);
+                      } else {
+                        handleBeTheStar();
+                      }
+                    }}
+                    className="w-full px-6 py-5 text-left active:scale-[0.99] transition-transform"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">⭐</span>
+                        <div>
+                          <span className="text-xl font-extrabold text-white tracking-tight">Be the Star</span>
+                          <p className="text-sm text-amber-200/80 mt-0.5">Upload photos. Star in your story.</p>
+                          {entryMode !== "star" && (
+                            <p className="text-xs text-white/40 mt-0.5">1 photo = just you &nbsp;/&nbsp; 2–5 = squad</p>
+                          )}
+                        </div>
+                      </div>
+                      <span className={cn(
+                        "text-amber-300 text-lg transition-transform duration-200",
+                        entryMode === "star" ? "rotate-180" : ""
+                      )}>▾</span>
+                    </div>
+                  </button>
+
+                  {/* Expanded content */}
+                  {entryMode === "star" && (
+                    <div className="px-6 pb-6 space-y-4">
+                      {/* Photo upload slots */}
+                      <StarModeUploader
+                        photos={starPhotos}
+                        onPhotoAdded={handleStarPhotoAdded}
+                        onPhotoRemoved={handleStarPhotoRemoved}
+                        onProceed={() => {}}
+                        pipelineRunning={pipelineRunning}
+                      />
+
+                      {/* Story input */}
+                      <div className="relative">
+                        <textarea
+                          id="story-input-star"
+                          ref={storyIdeaTextareaRef}
+                          value={storyIdea}
+                          onChange={(e) => {
+                            setStoryIdea(e.target.value);
+                            requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+                          }}
+                          onInput={() => setStoryFieldTick((n) => n + 1)}
+                          onCompositionEnd={(e) => {
+                            setStoryIdea(e.currentTarget.value);
+                            setStoryFieldTick((n) => n + 1);
+                          }}
+                          onFocus={handleTextareaFocus}
+                          onBlur={handleTextareaBlur}
+                          rows={3}
+                          placeholder={"Describe your story...\nUse #2 #3 to write their fate."}
+                          className="min-h-[100px] w-full resize-none rounded-xl border border-amber-500/30 bg-black/60 px-4 py-3 pr-36 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
+                        />
+                        {/* Spark Chaos button — inset top-right */}
+                        <button
+                          type="button"
+                          onClick={() => setShowChaosSheet(true)}
+                          className={cn(
+                            "absolute top-2 right-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                            "border-amber-500/50 bg-black/60 text-amber-400/80 hover:border-amber-400 hover:text-amber-300 hover:bg-amber-500/10",
+                            sparkFlash && "animate-pulse border-amber-400 text-amber-300 shadow-md shadow-amber-500/40"
+                          )}
+                        >
+                          Spark Chaos ⚡
+                        </button>
+                      </div>
+
+                      {showInspirationFollowUps && (
+                        <InspirationFollowUpCards
+                          storyIdeaRaw={storyIdea}
+                          answers={inspirationFollowUpAnswers}
+                          onSetAnswer={setInspirationFollowUpAnswer}
+                        />
+                      )}
+
+                      {/* Generate button */}
+                      <button
+                        type="button"
+                        disabled={pipelineRunning || starPhotos.length === 0}
+                        onPointerDown={() => {
+                          const el = storyIdeaTextareaRef.current;
+                          if (el && el.value !== storyIdea) {
+                            flushSync(() => setStoryIdea(el.value));
+                          }
+                        }}
+                        onClick={() => void runDramaPipeline()}
+                        className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {pipelineRunning ? "Working on it…" : "Generate My Movie ✨"}
+                      </button>
+
+                      {starPhotos.length === 0 && (
+                        <p className="text-center text-xs text-amber-200/60">Upload at least 1 photo to generate</p>
+                      )}
+
+                      {/* Progress */}
+                      {showProgress && (
+                        <div className="space-y-3">
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                          <p className="text-center text-sm text-amber-200/95">
+                            {pipelinePhase === "error"
+                              ? "Something went wrong"
+                              : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
+                          </p>
+                          {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
+                            <div className="rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
+                              <p className="text-sm font-semibold text-orange-300">
+                                ⚠️ Keep this page open — generating your scenes...
+                              </p>
+                              <p className="mt-1 text-xs text-orange-200/70">
+                                Do not switch tabs or close this window.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {pipelineError && (
+                        <p className="text-center text-sm text-red-400" role="alert">
+                          {pipelineError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Button 2: Be the Director ─────────────────────────────── */}
+              <div className={cn(
+                "rounded-2xl border transition-all",
+                entryMode === "director"
+                  ? "border-white/25 bg-zinc-900/90"
+                  : "border-white/15 bg-zinc-900/80 hover:bg-zinc-800/80 hover:border-white/25"
+              )}>
+                {/* Header row — always visible, click to toggle */}
+                <button
+                  type="button"
+                  onClick={() => setEntryMode(entryMode === "director" ? null : "director")}
+                  className="w-full px-6 py-5 text-left active:scale-[0.99] transition-transform"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🎬</span>
+                      <div>
+                        <span className="text-xl font-bold text-white tracking-tight">Be the Director</span>
+                        <p className="text-sm text-white/50 mt-0.5">Write your story. Direct your vision.</p>
+                      </div>
+                    </div>
+                    <span className={cn(
+                      "text-white/40 text-lg transition-transform duration-200",
+                      entryMode === "director" ? "rotate-180" : ""
+                    )}>▾</span>
+                  </div>
+                </button>
+
+                {/* Expanded content */}
+                {entryMode === "director" && (
+                  <div className="px-6 pb-6 space-y-4 border-t border-white/10 pt-4">
+
+                {/* Story input — Director mode */}
+                <div className="relative">
+                  <textarea
+                    id="story-input-director"
+                    ref={entryMode === "director" ? storyIdeaTextareaRef : undefined}
+                    value={storyIdea}
+                    onChange={(e) => {
+                      setStoryIdea(e.target.value);
+                      requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+                    }}
+                    onInput={() => setStoryFieldTick((n) => n + 1)}
+                    onCompositionEnd={(e) => {
+                      setStoryIdea(e.currentTarget.value);
+                      setStoryFieldTick((n) => n + 1);
+                    }}
+                    rows={3}
+                    placeholder="Describe your story..."
+                    className="min-h-[100px] w-full resize-none rounded-xl border border-white/15 bg-zinc-950 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
+                  />
+                </div>
+
+                {showInspirationFollowUps && (
                   <InspirationFollowUpCards
                     storyIdeaRaw={storyIdea}
                     answers={inspirationFollowUpAnswers}
                     onSetAnswer={setInspirationFollowUpAnswer}
                   />
-                </div>
-              )}
-            </div>
-
-            {/* ═══════════════════════════════════════════════════════════════
-                STEP 3: Two Main Buttons
-            ═══════════════════════════════════════════════════════════════ */}
-            {entryMode === null && (
-              <div className="space-y-3 mb-8">
-                {/* Button 1: Be the Star */}
-                <button
-                  type="button"
-                  onClick={handleBeTheStar}
-                  className="group w-full rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30 hover:shadow-amber-500/50 transition-all active:scale-[0.99]"
-                >
-                  <div className="rounded-2xl bg-gradient-to-b from-amber-500/20 to-black/60 px-6 py-5 text-left">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-2xl">⭐</span>
-                      <span className="text-xl font-extrabold text-white tracking-tight">Be the Star</span>
-                    </div>
-                    <p className="text-sm text-amber-200/80 ml-9">Upload photos. Star in your story.</p>
-                    <p className="text-xs text-white/40 ml-9 mt-1">1 photo = just you &nbsp;/&nbsp; 2–5 = squad</p>
-                  </div>
-                </button>
-
-                {/* Button 2: Be the Director */}
-                <button
-                  type="button"
-                  onClick={() => setEntryMode("director")}
-                  className="w-full rounded-2xl border border-white/15 bg-zinc-900/80 px-6 py-5 text-left hover:bg-zinc-800/80 hover:border-white/25 transition-all active:scale-[0.99]"
-                >
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-2xl">🎬</span>
-                    <span className="text-xl font-bold text-white tracking-tight">Be the Director</span>
-                  </div>
-                  <p className="text-sm text-white/50 ml-9">Write your story. Direct your vision.</p>
-                </button>
-              </div>
-            )}
-
-            {/* ═══════════════════════════════════════════════════════════════
-                STAR MODE: Photo upload + pipeline
-            ═══════════════════════════════════════════════════════════════ */}
-            {entryMode === "star" && (
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-base font-bold text-amber-400">⭐ Be the Star</h2>
-                    <p className="text-xs text-white/40 mt-0.5">Upload your photo to star in the movie</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEntryMode(null)}
-                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
-                  >
-                    ← Back
-                  </button>
-                </div>
-
-                <StarModeUploader
-                  photos={starPhotos}
-                  extraSlots={showExtraSlots}
-                  onPhotoAdded={handleStarPhotoAdded}
-                  onPhotoRemoved={handleStarPhotoRemoved}
-                  onProceed={() => void runDramaPipeline()}
-                  pipelineRunning={pipelineRunning}
-                />
-
-                {/* Progress */}
-                {showProgress && (
-                  <div className="mt-6 space-y-3">
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                    <p className="text-center text-sm text-amber-200/95">
-                      {pipelinePhase === "error"
-                        ? "Something went wrong"
-                        : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
-                    </p>
-                    {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
-                      <div className="mt-3 rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
-                        <p className="text-sm font-semibold text-orange-300">
-                          ⚠️ Keep this page open — generating your scenes...
-                        </p>
-                        <p className="mt-1 text-xs text-orange-200/70">
-                          Do not switch tabs or close this window.
-                        </p>
-                      </div>
-                    )}
-                  </div>
                 )}
-
-                {pipelineError && (
-                  <p className="mt-4 text-center text-sm text-red-400" role="alert">
-                    {pipelineError}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ═══════════════════════════════════════════════════════════════
-                DIRECTOR MODE: Full existing flow (unchanged logic)
-            ═══════════════════════════════════════════════════════════════ */}
-            {entryMode === "director" && (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-base font-bold text-white">🎬 Be the Director</h2>
-                    <p className="text-xs text-white/40 mt-0.5">Write your story. Direct your vision.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEntryMode(null)}
-                    className="text-xs text-white/30 hover:text-white/60 transition-colors"
-                  >
-                    ← Back
-                  </button>
-                </div>
 
                 {/* Cast section */}
-                <section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+                <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
                   <h2 className="text-sm font-semibold text-amber-400">Cast (optional)</h2>
                   <p className="mt-1 text-xs text-white/45">
                     Choose look templates, then confirm each selected role before generating.
@@ -1806,7 +1867,7 @@ export default function Home() {
                 </section>
 
                 {/* Generate buttons */}
-                <section className="mb-6 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-black/40 p-6">
+                <div className="space-y-2">
                   <Button
                     type="button"
                     className={cn(
@@ -1826,11 +1887,11 @@ export default function Home() {
                     {pipelineRunning && !directorModeActive ? "Working on it…" : "Generate My Drama"}
                   </Button>
 
-                  {/* Director Mode button — always visible below main button */}
+                  {/* Director Mode button */}
                   <button
                     type="button"
                     disabled={pipelineRunning}
-                    className="w-full mt-2 py-3 border border-white text-white text-sm rounded-lg hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-3 border border-white text-white text-sm rounded-lg hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     onPointerDown={() => {
                       const el = storyIdeaTextareaRef.current;
                       if (el && el.value !== storyIdea) {
@@ -1841,67 +1902,74 @@ export default function Home() {
                   >
                     {pipelineRunning && directorModeActive ? "Working on it…" : "🎬 Director Mode — Review Each Step"}
                   </button>
+
                   {!canRunDramaLive && !pipelineRunning && (
-                    <p className="mt-2 text-center text-xs text-white/40">
-                      Short ideas: add 8+ characters (use follow-up cards if shown). Long scripts: 50+
-                      characters skips formatting and goes straight to analysis.
+                    <p className="text-center text-xs text-white/40">
+                      Short ideas: add 8+ characters. Long scripts: 50+ characters skips formatting.
                     </p>
                   )}
                   {canRunDramaLive && hasSelectedCast && !allSelectedCastConfirmed && !pipelineRunning && (
-                    <p className="mt-2 text-center text-xs text-amber-200/90">
+                    <p className="text-center text-xs text-amber-200/90">
                       Please confirm your cast first
                     </p>
                   )}
                   {canRunDramaLive && !pipelineRunning && (
-                    <p
-                      className={cn(
-                        "mt-2 text-center text-xs",
-                        inspirationGenerateReady ? "text-amber-200/90" : "text-white/35",
-                      )}
-                    >
+                    <p className={cn("text-center text-xs", inspirationGenerateReady ? "text-amber-200/90" : "text-white/35")}>
                       {inspirationGenerateReady
                         ? "Your idea is rich enough — Generate is highlighted, ready to shoot."
-                        : "Add ~50 characters including protagonist, conflict, and resolution cues to unlock the button."}
+                        : "Add ~50 characters including protagonist, conflict, and resolution cues."}
                     </p>
                   )}
+                </div>
 
-                  {showProgress && (
-                    <div className="mt-6 space-y-3">
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
-                      <p className="text-center text-sm text-amber-200/95">
-                        {pipelinePhase === "error"
-                          ? "Something went wrong"
-                          : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
-                      </p>
-                      <p className="text-center text-[11px] text-white/35">
-                        Creating project → Analyzing story → Locking characters → Preparing scenes →
-                        Generating your scenes
-                      </p>
-                      {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
-                        <div className="mt-3 rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
-                          <p className="text-sm font-semibold text-orange-300">
-                            ⚠️ Keep this page open — generating your scenes...
-                          </p>
-                          <p className="mt-1 text-xs text-orange-200/70">
-                            Do not switch tabs or close this window.
-                          </p>
-                        </div>
-                      )}
+                {showProgress && (
+                  <div className="space-y-3">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
+                        style={{ width: `${progressPct}%` }}
+                      />
                     </div>
-                  )}
-
-                  {pipelineError && (
-                    <p className="mt-4 text-center text-sm text-red-400" role="alert">
-                      {pipelineError}
+                    <p className="text-center text-sm text-amber-200/95">
+                      {pipelinePhase === "error"
+                        ? "Something went wrong"
+                        : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
                     </p>
-                  )}
-                </section>
+                    <p className="text-center text-[11px] text-white/35">
+                      Creating project → Analyzing story → Locking characters → Preparing scenes →
+                      Generating your scenes
+                    </p>
+                    {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
+                      <div className="rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
+                        <p className="text-sm font-semibold text-orange-300">
+                          ⚠️ Keep this page open — generating your scenes...
+                        </p>
+                        <p className="mt-1 text-xs text-orange-200/70">
+                          Do not switch tabs or close this window.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
+                {pipelineError && (
+                  <p className="text-center text-sm text-red-400" role="alert">
+                    {pipelineError}
+                  </p>
+                )}
+
+                  </div>
+                )}
+              </div>
+
+            </div>
+            {/* ── End Two Main Buttons ─────────────────────────────────────── */}
+
+            {/* ═══════════════════════════════════════════════════════════════
+                DIRECTOR MODE: Review panels (outside the button card)
+            ═══════════════════════════════════════════════════════════════ */}
+            {entryMode === "director" && (
+              <>
                 {showDirectorReview && (
                   <section className="mt-6">
                     <DirectorReviewPanel
