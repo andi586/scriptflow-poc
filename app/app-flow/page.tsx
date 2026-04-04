@@ -1318,6 +1318,107 @@ export default function Home() {
     });
   }, []);
 
+  // ─── Be the Star: pipeline (uploads photos as character reference images) ──
+  const runStarModePipeline = useCallback(async () => {
+    const latestIdea = storyIdeaTextareaRef.current?.value ?? storyIdea;
+    if (latestIdea !== storyIdea) setStoryIdea(latestIdea);
+
+    if (starPhotos.length === 0) {
+      setPipelineError("Upload at least 1 photo to generate.");
+      return;
+    }
+
+    setPipelineError(null);
+    setPipelineRunning(true);
+    setLastSubmittedClipTaskIds([]);
+    let activePhase: PipelinePhase = "creating_project";
+    setPipelinePhase("creating_project");
+
+    try {
+      // 1. Create project
+      const cr = await createNewProjectAction();
+      if (!cr.success) throw new Error(errMsg(cr.error));
+      const pid = cr.data.projectId;
+      setProjectId(pid);
+      setCurrentProjectId(pid);
+      writeLazySessionIdToStorage(pid);
+      try { window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid); } catch {}
+
+      // 2. Upload star photos to Supabase storage and collect URLs
+      const supabase = createClient();
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < starPhotos.length; i++) {
+        const photo = starPhotos[i];
+        try {
+          const { blob, contentType } = await prepareImageForUpload(photo.file);
+          const objectPath = `star-mode/${pid}/photo_${i}.${contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg"}`;
+          const { error: uploadError } = await supabase.storage
+            .from("character-images")
+            .upload(objectPath, blob, { contentType, upsert: true });
+          if (uploadError) throw new Error(uploadError.message);
+          const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
+          if (pub.publicUrl) uploadedUrls.push(pub.publicUrl);
+        } catch (e) {
+          console.warn(`[StarMode] Failed to upload photo ${i}:`, e);
+        }
+      }
+
+      // 3. Analyze story
+      activePhase = "analyzing_story";
+      setPipelinePhase("analyzing_story");
+      const trimmedRaw = latestIdea.trim();
+      const composedForRun = composeInspirationForNel(latestIdea, inspirationFollowUpAnswers);
+      const isDirectScript = trimmedRaw.length >= DIRECT_SCRIPT_MIN_CHARS;
+      let nelScript: string;
+      if (isDirectScript) {
+        nelScript = trimmedRaw;
+      } else if (composedForRun.trim().length >= 8) {
+        const fr = await formatStoryIdeaAction({ idea: composedForRun.trim() });
+        if (!fr.success) throw new Error(errMsg(fr.error));
+        nelScript = storyboardShotsToNelScriptText(fr.data.shots);
+      } else {
+        // No story text — use a default star-mode prompt
+        nelScript = `A cinematic short film starring the uploaded characters. Make it dramatic and visually stunning.`;
+      }
+
+      const ar = await analyzeScriptAction({ projectId: pid, scriptText: nelScript, nelProfile: "lazy" });
+      if (!ar.success) throw new Error(errMsg(ar.error));
+
+      // 4. Attach uploaded photos as character reference images via API
+      activePhase = "locking_characters";
+      setPipelinePhase("locking_characters");
+      if (uploadedUrls.length > 0) {
+        try {
+          await fetch("/api/projects/" + pid + "/star-photos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photoUrls: uploadedUrls }),
+          });
+        } catch (e) {
+          console.warn("[StarMode] Failed to attach star photos:", e);
+        }
+      }
+
+      // 5. Generate Kling prompts
+      activePhase = "generating_prompts";
+      setPipelinePhase("generating_prompts");
+      const gr = await generateKlingPromptsAction({ projectId: pid });
+      if (!gr.success) throw new Error(errMsg(gr.error));
+
+      // 6. Director review (same as drama pipeline)
+      activePhase = "director_review";
+      setPipelinePhase("director_review");
+      setDirectorReviewPrompts(gr.data.prompts);
+      setShowDirectorReview(true);
+    } catch (e) {
+      setPipelinePhase("error");
+      const raw = e instanceof Error ? e.message : errMsg(e);
+      setPipelineError(`${activePhase}: ${raw}`);
+    } finally {
+      setPipelineRunning(false);
+    }
+  }, [storyIdea, starPhotos, inspirationFollowUpAnswers]);
+
   // ─── Be the Star: check consent then proceed ───────────────────────────────
   const handleBeTheStar = useCallback(() => {
     try {
@@ -1543,7 +1644,7 @@ export default function Home() {
                             flushSync(() => setStoryIdea(el.value));
                           }
                         }}
-                        onClick={() => void runDramaPipeline()}
+                        onClick={() => void runStarModePipeline()}
                         className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {pipelineRunning ? "Working on it…" : "Make the Movie ✨"}
