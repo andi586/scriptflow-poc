@@ -419,6 +419,8 @@ function appendPromptSafetyAndStyleLock(prompt: string) {
 
 export async function generateKlingPromptsAction(input: {
   projectId: string;
+  /** Optional: limit the number of generated prompts (e.g. 3/5/8 for Star Mode tiers). */
+  maxScenes?: number;
 }): Promise<ActionResult<{ prompts: KlingPromptItem[] }>> {
   try {
     const projectId = requireProjectId(input.projectId);
@@ -438,10 +440,17 @@ export async function generateKlingPromptsAction(input: {
         ? (storyMemory.raw_analysis as Record<string, unknown>)
         : {};
 
-    const beats = normalizeBeats(rawAnalysis);
-    if (beats.length === 0) {
+    const allBeats = normalizeBeats(rawAnalysis);
+    if (allBeats.length === 0) {
       throw new Error("story_memory 中没有 beats，无法生成提示词。");
     }
+
+    // Enforce maxScenes limit: slice beats BEFORE sending to Claude so it only
+    // generates the requested number of prompts (not just truncated after the fact).
+    const beats =
+      typeof input.maxScenes === "number" && input.maxScenes > 0
+        ? allBeats.slice(0, input.maxScenes)
+        : allBeats;
 
     const characters = Array.isArray(rawAnalysis.characters) ? rawAnalysis.characters : [];
     const propRegistry = normalizePropRegistry(rawAnalysis);

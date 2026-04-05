@@ -1489,14 +1489,14 @@ export default function Home() {
         }
       }
 
-      // 5. Generate Kling prompts
+      // 5. Generate Kling prompts — pass maxScenes so Claude only generates N beats
       activePhase = "generating_prompts";
       setPipelinePhase("generating_prompts");
-      const gr = await generateKlingPromptsAction({ projectId: pid });
+      const selectedTier = STAR_DURATION_OPTIONS.find((o) => o.id === starDurationTier) ?? STAR_DURATION_OPTIONS[1];
+      const gr = await generateKlingPromptsAction({ projectId: pid, maxScenes: selectedTier.maxScenes });
       if (!gr.success) throw new Error(errMsg(gr.error));
 
-      // 6. Slice prompts to selected duration tier (maxScenes)
-      const selectedTier = STAR_DURATION_OPTIONS.find((o) => o.id === starDurationTier) ?? STAR_DURATION_OPTIONS[1];
+      // 6. Safety-slice in case Claude returned more than requested
       const slicedPrompts = Array.isArray(gr.data.prompts)
         ? gr.data.prompts.slice(0, selectedTier.maxScenes)
         : gr.data.prompts;
