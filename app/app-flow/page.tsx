@@ -2110,96 +2110,93 @@ export default function Home() {
               </section>
             )}
 
-            {entryMode === "director" && (
-              <>
-                {/* Director Mode: Script Review Panel */}
-                {showScriptReview && scriptReviewData && currentProjectId && (
-                  <section className="mt-6">
-                    <ScriptReviewPanel
-                      projectId={currentProjectId}
-                      projectTitle={scriptReviewData.projectTitle}
-                      episode={scriptReviewData.episode}
-                      characters={scriptReviewData.characters}
-                      isSaving={isSavingLines || isSubmittingToKling}
-                      onConfirm={(editedLines) => void handleScriptReviewConfirm(editedLines)}
-                      onStartOver={() => {
-                        setShowScriptReview(false);
-                        setScriptReviewData(null);
-                        setDirectorModeActive(false);
-                        setPipelinePhase("idle");
-                        setPipelineError(null);
-                      }}
-                    />
-                  </section>
-                )}
+            {/* ── Director Mode: Script Review Panel (director-only) ─────────── */}
+            {entryMode === "director" && showScriptReview && scriptReviewData && currentProjectId && (
+              <section className="mt-6">
+                <ScriptReviewPanel
+                  projectId={currentProjectId}
+                  projectTitle={scriptReviewData.projectTitle}
+                  episode={scriptReviewData.episode}
+                  characters={scriptReviewData.characters}
+                  isSaving={isSavingLines || isSubmittingToKling}
+                  onConfirm={(editedLines) => void handleScriptReviewConfirm(editedLines)}
+                  onStartOver={() => {
+                    setShowScriptReview(false);
+                    setScriptReviewData(null);
+                    setDirectorModeActive(false);
+                    setPipelinePhase("idle");
+                    setPipelineError(null);
+                  }}
+                />
+              </section>
+            )}
 
-                {/* Director Mode: show clips after Kling submit */}
-                {directorModeActive && pipelinePhase === "done" && currentProjectId && (
-                  <section
-                    ref={clipsResultsSectionRef}
-                    className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
-                    aria-labelledby="director-clips-heading"
-                  >
-                    <h2 id="director-clips-heading" className="text-base font-semibold text-emerald-300">
-                      Your clips
-                    </h2>
-                    <p className="mt-1 text-xs text-white/50">
-                      Sit back and relax — we'll notify you when your episode is ready.
-                    </p>
-                    <VideoResultsPanel
-                      sessionId={currentProjectId}
-                      taskIds={lastSubmittedClipTaskIds}
-                      refreshNonce={clipsRefreshNonce}
-                      title="Scenes"
-                    />
-                  </section>
-                )}
+            {/* ── Async render job progress panel (both modes) ──────────────── */}
+            {activeRenderJobId && (
+              <section className="mt-6">
+                <RenderJobProgress
+                  jobId={activeRenderJobId}
+                  onComplete={(finalVideoUrl, taskIds) => {
+                    if (taskIds.length > 0) {
+                      setLastSubmittedClipTaskIds(taskIds);
+                      setClipsRefreshNonce((n) => n + 1);
+                    }
+                    setPipelinePhase("done");
+                  }}
+                  onFailed={(error) => {
+                    setPipelineError(error);
+                    setPipelinePhase("error");
+                  }}
+                  onStartOver={startNewLazySession}
+                />
+              </section>
+            )}
 
-                {/* Async render job progress panel */}
-                {activeRenderJobId && (
-                  <section className="mt-6">
-                    <RenderJobProgress
-                      jobId={activeRenderJobId}
-                      onComplete={(finalVideoUrl, taskIds) => {
-                        if (taskIds.length > 0) {
-                          setLastSubmittedClipTaskIds(taskIds);
-                          setClipsRefreshNonce((n) => n + 1);
-                        }
-                        setPipelinePhase("done");
-                      }}
-                      onFailed={(error) => {
-                        setPipelineError(error);
-                        setPipelinePhase("error");
-                      }}
-                      onStartOver={startNewLazySession}
-                    />
-                  </section>
-                )}
+            {/* ── Video results: Director Mode (directorModeActive) ─────────── */}
+            {directorModeActive && pipelinePhase === "done" && currentProjectId && (
+              <section
+                ref={clipsResultsSectionRef}
+                className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
+                aria-labelledby="director-clips-heading"
+              >
+                <h2 id="director-clips-heading" className="text-base font-semibold text-emerald-300">
+                  Your clips
+                </h2>
+                <p className="mt-1 text-xs text-white/50">
+                  Sit back and relax — we'll notify you when your episode is ready.
+                </p>
+                <VideoResultsPanel
+                  sessionId={currentProjectId}
+                  taskIds={lastSubmittedClipTaskIds}
+                  refreshNonce={clipsRefreshNonce}
+                  title="Scenes"
+                />
+              </section>
+            )}
 
-                {pipelinePhase === "done" && projectId.trim() && !directorModeActive && (
-                  <section
-                    ref={clipsResultsSectionRef}
-                    className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
-                    aria-labelledby="clips-results-heading"
-                  >
-                    <h2 id="clips-results-heading" className="text-base font-semibold text-emerald-300">
-                      Your clips
-                    </h2>
-                    <p className="mt-1 text-xs text-white/50">
-                      Sit back and relax — we'll notify you when your episode is ready.
-                    </p>
-                    <VideoResultsPanel
-                      sessionId={projectId}
-                      taskIds={lastSubmittedClipTaskIds}
-                      refreshNonce={clipsRefreshNonce}
-                      title="Scenes"
-                    />
+            {/* ── Video results: non-Director-Mode (Be the Star / Ghost Mode) ── */}
+            {pipelinePhase === "done" && projectId.trim() && !directorModeActive && (
+              <section
+                ref={clipsResultsSectionRef}
+                className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
+                aria-labelledby="clips-results-heading"
+              >
+                <h2 id="clips-results-heading" className="text-base font-semibold text-emerald-300">
+                  Your clips
+                </h2>
+                <p className="mt-1 text-xs text-white/50">
+                  Sit back and relax — we'll notify you when your episode is ready.
+                </p>
+                <VideoResultsPanel
+                  sessionId={projectId}
+                  taskIds={lastSubmittedClipTaskIds}
+                  refreshNonce={clipsRefreshNonce}
+                  title="Scenes"
+                />
 
-                    {/* Cinema Bazaar: Sell as Asset */}
-                    <SellAsAssetButton projectId={projectId} />
-                  </section>
-                )}
-              </>
+                {/* Cinema Bazaar: Sell as Asset */}
+                <SellAsAssetButton projectId={projectId} />
+              </section>
             )}
           </>
         )}
