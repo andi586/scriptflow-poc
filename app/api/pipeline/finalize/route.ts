@@ -151,10 +151,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdminClient()
 
-    // 从 projects 表读取 script_raw、title、episode_number 和 is_star_mode
+    // 从 projects 表读取 script_raw、title、episode_number、is_star_mode 和 language
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('script_raw, title, episode_number, status, is_star_mode')
+      .select('script_raw, title, episode_number, status, is_star_mode, language')
       .eq('id', projectId)
       .single()
 
@@ -274,15 +274,88 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No completed video URLs' }, { status: 422 })
     }
 
+    // 读取用户语言（用于 ElevenLabs language_code 和 FFmpeg 字幕字体）
+    // 默认 'en'；Star Mode 从输入检测；Director Mode 从 projects.language 读取
+    const userLanguage: string = ((project as any).language ?? 'en').toLowerCase().split('-')[0]
+    console.log('[finalize] userLanguage:', userLanguage)
+
+    // ── Step 3: Claude back-translation ──────────────────────────────────────
+    // If userLanguage is not English, translate dialogue lines back to user language
+    // before TTS so voice and subtitles are in the user's native language.
+    async function translateDialogueToUserLanguage(
+      blocks: Array<{ shotIndex: number; role: string; text: string }>,
+      targetLang: string
+    ): Promise<Array<{ shotIndex: number; role: string; text: string }>> {
+      if (targetLang === 'en' || blocks.length === 0) return blocks
+      const LANG_NAMES: Record<string, string> = {
+        zh: 'Chinese (Simplified)', ja: 'Japanese', ko: 'Korean',
+        es: 'Spanish', fr: 'French', ar: 'Arabic', hi: 'Hindi',
+        pt: 'Portuguese', de: 'German', it: 'Italian', ru: 'Russian',
+        th: 'Thai', vi: 'Vietnamese', id: 'Indonesian',
+      }
+      const langName = LANG_NAMES[targetLang] ?? targetLang
+      const anthropicKey = process.env.ANTHROPIC_API_KEY
+      if (!anthropicKey) {
+        console.warn('[finalize] No ANTHROPIC_API_KEY — skipping back-translation')
+        return blocks
+      }
+      try {
+        const linesJson = JSON.stringify(blocks.map(b => ({ role: b.role, text: b.text })))
+        const prompt = `You are a professional drama script translator. Translate the following dialogue lines from English to ${langName}.
+
+Rules:
+- Preserve emotional intensity and dramatic tension
+- Use natural, colloquial speech (not formal/literary)
+- Keep character names unchanged
+- Return ONLY a JSON array with the same structure: [{"role":"...","text":"..."}]
+- No explanations, no markdown, just the JSON array
+
+Dialogue to translate:
+${linesJson}`
+
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-3-5-haiku-20241022',
+            max_tokens: 2048,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        })
+        if (!res.ok) {
+          console.warn('[finalize] Claude translation HTTP error:', res.status)
+          return blocks
+        }
+        const data = await res.json() as any
+        const translated = JSON.parse(data.content?.[0]?.text ?? '[]') as Array<{ role: string; text: string }>
+        if (!Array.isArray(translated) || translated.length !== blocks.length) {
+          console.warn('[finalize] Claude translation returned unexpected shape — using original')
+          return blocks
+        }
+        console.log(`[finalize] Back-translated ${blocks.length} lines to ${langName}`)
+        return blocks.map((b, i) => ({ ...b, text: translated[i]?.text ?? b.text }))
+      } catch (e) {
+        console.warn('[finalize] Claude back-translation failed (using original):', e instanceof Error ? e.message : e)
+        return blocks
+      }
+    }
+
     // 生成TTS配音（仅当有对白时）
     const audioList: Array<{ audioUrl: string; duration: number }> = []
     const srtChunks: string[] = []
 
     if (dialogueBlocks.length > 0) {
+      // Back-translate dialogue to user language before TTS
+      const translatedBlocks = await translateDialogueToUserLanguage(dialogueBlocks, userLanguage)
+
       let runningOffset = 0
       let srtSeq = 1
 
-      for (const block of dialogueBlocks) {
+      for (const block of translatedBlocks) {
         const voiceId = process.env[CHARACTER_VOICE_ENV_MAP[block.role]]
         console.error("[finalize] role=", block.role, "voiceId=", voiceId)
         if (!voiceId) {
@@ -292,10 +365,15 @@ export async function POST(request: NextRequest) {
 
         const apiKey = process.env.ELEVENLABS_API_KEY
         console.error("[finalize] apiKey prefix=", apiKey?.slice(0,8))
+        // Pass language_code to ElevenLabs for multilingual TTS
+        const ttsBody: Record<string, any> = { text: block.text, model_id: ELEVENLABS_MODEL_ID }
+        if (userLanguage !== 'en') {
+          ttsBody.language_code = userLanguage
+        }
         const res = await fetch(`${ELEVENLABS_WITH_TIMESTAMPS_BASE_URL}/${voiceId}/with-timestamps`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'xi-api-key': apiKey! },
-          body: JSON.stringify({ text: block.text, model_id: ELEVENLABS_MODEL_ID }),
+          body: JSON.stringify(ttsBody),
         })
 
         const rawText = await res.text()
@@ -397,6 +475,7 @@ export async function POST(request: NextRequest) {
       bgmUrl: bgmUrl ?? undefined,
       ambienceUrl: ambienceUrl ?? undefined,
       isStarMode,
+      userLanguage, // ISO 639-1 code for subtitle font selection
     }
     console.log('[finalize] about to call Railway, ambienceUrl=', ambienceUrl)
     console.log('[railway-request] url:', RAILWAY_MERGE_URL)

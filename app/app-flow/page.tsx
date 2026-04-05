@@ -1495,6 +1495,34 @@ export default function Home() {
       // Detect non-English: if text contains CJK or other non-ASCII chars, translate via Claude
       const hasNonEnglish = /[\u0080-\uFFFF]/.test(trimmedRaw) || /[\u0080-\uFFFF]/.test(composedForRun);
       let storyForNel = composedForRun.trim().length >= 8 ? composedForRun.trim() : trimmedRaw;
+
+      // Detect language code from input text (simple heuristic)
+      const detectedLang = (() => {
+        const t = storyForNel;
+        if (/[\u4e00-\u9fff\u3400-\u4dbf]/.test(t)) return 'zh';
+        if (/[\u3040-\u309f\u30a0-\u30ff]/.test(t)) return 'ja';
+        if (/[\uac00-\ud7af]/.test(t)) return 'ko';
+        if (/[\u0600-\u06ff]/.test(t)) return 'ar';
+        if (/[\u0900-\u097f]/.test(t)) return 'hi';
+        if (/[\u0e00-\u0e7f]/.test(t)) return 'th';
+        if (/[\u00c0-\u024f]/.test(t)) return 'es'; // rough Latin extended → Spanish/French/etc
+        return 'en';
+      })();
+
+      // Save detected language to project so finalize pipeline can use it for TTS + subtitles
+      if (detectedLang !== 'en') {
+        try {
+          await fetch(`/api/projects/${pid}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ language: detectedLang }),
+          });
+          console.log('[StarMode] Saved language to project:', detectedLang);
+        } catch (e) {
+          console.warn('[StarMode] Failed to save language:', e);
+        }
+      }
+
       if (hasNonEnglish && storyForNel.trim().length > 0) {
         try {
           const translateRes = await fetch("/api/translate", {
