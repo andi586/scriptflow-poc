@@ -1363,6 +1363,21 @@ export default function Home() {
     });
   }, []);
 
+  // ─── Be the Star: duration tier ──────────────────────────────────────────
+  type StarDurationTier = "taste" | "moment" | "full";
+  const [starDurationTier, setStarDurationTier] = useState<StarDurationTier>("moment");
+  const STAR_DURATION_OPTIONS: Array<{
+    id: StarDurationTier;
+    icon: string;
+    label: string;
+    sub: string;
+    maxScenes: number;
+  }> = [
+    { id: "taste",  icon: "⚡", label: "Taste of Fame",       sub: "~30s", maxScenes: 3 },
+    { id: "moment", icon: "🎬", label: "My Moment",           sub: "~60s", maxScenes: 5 },
+    { id: "full",   icon: "🎭", label: "Full Star Treatment", sub: "~90s", maxScenes: 8 },
+  ];
+
   // ─── Be the Star: estimated wait time ────────────────────────────────────
   const [starEstimatedMinutes, setStarEstimatedMinutes] = useState<number | null>(null);
 
@@ -1480,18 +1495,24 @@ export default function Home() {
       const gr = await generateKlingPromptsAction({ projectId: pid });
       if (!gr.success) throw new Error(errMsg(gr.error));
 
-      // 6. Calculate estimated wait time (45s per scene) and show it
-      const sceneCount = Array.isArray(gr.data.prompts) ? gr.data.prompts.length : 9;
+      // 6. Slice prompts to selected duration tier (maxScenes)
+      const selectedTier = STAR_DURATION_OPTIONS.find((o) => o.id === starDurationTier) ?? STAR_DURATION_OPTIONS[1];
+      const slicedPrompts = Array.isArray(gr.data.prompts)
+        ? gr.data.prompts.slice(0, selectedTier.maxScenes)
+        : gr.data.prompts;
+
+      // 7. Calculate estimated wait time (45s per scene) and show it
+      const sceneCount = Array.isArray(slicedPrompts) ? slicedPrompts.length : selectedTier.maxScenes;
       const estimatedSeconds = sceneCount * 45;
       const estimatedMinutes = Math.ceil(estimatedSeconds / 60);
       setStarEstimatedMinutes(estimatedMinutes);
 
-      // 7. Auto-submit to Kling — no Director Review, zero user interruption
+      // 8. Auto-submit to Kling — no Director Review, zero user interruption
       activePhase = "submitting_kling";
       setPipelinePhase("submitting_kling");
       const sr = await submitKlingTasksAction({
         projectId: pid,
-        prompts: gr.data.prompts as any,
+        prompts: slicedPrompts as any,
       });
       if (!sr.success) throw new Error(errMsg(sr.error));
 
@@ -1743,6 +1764,33 @@ export default function Home() {
                           onSetAnswer={setInspirationFollowUpAnswer}
                         />
                       )}
+
+                      {/* ── Duration selector ─────────────────────────────── */}
+                      <div className="space-y-2">
+                        <p className="text-xs text-white/40 font-medium tracking-wide">How long is your moment?</p>
+                        <div className="flex gap-2">
+                          {STAR_DURATION_OPTIONS.map((opt) => {
+                            const selected = starDurationTier === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setStarDurationTier(opt.id)}
+                                className={cn(
+                                  "flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 rounded-xl border text-xs font-semibold transition-all",
+                                  selected
+                                    ? "border-amber-400 bg-amber-500/20 text-amber-300 shadow-md shadow-amber-500/30 ring-1 ring-amber-400/50"
+                                    : "border-white/15 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/60"
+                                )}
+                              >
+                                <span className="text-base">{opt.icon}</span>
+                                <span className="leading-tight text-center">{opt.label}</span>
+                                <span className={cn("text-[10px]", selected ? "text-amber-400/80" : "text-white/25")}>{opt.sub}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
 
                       {/* Generate button */}
                       <button
