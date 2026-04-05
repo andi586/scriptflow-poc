@@ -2140,22 +2140,22 @@ export default function Home() {
             {/* ═══════════════════════════════════════════════════════════════
                 DIRECTOR MODE: Review panels (outside the button card)
             ═══════════════════════════════════════════════════════════════ */}
+            {showDirectorReview && (
+              <section className="mt-6">
+                <DirectorReviewPanel
+                  prompts={directorReviewPrompts}
+                  onApprove={handleDirectorApprove}
+                  onCancel={() => {
+                    setShowDirectorReview(false);
+                    setPipelinePhase("idle");
+                  }}
+                  isSubmitting={isSubmittingToKling}
+                />
+              </section>
+            )}
+
             {entryMode === "director" && (
               <>
-                {showDirectorReview && (
-                  <section className="mt-6">
-                    <DirectorReviewPanel
-                      prompts={directorReviewPrompts}
-                      onApprove={handleDirectorApprove}
-                      onCancel={() => {
-                        setShowDirectorReview(false);
-                        setPipelinePhase("idle");
-                      }}
-                      isSubmitting={isSubmittingToKling}
-                    />
-                  </section>
-                )}
-
                 {/* Director Mode: Script Review Panel */}
                 {showScriptReview && scriptReviewData && currentProjectId && (
                   <section className="mt-6">
