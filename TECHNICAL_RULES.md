@@ -262,3 +262,9 @@ cat > TECHNICAL_RULES.md << 'EOF'
 **症状：** ssh: connect to host github.com port 22: Undefined error
 **解决：** git push ssh://git@ssh.github.com:443/andi586/scriptflow-poc.git main
 **永久规则：** 泰国网络不稳定时用443端口绕过
+
+### 规则45：Seedance 2.0已在PiAPI上线
+日期：2026-04-05
+Seedance 2.0可通过PiAPI调用
+加入F80多供应商候选列表
+评估后决定是否接入
