@@ -49,6 +49,7 @@ import type { CharacterRole } from "@/types";
 import { prepareImageForUpload } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
 import { SellAsAssetButton } from "@/components/sell-as-asset-button";
+import { ScriptFlowWaitingScreen } from "@/components/scriptflow-waiting-screen";
 
 /** Pasted scripts at least this long skip idea→9-shot formatting and go straight to NEL. */
 const DIRECT_SCRIPT_MIN_CHARS = 50;
@@ -1477,8 +1478,23 @@ export default function Home() {
     }
   }, []);
 
+  // ─── Waiting screen visibility ────────────────────────────────────────────
+  // Show the immersive waiting screen whenever the pipeline is actively running
+  // (not idle, not error, not done, not director_review pause)
+  const showWaitingScreen =
+    pipelineRunning &&
+    pipelinePhase !== "idle" &&
+    pipelinePhase !== "error" &&
+    pipelinePhase !== "director_review";
+
   return (
     <div className="min-h-screen bg-black text-white">
+      {/* ─── ScriptFlow Immersive Waiting Screen ────────────────────────────── */}
+      <ScriptFlowWaitingScreen
+        phase={pipelinePhase}
+        visible={showWaitingScreen}
+      />
+
       {/* ─── Modals ─────────────────────────────────────────────────────────── */}
       {showLegalModal && (
         <LegalConsentModal
@@ -1698,36 +1714,7 @@ export default function Home() {
                         <p className="text-center text-xs text-amber-200/60">Upload at least 1 photo to generate</p>
                       )}
 
-                      {/* Progress */}
-                      {showProgress && (
-                        <div className="space-y-3">
-                          {pipelineRunning && pipelinePhase !== "error" && pipelinePhase !== "done" && (
-                            <CinematicLoader key={pipelinePhase} />
-                          )}
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                            <div
-                              className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
-                              style={{ width: `${progressPct}%` }}
-                            />
-                          </div>
-                          <p className="text-center text-sm text-amber-200/95">
-                            {pipelinePhase === "error"
-                              ? "Something went wrong"
-                              : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
-                          </p>
-                          {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
-                            <div className="rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
-                              <p className="text-sm font-semibold text-orange-300">
-                                ⚠️ Keep this page open — generating your scenes...
-                              </p>
-                              <p className="mt-1 text-xs text-orange-200/70">
-                                Do not switch tabs or close this window.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
+                      {/* Error display only — progress is handled by ScriptFlowWaitingScreen */}
                       {pipelineError && (
                         <p className="text-center text-sm text-red-400" role="alert">
                           {pipelineError}
@@ -2090,39 +2077,7 @@ export default function Home() {
                   )}
                 </div>
 
-                {showProgress && (
-                  <div className="space-y-3">
-                    {pipelineRunning && pipelinePhase !== "error" && pipelinePhase !== "done" && (
-                      <CinematicLoader key={pipelinePhase} />
-                    )}
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-amber-500 transition-all duration-500 ease-out"
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                    <p className="text-center text-sm text-amber-200/95">
-                      {pipelinePhase === "error"
-                        ? "Something went wrong"
-                        : PHASE_LABEL[pipelinePhase as keyof typeof PHASE_LABEL] ?? ""}
-                    </p>
-                    <p className="text-center text-[11px] text-white/35">
-                      Creating project → Analyzing story → Locking characters → Preparing scenes →
-                      Generating your scenes
-                    </p>
-                    {(pipelinePhase === "generating_prompts" || pipelinePhase === "analyzing_story" || pipelinePhase === "locking_characters" || pipelinePhase === "creating_project" || pipelinePhase === "submitting_kling") && (
-                      <div className="rounded-xl border border-orange-500/60 bg-orange-500/15 px-4 py-3 text-center">
-                        <p className="text-sm font-semibold text-orange-300">
-                          ⚠️ Keep this page open — generating your scenes...
-                        </p>
-                        <p className="mt-1 text-xs text-orange-200/70">
-                          Do not switch tabs or close this window.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
+                {/* Error display only — progress is handled by ScriptFlowWaitingScreen */}
                 {pipelineError && (
                   <p className="text-center text-sm text-red-400" role="alert">
                     {pipelineError}
