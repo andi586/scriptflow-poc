@@ -2272,8 +2272,20 @@ export default function Home() {
               </section>
             )}
 
-            {/* ── Video results: non-Director-Mode (Be the Star / Ghost Mode) ── */}
-            {pipelinePhase === "done" && projectId.trim() && !directorModeActive && (
+            {/* ── Video results: Be the Star mode — clean, no labels ─────────── */}
+            {entryMode === "star" && pipelinePhase === "done" && projectId.trim() && (
+              <section ref={clipsResultsSectionRef} className="mt-8 scroll-mt-24">
+                <VideoResultsPanel
+                  sessionId={projectId}
+                  taskIds={lastSubmittedClipTaskIds}
+                  refreshNonce={clipsRefreshNonce}
+                  title=""
+                />
+              </section>
+            )}
+
+            {/* ── Video results: Director mode (non-directorModeActive ghost mode) ── */}
+            {entryMode === "director" && pipelinePhase === "done" && projectId.trim() && !directorModeActive && (
               <section
                 ref={clipsResultsSectionRef}
                 className="mt-8 scroll-mt-24 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-500/10 to-black/30 p-6"
@@ -2291,9 +2303,6 @@ export default function Home() {
                   refreshNonce={clipsRefreshNonce}
                   title="Scenes"
                 />
-
-                {/* Cinema Bazaar: Sell as Asset — only in Director mode */}
-                {directorModeActive && <SellAsAssetButton projectId={projectId} />}
               </section>
             )}
           </>
