@@ -2143,6 +2143,7 @@ export default function Home() {
             {showDirectorReview && (
               <section className="mt-6">
                 <DirectorReviewPanel
+                  key={directorReviewPrompts.length}
                   prompts={directorReviewPrompts}
                   onApprove={handleDirectorApprove}
                   onCancel={() => {

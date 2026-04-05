@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +21,11 @@ export function DirectorReviewPanel({
 }: DirectorReviewPanelProps) {
   const [editedPrompts, setEditedPrompts] = useState<Array<{ prompt: string; [key: string]: any }>>([...prompts])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
+
+  // Sync editedPrompts when prompts prop changes (e.g. when parent sets data after mount)
+  useEffect(() => {
+    setEditedPrompts([...prompts])
+  }, [prompts])
 
   const handleEdit = (index: number, value: string) => {
     const updated = [...editedPrompts]
