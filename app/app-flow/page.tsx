@@ -1377,6 +1377,7 @@ export default function Home() {
     }
 
     setPipelineError(null);
+    setDirectorModeActive(false);
     setPipelineRunning(true);
     setLastSubmittedClipTaskIds([]);
     setStarEstimatedMinutes(null);
@@ -1447,24 +1448,28 @@ export default function Home() {
           console.warn("[StarMode] Failed to attach star photos:", e);
         }
 
-        // Write photos into project_cast so submitKlingTasksAction can read them
-        // and pass them as Kling Elements (reference images) to lock character faces.
+        // Write photos into character_templates (project-scoped rows) so submitKlingTasksAction
+        // can read them and pass them as Kling Elements (reference images) to lock character faces.
+        // PROJECT_CAST_TABLE = "character_templates" — rows with project_id set are project-scoped.
         try {
           const supabaseForCast = createClient();
           for (let i = 0; i < uploadedUrls.length && i < 4; i++) {
-            const { error: castErr } = await supabaseForCast.from("project_cast").insert({
+            const { error: castErr } = await supabaseForCast.from("character_templates").insert({
               project_id: pid,
               name: i === 0 ? "Star" : `Character ${i + 1}`,
-              appearance: "uploaded photo reference",
+              label: i === 0 ? "Star" : `Character ${i + 1}`,
+              role: i === 0 ? "protagonist" : "supporting",
+              personality: "uploaded photo reference",
+              language_fingerprint: "en",
               reference_image_url: uploadedUrls[i],
             });
             if (castErr) {
-              console.warn(`[StarMode] Failed to insert project_cast row ${i}:`, castErr.message);
+              console.warn(`[StarMode] Failed to insert character_templates row ${i}:`, castErr.message);
             }
           }
-          console.log(`[StarMode] Wrote ${Math.min(uploadedUrls.length, 4)} photo(s) to project_cast`);
+          console.log(`[StarMode] Wrote ${Math.min(uploadedUrls.length, 4)} photo(s) to character_templates`);
         } catch (e) {
-          console.warn("[StarMode] Failed to write project_cast:", e);
+          console.warn("[StarMode] Failed to write character_templates:", e);
         }
       }
 
