@@ -1363,7 +1363,10 @@ export default function Home() {
     });
   }, []);
 
-  // ─── Be the Star: pipeline (uploads photos as character reference images) ──
+  // ─── Be the Star: estimated wait time ────────────────────────────────────
+  const [starEstimatedMinutes, setStarEstimatedMinutes] = useState<number | null>(null);
+
+  // ─── Be the Star: pipeline (uploads photos, auto-submits Kling, zero interruption) ──
   const runStarModePipeline = useCallback(async () => {
     const latestIdea = storyIdeaTextareaRef.current?.value ?? storyIdea;
     if (latestIdea !== storyIdea) setStoryIdea(latestIdea);
@@ -1376,6 +1379,7 @@ export default function Home() {
     setPipelineError(null);
     setPipelineRunning(true);
     setLastSubmittedClipTaskIds([]);
+    setStarEstimatedMinutes(null);
     let activePhase: PipelinePhase = "creating_project";
     setPipelinePhase("creating_project");
 
@@ -1450,11 +1454,30 @@ export default function Home() {
       const gr = await generateKlingPromptsAction({ projectId: pid });
       if (!gr.success) throw new Error(errMsg(gr.error));
 
-      // 6. Director review (same as drama pipeline)
-      activePhase = "director_review";
-      setPipelinePhase("director_review");
-      setDirectorReviewPrompts(gr.data.prompts);
-      setShowDirectorReview(true);
+      // 6. Calculate estimated wait time (45s per scene) and show it
+      const sceneCount = Array.isArray(gr.data.prompts) ? gr.data.prompts.length : 9;
+      const estimatedSeconds = sceneCount * 45;
+      const estimatedMinutes = Math.ceil(estimatedSeconds / 60);
+      setStarEstimatedMinutes(estimatedMinutes);
+
+      // 7. Auto-submit to Kling — no Director Review, zero user interruption
+      activePhase = "submitting_kling";
+      setPipelinePhase("submitting_kling");
+      const sr = await submitKlingTasksAction({
+        projectId: pid,
+        prompts: gr.data.prompts as any,
+      });
+      if (!sr.success) throw new Error(errMsg(sr.error));
+
+      const submittedIds = sr.data.tasks
+        .map((t: any) => t.task_id.trim())
+        .filter((id: string) => id.length > 0);
+      writeKlingTaskSnapshotToStorage(pid, submittedIds);
+      setLastSubmittedClipTaskIds(submittedIds);
+      setClipsRefreshNonce((n) => n + 1);
+
+      // 8. Done — VideoResultsPanel will auto-render
+      setPipelinePhase("done");
     } catch (e) {
       setPipelinePhase("error");
       const raw = e instanceof Error ? e.message : errMsg(e);
@@ -1493,6 +1516,7 @@ export default function Home() {
       <ScriptFlowWaitingScreen
         phase={pipelinePhase}
         visible={showWaitingScreen}
+        estimatedMinutes={entryMode === "star" ? starEstimatedMinutes : null}
       />
 
       {/* ─── Modals ─────────────────────────────────────────────────────────── */}

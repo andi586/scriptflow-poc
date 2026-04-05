@@ -53,11 +53,14 @@ function getProgressForPhase(phase: string): number {
 interface ScriptFlowWaitingScreenProps {
   phase: string;
   visible: boolean;
+  /** Optional estimated wait time in minutes (shown in Be the Star mode after prompts are generated) */
+  estimatedMinutes?: number | null;
 }
 
 export function ScriptFlowWaitingScreen({
   phase,
   visible,
+  estimatedMinutes,
 }: ScriptFlowWaitingScreenProps) {
   const [displayedPhrase, setDisplayedPhrase] = useState(() =>
     getPhrasForPhase(phase)
@@ -175,6 +178,21 @@ export function ScriptFlowWaitingScreen({
         {displayedPhrase}
       </p>
 
+      {/* ── Estimated wait time (shown once known, fades in) ────────────────── */}
+      {estimatedMinutes != null && estimatedMinutes > 0 && (
+        <p
+          className="mt-5 text-center text-sm select-none px-8"
+          style={{
+            color: "rgba(255,255,255,0.38)",
+            maxWidth: 320,
+            lineHeight: 1.5,
+            animation: "sf-fadein 1s ease forwards",
+          }}
+        >
+          Your movie will be ready in approximately {estimatedMinutes} minute{estimatedMinutes !== 1 ? "s" : ""}
+        </p>
+      )}
+
       {/* ── Progress line ───────────────────────────────────────────────────── */}
       <div
         className="absolute bottom-0 left-0 right-0"
@@ -195,6 +213,10 @@ export function ScriptFlowWaitingScreen({
         @keyframes sf-breathe {
           0%, 100% { opacity: 0.25; transform: scale(0.85); }
           50%       { opacity: 1;    transform: scale(1.15); }
+        }
+        @keyframes sf-fadein {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
