@@ -478,19 +478,36 @@ function StarModeUploader({
     return { icon: "+", label: `#${i + 1} Awaiting fate 🎭` };
   };
 
+  const [convertError, setConvertError] = useState<string | null>(null);
+
   const handleFileChange = async (file: File, index: number) => {
+    console.log("[StarUpload] file received:", file.name, "type:", file.type, "size:", file.size);
+    setConvertError(null);
+
+    const heic = isHeicFile(file);
+    console.log("[StarUpload] isHeic:", heic);
+
     let finalFile = file;
-    if (isHeicFile(file)) {
+    if (heic) {
       setConvertingSlot(index);
       try {
+        console.log("[StarUpload] Starting HEIC→JPEG conversion...");
         finalFile = await convertHeicToJpeg(file);
+        console.log("[StarUpload] Conversion success:", finalFile.name, "type:", finalFile.type, "size:", finalFile.size);
       } catch (e) {
-        console.warn("[HEIC] Conversion failed, using original:", e);
+        console.error("[StarUpload] HEIC conversion failed:", e);
+        setConvertError("Could not convert HEIC photo. Please export as JPG from your Photos app and try again.");
+        setConvertingSlot(null);
+        return;
       } finally {
         setConvertingSlot(null);
       }
+    } else if (!isJpgPngWebpFile(file)) {
+      console.warn("[StarUpload] Unsupported file type:", file.type, file.name);
+      return;
     }
-    if (!isJpgPngWebpFile(finalFile) && !isHeicFile(file)) return;
+
+    console.log("[StarUpload] Calling onPhotoAdded with:", finalFile.name, finalFile.type);
     onPhotoAdded(finalFile, index);
   };
 
@@ -566,6 +583,10 @@ function StarModeUploader({
           );
         })}
       </div>
+
+      {convertError && (
+        <p className="text-xs text-red-400 text-center px-2">{convertError}</p>
+      )}
 
       {photos.length > 0 && (
         <p className="text-xs text-white/40 text-center">
