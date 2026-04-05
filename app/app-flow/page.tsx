@@ -1431,6 +1431,17 @@ export default function Home() {
       writeLazySessionIdToStorage(pid);
       try { window.localStorage.setItem(SCRIPTFLOW_PROJECT_ID_STORAGE_KEY, pid); } catch {}
 
+      // Mark this project as Star Mode so finalize pipeline skips episode title cards
+      try {
+        await fetch(`/api/projects/${pid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_star_mode: true }),
+        });
+      } catch (e) {
+        console.warn('[StarMode] Failed to set is_star_mode flag:', e);
+      }
+
       // 2. Upload star photos to Supabase storage and collect URLs
       const supabase = createClient();
       const uploadedUrls: string[] = [];

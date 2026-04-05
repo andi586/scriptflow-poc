@@ -151,10 +151,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdminClient()
 
-    // 从 projects 表读取 script_raw、title 和 episode_number
+    // 从 projects 表读取 script_raw、title、episode_number 和 is_star_mode
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('script_raw, title, episode_number, status')
+      .select('script_raw, title, episode_number, status, is_star_mode')
       .eq('id', projectId)
       .single()
 
@@ -162,6 +162,7 @@ export async function POST(request: NextRequest) {
       id: projectId,
       title: project?.title,
       episode_number: (project as any)?.episode_number,
+      is_star_mode: (project as any)?.is_star_mode,
       has_script_raw: !!(project as any)?.script_raw,
     }))
 
@@ -376,6 +377,9 @@ export async function POST(request: NextRequest) {
     // 读取 episode_number（如果 projects 表有该字段）
     const episodeNum: number = (project as any).episode_number ?? 1
 
+    // 检测是否为 Star Mode 项目（Star Mode 不添加片头集数字幕）
+    const isStarMode: boolean = !!(project as any).is_star_mode
+
     // 调用Railway合并（四轨：视频 + 对白音频 + BGM + 环境音）
     const mergeBody = {
       projectId,
@@ -387,6 +391,7 @@ export async function POST(request: NextRequest) {
       episodeTitle,
       bgmUrl: bgmUrl ?? undefined,
       ambienceUrl: ambienceUrl ?? undefined,
+      isStarMode,
     }
     console.log('[finalize] about to call Railway, ambienceUrl=', ambienceUrl)
     console.log('[railway-request] url:', RAILWAY_MERGE_URL)
