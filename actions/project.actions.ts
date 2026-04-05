@@ -8,21 +8,22 @@ export async function createProjectAction(input: {
   title: string;
   userId: string;
   language?: string;
+  /** Director Mode: user-defined episode number. Null = no title card (Star Mode or no series). */
+  episodeNumber?: number | null;
+  /** Director Mode: user-defined series name. */
+  seriesName?: string | null;
 }): Promise<ActionResult<{ projectId: string }>> {
   try {
     console.log(
       "[CREATE PROJECT ENTRY]",
-      JSON.stringify({ title: input.title, userId: input.userId, language: input.language ?? "en" })
+      JSON.stringify({ title: input.title, userId: input.userId, language: input.language ?? "en", episodeNumber: input.episodeNumber ?? null })
     );
     const supabase = createClient();
 
-    // Auto-calculate episode_number: COUNT existing projects for this user + 1
-    const { count: existingCount } = await supabase
-      .from("projects")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", input.userId);
-    const episodeNumber = (existingCount ?? 0) + 1;
-    console.log("[CREATE PROJECT] auto episode_number:", episodeNumber, "for user:", input.userId);
+    // episode_number: only set if explicitly provided (Director Mode with series)
+    // Star Mode and default Director Mode → null (no title card)
+    const episodeNumber = input.episodeNumber ?? null;
+    console.log("[CREATE PROJECT] episode_number:", episodeNumber, "for user:", input.userId);
 
     const { data, error } = await supabase
       .from("projects")
@@ -31,6 +32,7 @@ export async function createProjectAction(input: {
         title: input.title,
         language: input.language ?? "en",
         episode_number: episodeNumber,
+        series_name: input.seriesName ?? null,
       })
       .select("id")
       .single();

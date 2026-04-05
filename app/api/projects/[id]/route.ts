@@ -19,7 +19,7 @@ export async function PATCH(
 
     const body = await req.json().catch(() => ({}));
     // Allowlist of fields that can be patched
-    const allowed = ["is_star_mode", "title", "status"] as const;
+    const allowed = ["is_star_mode", "title", "status", "episode_number", "series_name"] as const;
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) updates[key] = body[key];

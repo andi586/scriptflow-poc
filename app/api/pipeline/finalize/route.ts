@@ -374,8 +374,12 @@ export async function POST(request: NextRequest) {
       console.warn('[finalize] BGM selection failed (skipping):', bgmErr instanceof Error ? bgmErr.message : bgmErr)
     }
 
-    // 读取 episode_number（如果 projects 表有该字段）
-    const episodeNum: number = (project as any).episode_number ?? 1
+    // 读取 episode_number（null = 无系列编号，不显示片头）
+    // Star Mode 项目 episode_number 为 null，Director Mode 可以有值
+    const episodeNum: number | null = (project as any).episode_number ?? null
+
+    // 读取 series_name（用户自定义系列名，Director Mode 专用）
+    const seriesName: string | null = (project as any).series_name ?? null
 
     // 检测是否为 Star Mode 项目（Star Mode 不添加片头集数字幕）
     const isStarMode: boolean = !!(project as any).is_star_mode
@@ -387,8 +391,9 @@ export async function POST(request: NextRequest) {
       audioUrls: audioList.map(a => a.audioUrl),
       srtContent: srtChunks.join('\n\n'),
       projectTitle,
-      episodeNum,
+      episodeNum,   // null = no title card; number = show episode title card
       episodeTitle,
+      seriesName,   // user-defined series name (Director Mode only)
       bgmUrl: bgmUrl ?? undefined,
       ambienceUrl: ambienceUrl ?? undefined,
       isStarMode,

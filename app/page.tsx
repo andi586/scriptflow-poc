@@ -337,7 +337,7 @@ export default function HomePage() {
             <Link href="/app-flow" className="bg-[#D4A017] text-black font-bold px-10 py-5 rounded-full text-xl hover:bg-[#e6b520] transition inline-block mb-6">
               Reserve My Golden Seat
             </Link>
-            <p className="text-white/30 text-sm">getscriptflow.com · @wolfemperorai · heavencinema.ai</p>
+            <p className="text-white/30 text-sm">getscriptflow.com · heavencinema.ai</p>
           </FadeUp>
         </div>
       </section>
