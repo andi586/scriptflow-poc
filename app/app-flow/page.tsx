@@ -480,6 +480,7 @@ function StarModeUploader({
 
   const handleFileChange = async (file: File, index: number) => {
     let finalFile = file;
+    console.log("[HEIC DEBUG] handleFileChange called, file:", file.name, file.type);
     if (isHeicFile(file)) {
       setConvertingSlot(index);
       try {
