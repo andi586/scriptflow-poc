@@ -1336,6 +1336,28 @@ export default function Home() {
   const progressPct =
     pipelinePhase === "error" ? phaseProgress("submitting_kling") : phaseProgress(pipelinePhase);
 
+  // ─── Star Mode: saved photos (localStorage) ───────────────────────────────
+  const STAR_SAVED_PHOTOS_KEY = "scriptflow_star_saved_photo_urls";
+  const [savedPhotoUrls, setSavedPhotoUrls] = useState<string[]>([]);
+  const [showSavedPhotosPrompt, setShowSavedPhotosPrompt] = useState(false);
+
+  // Load saved photo URLs on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STAR_SAVED_PHOTOS_KEY);
+      if (raw) {
+        const urls: string[] = JSON.parse(raw);
+        if (Array.isArray(urls) && urls.length > 0) {
+          setSavedPhotoUrls(urls);
+          setShowSavedPhotosPrompt(true);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // ─── Star Mode: translation state ─────────────────────────────────────────
+  const [translatedToEnglish, setTranslatedToEnglish] = useState(false);
+
   // ─── Star Mode: handle photo added ────────────────────────────────────────
   const handleStarPhotoAdded = useCallback((file: File, index: number) => {
     const localUrl = URL.createObjectURL(file);
@@ -1428,17 +1450,45 @@ export default function Home() {
         }
       }
 
-      // 3. Analyze story
+      // Save uploaded URLs to localStorage for next-session recall
+      if (uploadedUrls.length > 0) {
+        try { localStorage.setItem(STAR_SAVED_PHOTOS_KEY, JSON.stringify(uploadedUrls)); } catch {}
+      }
+
+      // 3. Analyze story — auto-translate non-English input to English
       activePhase = "analyzing_story";
       setPipelinePhase("analyzing_story");
       const trimmedRaw = latestIdea.trim();
       const composedForRun = composeInspirationForNel(latestIdea, inspirationFollowUpAnswers);
-      const isDirectScript = trimmedRaw.length >= DIRECT_SCRIPT_MIN_CHARS;
+
+      // Detect non-English: if text contains CJK or other non-ASCII chars, translate via Claude
+      const hasNonEnglish = /[\u0080-\uFFFF]/.test(trimmedRaw) || /[\u0080-\uFFFF]/.test(composedForRun);
+      let storyForNel = composedForRun.trim().length >= 8 ? composedForRun.trim() : trimmedRaw;
+      if (hasNonEnglish && storyForNel.trim().length > 0) {
+        try {
+          const translateRes = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: storyForNel }),
+          });
+          if (translateRes.ok) {
+            const { translated } = await translateRes.json() as { translated?: string };
+            if (translated && translated.trim().length > 0) {
+              storyForNel = translated.trim();
+              setTranslatedToEnglish(true);
+            }
+          }
+        } catch (e) {
+          console.warn("[StarMode] Translation failed, using original:", e);
+        }
+      }
+
+      const isDirectScript = storyForNel.length >= DIRECT_SCRIPT_MIN_CHARS;
       let nelScript: string;
       if (isDirectScript) {
-        nelScript = trimmedRaw;
-      } else if (composedForRun.trim().length >= 8) {
-        const fr = await formatStoryIdeaAction({ idea: composedForRun.trim() });
+        nelScript = storyForNel;
+      } else if (storyForNel.trim().length >= 8) {
+        const fr = await formatStoryIdeaAction({ idea: storyForNel.trim() });
         if (!fr.success) throw new Error(errMsg(fr.error));
         nelScript = storyboardShotsToNelScriptText(fr.data.shots);
       } else {
@@ -1713,6 +1763,71 @@ export default function Home() {
                     <div className="px-6 pb-6 space-y-4">
                       <p className="text-sm text-amber-200/70">Upload photos. Star in your story. &nbsp;<span className="text-white/30">1 photo = just you · 2–10 = squad</span></p>
                       <p className="text-xs text-white/35 -mt-2">Add friends. Make it chaos.</p>
+                      {/* ── Saved photos prompt ───────────────────────────── */}
+                      {showSavedPhotosPrompt && starPhotos.length === 0 && savedPhotoUrls.length > 0 && (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex flex-col gap-3">
+                          <div className="flex items-center gap-3">
+                            {/* Thumbnail previews */}
+                            <div className="flex gap-1.5">
+                              {savedPhotoUrls.slice(0, 3).map((url, i) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={i} src={url} alt="" className="w-10 h-10 rounded-lg object-cover border border-amber-500/40" />
+                              ))}
+                              {savedPhotoUrls.length > 3 && (
+                                <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-xs text-white/50">
+                                  +{savedPhotoUrls.length - 3}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-amber-200">Use your saved photos?</p>
+                              <p className="text-xs text-white/40">{savedPhotoUrls.length} photo{savedPhotoUrls.length > 1 ? "s" : ""} from last time</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                // Load saved URLs as StarPhoto entries (no File, just URL)
+                                // We create placeholder File objects from the URLs
+                                setShowSavedPhotosPrompt(false);
+                                // Fetch each URL and create a File blob for upload
+                                for (let i = 0; i < savedPhotoUrls.length; i++) {
+                                  const url = savedPhotoUrls[i];
+                                  try {
+                                    const res = await fetch(url);
+                                    const blob = await res.blob();
+                                    const file = new File([blob], `saved_photo_${i}.jpg`, { type: blob.type || "image/jpeg" });
+                                    handleStarPhotoAdded(file, i);
+                                  } catch {
+                                    // If fetch fails, just show the URL as a preview
+                                    setStarPhotos((prev) => {
+                                      const next = [...prev];
+                                      next[i] = { file: new File([], `saved_${i}.jpg`), localUrl: url };
+                                      return next;
+                                    });
+                                  }
+                                }
+                              }}
+                              className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-sm font-bold hover:bg-amber-400 transition-colors"
+                            >
+                              Yes ✓ Use saved
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowSavedPhotosPrompt(false);
+                                setSavedPhotoUrls([]);
+                                try { localStorage.removeItem(STAR_SAVED_PHOTOS_KEY); } catch {}
+                              }}
+                              className="flex-1 py-2 rounded-lg border border-white/20 text-white/60 text-sm hover:bg-white/5 transition-colors"
+                            >
+                              Upload new
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Photo upload slots */}
                       <StarModeUploader
                         photos={starPhotos}
@@ -1730,6 +1845,7 @@ export default function Home() {
                           value={storyIdea}
                           onChange={(e) => {
                             setStoryIdea(e.target.value);
+                            setTranslatedToEnglish(false);
                             requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
                           }}
                           onInput={() => setStoryFieldTick((n) => n + 1)}
@@ -1740,7 +1856,7 @@ export default function Home() {
                           onFocus={handleTextareaFocus}
                           onBlur={handleTextareaBlur}
                           rows={3}
-                          placeholder={"What happens to them?"}
+                          placeholder="Speak or type in any language..."
                           className="min-h-[100px] w-full resize-none rounded-xl border border-amber-500/30 bg-black/60 px-4 py-3 pr-36 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
                         />
                         {/* Spark Chaos button — inset top-right */}
