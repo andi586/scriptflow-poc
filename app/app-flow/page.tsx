@@ -442,6 +442,19 @@ type StarPhoto = {
 
 const MAX_STAR_PHOTOS = 10;
 
+function isHeicFile(file: File): boolean {
+  const t = (file.type || "").toLowerCase();
+  if (t === "image/heic" || t === "image/heif") return true;
+  return /\.(heic|heif)$/i.test(file.name);
+}
+
+async function convertHeicToJpeg(file: File): Promise<File> {
+  // Dynamic import to avoid SSR issues
+  const heic2any = (await import("heic2any")).default;
+  const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 }) as Blob;
+  return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+}
+
 function StarModeUploader({
   photos,
   onPhotoAdded,
@@ -458,10 +471,27 @@ function StarModeUploader({
   // Dynamic slots: always show photos.length + 1 empty slot, capped at MAX_STAR_PHOTOS
   const totalSlots = Math.min(photos.length + 1, MAX_STAR_PHOTOS);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [convertingSlot, setConvertingSlot] = useState<number | null>(null);
 
   const slotLabel = (i: number) => {
     if (i === 0) return { icon: "📸", label: "#1 The Fate Writer ⭐" };
     return { icon: "+", label: `#${i + 1} Awaiting fate 🎭` };
+  };
+
+  const handleFileChange = async (file: File, index: number) => {
+    let finalFile = file;
+    if (isHeicFile(file)) {
+      setConvertingSlot(index);
+      try {
+        finalFile = await convertHeicToJpeg(file);
+      } catch (e) {
+        console.warn("[HEIC] Conversion failed, using original:", e);
+      } finally {
+        setConvertingSlot(null);
+      }
+    }
+    if (!isJpgPngWebpFile(finalFile) && !isHeicFile(file)) return;
+    onPhotoAdded(finalFile, index);
   };
 
   return (
@@ -470,6 +500,7 @@ function StarModeUploader({
         {Array.from({ length: totalSlots }).map((_, i) => {
           const photo = photos[i];
           const { icon, label } = slotLabel(i);
+          const isConverting = convertingSlot === i;
           return (
             <div key={i} className="flex flex-col gap-1">
               {/* Slot number label above the card */}
@@ -500,26 +531,32 @@ function StarModeUploader({
                 <>
                   <button
                     type="button"
+                    disabled={isConverting}
                     onClick={() => fileInputRefs.current[i]?.click()}
                     className={cn(
                       "w-full h-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-colors",
                       i === 0
                         ? "border-amber-500/60 bg-amber-500/5 hover:bg-amber-500/10"
-                        : "border-white/20 bg-white/3 hover:bg-white/5"
+                        : "border-white/20 bg-white/3 hover:bg-white/5",
+                      isConverting && "opacity-70 cursor-wait"
                     )}
                   >
-                    <span className="text-2xl">{icon}</span>
+                    {isConverting ? (
+                      <span className="text-[9px] text-amber-300/80 text-center px-1 leading-tight">Converting photo...</span>
+                    ) : (
+                      <span className="text-2xl">{icon}</span>
+                    )}
                   </button>
                   <input
                     ref={(el) => { fileInputRefs.current[i] = el; }}
                     type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp,image/*"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       e.target.value = "";
-                      if (!file || !isJpgPngWebpFile(file)) return;
-                      onPhotoAdded(file, i);
+                      if (!file) return;
+                      void handleFileChange(file, i);
                     }}
                   />
                 </>
