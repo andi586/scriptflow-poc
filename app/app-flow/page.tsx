@@ -1856,9 +1856,16 @@ export default function Home() {
                           onFocus={handleTextareaFocus}
                           onBlur={handleTextareaBlur}
                           rows={3}
-                          placeholder="Speak or type in any language..."
+                          placeholder={"Speak or type in any language...\n用任何语言说出你的故事"}
                           className="min-h-[100px] w-full resize-none rounded-xl border border-amber-500/30 bg-black/60 px-4 py-3 pr-36 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
                         />
+                        {/* Translation success note */}
+                        {translatedToEnglish && (
+                          <p className="absolute bottom-2 left-3 text-[10px] text-emerald-400/80 flex items-center gap-1">
+                            <span>✓</span>
+                            <span>Translated to English for best results</span>
+                          </p>
+                        )}
                         {/* Spark Chaos button — inset top-right */}
                         <button
                           type="button"
