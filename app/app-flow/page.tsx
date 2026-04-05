@@ -2292,8 +2292,8 @@ export default function Home() {
                   title="Scenes"
                 />
 
-                {/* Cinema Bazaar: Sell as Asset */}
-                <SellAsAssetButton projectId={projectId} />
+                {/* Cinema Bazaar: Sell as Asset — only in Director mode */}
+                {directorModeActive && <SellAsAssetButton projectId={projectId} />}
               </section>
             )}
           </>
