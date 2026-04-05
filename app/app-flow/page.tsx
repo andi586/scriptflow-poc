@@ -1457,10 +1457,11 @@ export default function Home() {
             const { error: castErr } = await supabaseForCast.from("character_templates").insert({
               project_id: pid,
               name: i === 0 ? "Star" : `Character ${i + 1}`,
-              label: i === 0 ? "Star" : `Character ${i + 1}`,
+              archetype: i === 0 ? "protagonist" : "supporting",
+              style_tags: [],
+              kling_prompt_base: "",
               role: i === 0 ? "protagonist" : "supporting",
-              personality: "uploaded photo reference",
-              language_fingerprint: "en",
+              appearance: "uploaded photo reference",
               reference_image_url: uploadedUrls[i],
             });
             if (castErr) {
