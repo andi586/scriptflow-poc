@@ -414,16 +414,20 @@ function appendKlingElementsReferenceInstructions(
 }
 
 /** Cinema Glow™ — beauty enhancement via prompt for Star Mode */
-const CINEMA_GLOW_SUFFIX =
-  "cinematic lighting, perfect skin, movie star appearance, professional film quality, flattering angle, soft focus beauty lighting";
+const CINEMA_GLOW_SUFFIXES: Record<string, string> = {
+  natural: "natural beauty, soft cinematic lighting, healthy skin glow",
+  cinema:  "movie star quality, professional film lighting, perfect complexion",
+  iconic:  "Hollywood film quality, iconic appearance, legendary cinematic presence",
+};
 
 function appendPromptSafetyAndStyleLock(prompt: string) {
   return `${prompt.trim()}\n\nNo text, no subtitles, no watermarks, no captions. Photorealistic style only. No animation, no cartoon. Both characters must appear as real humans.`.trim();
 }
 
 /** Appends Cinema Glow™ beauty suffix to a prompt (Star Mode only). */
-function appendCinemaGlow(prompt: string): string {
-  return `${prompt.trim()}, ${CINEMA_GLOW_SUFFIX}`.trim();
+function appendCinemaGlow(prompt: string, tier: string = "cinema"): string {
+  const suffix = CINEMA_GLOW_SUFFIXES[tier] ?? CINEMA_GLOW_SUFFIXES.cinema;
+  return `${prompt.trim()}, ${suffix}`.trim();
 }
 
 export async function generateKlingPromptsAction(input: {
@@ -706,6 +710,8 @@ async function insertKlingTaskForProject(
 export async function submitKlingTasksAction(input: {
   projectId: string;
   prompts: KlingPromptItem[];
+  /** Cinema Glow™ beauty tier for Star Mode: "natural" | "cinema" | "iconic". Defaults to "cinema". */
+  cinemaGlowTier?: string;
 }): Promise<ActionResult<{ tasks: KlingTaskItem[] }>> {
   try {
     const projectId = requireProjectId(input.projectId);
@@ -793,8 +799,8 @@ export async function submitKlingTasksAction(input: {
         characterRefs,
       );
       // Cinema Glow™: apply beauty enhancement for Star Mode projects
-      const finalPrompt = isStarMode ? appendCinemaGlow(basePrompt) : basePrompt;
-      console.log("[submitKlingTasksAction] Cinema Glow applied:", isStarMode, "scene:", item.beat_number);
+      const finalPrompt = isStarMode ? appendCinemaGlow(basePrompt, input.cinemaGlowTier ?? "cinema") : basePrompt;
+      console.log("[submitKlingTasksAction] Cinema Glow applied:", isStarMode, "tier:", input.cinemaGlowTier ?? "cinema", "scene:", item.beat_number);
       const sanitizedPrompt = appendPromptSafetyAndStyleLock(finalPrompt);
 
       // TEMP: disable Veo3 routing; force all scenes through Kling path.

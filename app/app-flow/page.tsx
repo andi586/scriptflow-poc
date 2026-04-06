@@ -1408,6 +1408,19 @@ export default function Home() {
   // ─── Be the Star: duration tier ──────────────────────────────────────────
   type StarDurationTier = "taste" | "moment" | "full";
   const [starDurationTier, setStarDurationTier] = useState<StarDurationTier>("moment");
+
+  // ─── Be the Star: Cinema Glow™ beauty tier ───────────────────────────────
+  type CinemaGlowTier = "natural" | "cinema" | "iconic";
+  const [cinemaGlowTier, setCinemaGlowTier] = useState<CinemaGlowTier>("cinema");
+  const CINEMA_GLOW_OPTIONS: Array<{
+    id: CinemaGlowTier;
+    icon: string;
+    label: string;
+  }> = [
+    { id: "natural", icon: "✨", label: "Natural" },
+    { id: "cinema",  icon: "🎬", label: "Cinema"  },
+    { id: "iconic",  icon: "👑", label: "Iconic"  },
+  ];
   const STAR_DURATION_OPTIONS: Array<{
     id: StarDurationTier;
     icon: string;
@@ -1602,6 +1615,7 @@ export default function Home() {
       const sr = await submitKlingTasksAction({
         projectId: pid,
         prompts: slicedPrompts as any,
+        cinemaGlowTier,
       });
       if (!sr.success) throw new Error(errMsg(sr.error));
 
@@ -1949,6 +1963,32 @@ export default function Home() {
                                 <span className="text-base">{opt.icon}</span>
                                 <span className="leading-tight text-center">{opt.label}</span>
                                 <span className={cn("text-[10px]", selected ? "text-amber-400/80" : "text-white/25")}>{opt.sub}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* ── Cinema Glow™ beauty tier selector ────────────── */}
+                      <div className="space-y-2">
+                        <p className="text-xs text-white/40 font-medium tracking-wide">Cinema Glow™ beauty level</p>
+                        <div className="flex gap-2">
+                          {CINEMA_GLOW_OPTIONS.map((opt) => {
+                            const selected = cinemaGlowTier === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setCinemaGlowTier(opt.id)}
+                                className={cn(
+                                  "flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 rounded-xl border text-xs font-semibold transition-all",
+                                  selected
+                                    ? "border-purple-400 bg-purple-500/20 text-purple-200 shadow-md shadow-purple-500/30 ring-1 ring-purple-400/50"
+                                    : "border-white/15 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/60"
+                                )}
+                              >
+                                <span className="text-base">{opt.icon}</span>
+                                <span className="leading-tight text-center">{opt.label}</span>
                               </button>
                             );
                           })}
