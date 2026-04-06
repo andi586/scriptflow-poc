@@ -413,11 +413,110 @@ function appendKlingElementsReferenceInstructions(
   return `${prompt.trim()}\n\n${lines.join("\n")}`.trim();
 }
 
+// ─── Visual Bible Types (NEL v2.0) ───────────────────────────────────────────
+
+export type CharacterBibleEntry = {
+  id: string;
+  localName: string;
+  visualNameEn: string;
+  gender: "male" | "female" | "neutral";
+  archetype: string;
+  look: {
+    hair: string;
+    outfit: string;
+    shoes: string;
+    accessory: string;
+    palette: string;
+  };
+  negatives: string[];
+  voiceSlot: "Caius" | "Luna" | "Marcus" | "Narrator";
+};
+
+export type SceneBible = {
+  era: "ancient" | "modern" | "future" | "fantasy";
+  location: string;
+  environment: string;
+  palette: string;
+  propsBan: string[];
+};
+
+export type VisualBible = {
+  character_bible: CharacterBibleEntry[];
+  scene_bible: SceneBible;
+};
+
+/**
+ * Prompt Compiler v2.0 — compiles character_bible + scene_bible + beat action
+ * into a Kling-ready prompt. Total output capped at 800 chars.
+ */
+function compileVisualBiblePrompt(
+  beat: Record<string, unknown>,
+  visualBible: VisualBible,
+  beatAction: string,
+): string {
+  const { character_bible, scene_bible } = visualBible;
+
+  // Pick the primary character for this beat (first mentioned, or first in bible)
+  const beatText = (beatAction || String(beat.description ?? beat.action ?? "")).toLowerCase();
+  const primaryChar = character_bible.find((c) =>
+    beatText.includes(c.visualNameEn.toLowerCase()) ||
+    beatText.includes(c.localName.toLowerCase())
+  ) ?? character_bible[0];
+
+  const parts: string[] = [];
+
+  // 1. Character fixed description
+  if (primaryChar) {
+    const look = primaryChar.look;
+    const charDesc = [
+      `${primaryChar.visualNameEn}`,
+      look.hair,
+      look.outfit,
+      look.shoes !== "none" ? look.shoes : "",
+      look.accessory !== "none" ? look.accessory : "",
+    ].filter(Boolean).join(", ");
+    parts.push(charDesc);
+  }
+
+  // 2. Scene anchor
+  const sceneAnchor = [scene_bible.location, scene_bible.environment].filter(Boolean).join(", ");
+  if (sceneAnchor) parts.push(sceneAnchor);
+
+  // 3. Action
+  if (beatAction.trim()) parts.push(beatAction.trim());
+
+  // 4. Continuity lock
+  parts.push("consistent outfit throughout, same clothing in every scene, wardrobe continuity");
+
+  // 5. Negative constraints
+  const negatives: string[] = [];
+  if (primaryChar?.negatives?.length) negatives.push(...primaryChar.negatives);
+  if (scene_bible.propsBan?.length) negatives.push(...scene_bible.propsBan.map(p => `no ${p}`));
+  if (negatives.length > 0) parts.push(negatives.slice(0, 6).join(", "));
+
+  // Cap at 800 chars
+  let result = parts.join(", ");
+  if (result.length > 800) result = result.slice(0, 797) + "...";
+  return result;
+}
+
+/**
+ * Extract visual_bible from NEL raw_analysis if present.
+ * Falls back gracefully to null if not generated.
+ */
+function extractVisualBible(rawAnalysis: Record<string, unknown>): VisualBible | null {
+  const vb = rawAnalysis.visual_bible;
+  if (!vb || typeof vb !== "object") return null;
+  const obj = vb as Record<string, unknown>;
+  if (!Array.isArray(obj.character_bible) || !obj.scene_bible) return null;
+  return vb as VisualBible;
+}
+
 /** Cinema Glow™ — beauty enhancement via prompt for Star Mode */
 const CINEMA_GLOW_SUFFIXES: Record<string, string> = {
-  natural: "natural beauty, soft cinematic lighting, healthy radiant skin, authentic charming appearance",
-  cinema:  "movie star appearance, dramatic cinematic lighting, flawless complexion, charismatic screen presence, professional Hollywood film quality, strikingly handsome/beautiful",
-  iconic:  "legendary Hollywood icon appearance, perfect symmetrical features, epic cinematic lighting, timeless movie star beauty, larger than life screen presence",
+  natural: "natural beauty, soft cinematic lighting, healthy radiant skin, authentic charming appearance, natural facial expressions, genuine emotions",
+  cinema:  "movie star appearance, dramatic cinematic lighting, flawless complexion, charismatic screen presence, professional Hollywood film quality, strikingly handsome/beautiful, natural expressive face",
+  iconic:  "legendary Hollywood icon appearance, perfect symmetrical features, epic cinematic lighting, timeless movie star beauty, larger than life screen presence, natural authentic expressions",
 };
 
 function appendPromptSafetyAndStyleLock(prompt: string) {
@@ -522,13 +621,36 @@ export async function generateKlingPromptsAction(input: {
       throw new Error("Claude 返回格式错误：不是数组。");
     }
 
+    // ── NEL v2.0: extract visual_bible if Claude generated it ────────────────
+    const visualBible = extractVisualBible(rawAnalysis);
+    if (visualBible) {
+      console.log("[generateKlingPromptsAction] visual_bible found — using Prompt Compiler v2.0");
+    }
+
     const prompts = parsed
       .map((item) => {
         const obj = item as Record<string, unknown>;
         const beatNumber = Number(obj.beat_number);
         const rawPrompt = typeof obj.prompt === "string" ? obj.prompt : "";
         const normalizedBeat = Number.isFinite(beatNumber) ? beatNumber : 0;
-        const promptWithLocks = injectBeatLocks(rawPrompt, normalizedBeat, propRegistry, causalResultFrames);
+
+        // ── Prompt Compiler v2.0: use visual_bible if available ──────────────
+        let compiledPrompt: string;
+        if (visualBible) {
+          // Find the matching beat from rawAnalysis for action text
+          const matchingBeat = beats.find((b) => {
+            const bn = Number((b as Record<string, unknown>).beat_number);
+            return bn === normalizedBeat;
+          }) as Record<string, unknown> | undefined;
+          const beatAction = rawPrompt || String(
+            matchingBeat?.action ?? matchingBeat?.description ?? matchingBeat?.scene_description ?? ""
+          );
+          compiledPrompt = compileVisualBiblePrompt(matchingBeat ?? {}, visualBible, beatAction);
+        } else {
+          compiledPrompt = rawPrompt;
+        }
+
+        const promptWithLocks = injectBeatLocks(compiledPrompt, normalizedBeat, propRegistry, causalResultFrames);
         const finalPrompt = injectHumanFlavors(promptWithLocks, { intensity: 'light', enableAll: true });
         return {
           beat_number: normalizedBeat,
