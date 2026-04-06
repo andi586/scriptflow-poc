@@ -462,12 +462,18 @@ function StarModeUploader({
   onPhotoRemoved,
   onProceed,
   pipelineRunning,
+  pendingProjectId,
+  onVoiceCloned,
 }: {
   photos: StarPhoto[];
   onPhotoAdded: (file: File, index: number) => void;
   onPhotoRemoved: (index: number) => void;
   onProceed: () => void;
   pipelineRunning: boolean;
+  /** Project ID to associate the cloned voice with (may be null before project is created) */
+  pendingProjectId?: string | null;
+  /** Called with the ElevenLabs voice_id after successful cloning */
+  onVoiceCloned?: (voiceId: string) => void;
 }) {
   // Dynamic slots: always show photos.length + 1 empty slot, capped at MAX_STAR_PHOTOS
   const totalSlots = Math.min(photos.length + 1, MAX_STAR_PHOTOS);
@@ -564,7 +570,40 @@ function StarModeUploader({
           const { error: videoUploadError } = await supabase.storage
             .from("character-images")
             .upload(videoPath, videoBlob, { contentType: mimeType, upsert: true });
-          if (videoUploadError) console.warn("[Recording] Video upload failed (non-fatal):", videoUploadError.message);
+          if (videoUploadError) {
+            console.warn("[Recording] Video upload failed (non-fatal):", videoUploadError.message);
+          }
+
+          // ── Voice cloning: call server-side API with the uploaded audio URL ──
+          // Only attempt if video upload succeeded and we have a projectId
+          if (!videoUploadError) {
+            const { data: videoPub } = supabase.storage
+              .from("character-images")
+              .getPublicUrl(videoPath);
+            const audioPublicUrl = videoPub?.publicUrl;
+
+            if (audioPublicUrl && onVoiceCloned) {
+              // Fire-and-forget: clone voice in background, non-blocking
+              void (async () => {
+                try {
+                  const cloneRes = await fetch("/api/voice-clone", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ audioUrl: audioPublicUrl, projectId: pendingProjectId }),
+                  });
+                  const cloneData = await cloneRes.json() as { ok: boolean; voiceId?: string; error?: string };
+                  if (cloneData.ok && cloneData.voiceId) {
+                    console.log("[Recording] Voice cloned:", cloneData.voiceId);
+                    onVoiceCloned(cloneData.voiceId);
+                  } else {
+                    console.warn("[Recording] Voice clone failed (non-fatal):", cloneData.error);
+                  }
+                } catch (e) {
+                  console.warn("[Recording] Voice clone request failed (non-fatal):", e);
+                }
+              })();
+            }
+          }
 
           // Add frame as a photo slot
           const nextIndex = photos.length;
@@ -2069,6 +2108,18 @@ export default function Home() {
                         onPhotoRemoved={handleStarPhotoRemoved}
                         onProceed={() => {}}
                         pipelineRunning={pipelineRunning}
+                        pendingProjectId={currentProjectId}
+                        onVoiceCloned={(voiceId) => {
+                          console.log("[StarMode] Voice cloned, voiceId:", voiceId);
+                          // If project already exists, save immediately
+                          if (currentProjectId) {
+                            void fetch(`/api/projects/${currentProjectId}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ user_voice_id: voiceId }),
+                            }).catch((e) => console.warn("[StarMode] Failed to save user_voice_id:", e));
+                          }
+                        }}
                       />
 
                       {/* 2. Story input */}

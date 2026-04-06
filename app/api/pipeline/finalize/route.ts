@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     // 从 projects 表读取 script_raw、title、episode_number、is_star_mode 和 language
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('script_raw, title, episode_number, status, is_star_mode, language')
+      .select('script_raw, title, episode_number, status, is_star_mode, language, user_voice_id')
       .eq('id', projectId)
       .single()
 
@@ -408,9 +408,16 @@ ${linesJson}`
       let runningOffset = 0
       let srtSeq = 1
 
+      // Read user_voice_id from project (set after voice cloning from recording)
+      const userVoiceId: string | null = (project as any).user_voice_id ?? null
+      if (userVoiceId) {
+        console.log('[finalize] user_voice_id found — will use cloned voice for all TTS:', userVoiceId)
+      }
+
       for (const block of translatedBlocks) {
-        const voiceId = process.env[CHARACTER_VOICE_ENV_MAP[block.role]]
-        console.error("[finalize] role=", block.role, "voiceId=", voiceId)
+        // Prefer user's cloned voice if available; fall back to character-specific voice
+        const voiceId = userVoiceId ?? process.env[CHARACTER_VOICE_ENV_MAP[block.role]]
+        console.error("[finalize] role=", block.role, "voiceId=", voiceId, userVoiceId ? "(cloned)" : "(default)")
         if (!voiceId) {
           console.warn(`[finalize] No voice ID for "${block.role}" — skipping TTS`)
           continue
