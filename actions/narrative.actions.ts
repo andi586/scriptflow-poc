@@ -485,14 +485,21 @@ function compileVisualBiblePrompt(
   // 3. Action
   if (beatAction.trim()) parts.push(beatAction.trim());
 
-  // 4. Continuity lock
-  parts.push("consistent outfit throughout, same clothing in every scene, wardrobe continuity");
+  // 4. Continuity lock + global clothing constraint
+  parts.push("consistent outfit throughout, same clothing in every scene, wardrobe continuity, fully dressed, complete costume");
 
-  // 5. Negative constraints
+  // 5. Negative constraints (with male-specific clothing guards)
   const negatives: string[] = [];
   if (primaryChar?.negatives?.length) negatives.push(...primaryChar.negatives);
+  // Enforce male clothing safety regardless of what Claude put in negatives
+  if (primaryChar?.gender === "male") {
+    const maleGuards = ["no bare chest", "no shirtless", "fully clothed at all times"];
+    for (const g of maleGuards) {
+      if (!negatives.includes(g)) negatives.push(g);
+    }
+  }
   if (scene_bible.propsBan?.length) negatives.push(...scene_bible.propsBan.map(p => `no ${p}`));
-  if (negatives.length > 0) parts.push(negatives.slice(0, 6).join(", "));
+  if (negatives.length > 0) parts.push(negatives.slice(0, 9).join(", "));
 
   // Cap at 800 chars
   let result = parts.join(", ");
