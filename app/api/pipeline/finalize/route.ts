@@ -211,10 +211,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Failed to fetch kling_tasks' }, { status: 500 })
     }
 
-    // 解析对白块：structure.episodes[0].lines[]（容错：lines 不存在或为空则跳过）
+    // ── Debug: dump script_raw structure to trace dialogueBlocks source ──────
+    console.log('[finalize] script_raw structure:', JSON.stringify(scriptRaw).slice(0, 500))
+
+    // 解析对白块：多格式兼容
+    // 格式1: structure.episodes[0].lines[] — F81 v2 / Director Mode
+    // 格式2: structure.scenes[].shots[] — NEL 原始格式
+    // 格式3: structure.scenes[] — 场景描述转旁白
     const episodes = scriptRaw?.structure?.episodes ?? []
-    const firstEpisodeLines: Array<{ character: string; text: string }> = episodes[0]?.lines ?? []
+    let firstEpisodeLines: Array<{ character: string; text: string }> = episodes[0]?.lines ?? []
+
+    // 格式2/3 兼容：如果 episodes[0].lines 为空，尝试从 scenes 提取
+    if (firstEpisodeLines.length === 0) {
+      const scenes: any[] = scriptRaw?.structure?.scenes ?? []
+      if (scenes.length > 0) {
+        console.log('[finalize] episodes[0].lines empty — falling back to scenes[] format')
+        // 格式2: scenes[].shots[] 有对白
+        const fromShots: Array<{ character: string; text: string }> = []
+        for (const scene of scenes) {
+          const shots: any[] = scene.shots ?? []
+          for (const shot of shots) {
+            const character = shot.character ?? shot.role ?? 'narrator'
+            const text = shot.dialogue ?? shot.text ?? shot.description ?? ''
+            if (text) fromShots.push({ character, text })
+          }
+        }
+        if (fromShots.length > 0) {
+          firstEpisodeLines = fromShots
+          console.log('[finalize] Extracted', fromShots.length, 'lines from scenes[].shots[]')
+        } else {
+          // 格式3: scenes[] 本身有 description/summary → 转成旁白行
+          const fromScenes: Array<{ character: string; text: string }> = scenes
+            .map((scene: any) => {
+              const text = scene.description ?? scene.summary ?? scene.title ?? ''
+              return text ? { character: 'narrator', text } : null
+            })
+            .filter(Boolean) as Array<{ character: string; text: string }>
+          if (fromScenes.length > 0) {
+            firstEpisodeLines = fromScenes
+            console.log('[finalize] Extracted', fromScenes.length, 'narrator lines from scenes[].description')
+          }
+        }
+      }
+    }
+
     const hasDialogue = firstEpisodeLines.length > 0
+    console.log('[finalize] hasDialogue:', hasDialogue, '| lines count:', firstEpisodeLines.length)
+    console.log('[finalize] firstEpisodeLines sample:', JSON.stringify(firstEpisodeLines.slice(0, 2)))
 
     const dialogueBlocks: Array<{ shotIndex: number; role: string; text: string }> = []
 
