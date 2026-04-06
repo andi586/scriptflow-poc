@@ -474,6 +474,133 @@ function StarModeUploader({
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [convertingSlot, setConvertingSlot] = useState<number | null>(null);
 
+  // ─── Video recording state ────────────────────────────────────────────────
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState<"idle" | "recording" | "processing" | "done" | "error">("idle");
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startRecording = async () => {
+    setRecordingError(null);
+    setRecordingStatus("recording");
+    setIsRecording(true);
+    recordedChunksRef.current = [];
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus"
+        : MediaRecorder.isTypeSupported("video/webm")
+        ? "video/webm"
+        : "video/mp4";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        // Stop all tracks
+        stream.getTracks().forEach((t) => t.stop());
+        setIsRecording(false);
+        setRecordingStatus("processing");
+
+        try {
+          const videoBlob = new Blob(recordedChunksRef.current, { type: mimeType });
+
+          // ── Extract first frame via canvas ──────────────────────────────
+          const videoUrl = URL.createObjectURL(videoBlob);
+          const video = document.createElement("video");
+          video.src = videoUrl;
+          video.muted = true;
+          video.playsInline = true;
+
+          await new Promise<void>((resolve, reject) => {
+            video.onloadeddata = () => resolve();
+            video.onerror = () => reject(new Error("Failed to load video for frame extraction"));
+            video.load();
+          });
+
+          video.currentTime = 0;
+          await new Promise<void>((resolve) => {
+            video.onseeked = () => resolve();
+          });
+
+          const canvas = document.createElement("canvas");
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 480;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas context unavailable");
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(videoUrl);
+
+          const frameBlob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((b) => {
+              if (b) resolve(b);
+              else reject(new Error("Canvas toBlob failed"));
+            }, "image/jpeg", 0.92);
+          });
+
+          const frameFile = new File([frameBlob], "recording_frame.jpg", { type: "image/jpeg" });
+
+          // ── Upload frame + audio to Supabase ────────────────────────────
+          const supabase = createClient();
+          const timestamp = Date.now();
+
+          // Upload frame image
+          const framePath = `star-mode/recordings/${timestamp}_frame.jpg`;
+          const { error: frameUploadError } = await supabase.storage
+            .from("character-images")
+            .upload(framePath, frameBlob, { contentType: "image/jpeg", upsert: true });
+          if (frameUploadError) throw new Error(`Frame upload failed: ${frameUploadError.message}`);
+
+          // Upload audio/video blob
+          const videoExt = mimeType.includes("mp4") ? "mp4" : "webm";
+          const videoPath = `star-mode/recordings/${timestamp}_recording.${videoExt}`;
+          const { error: videoUploadError } = await supabase.storage
+            .from("character-images")
+            .upload(videoPath, videoBlob, { contentType: mimeType, upsert: true });
+          if (videoUploadError) console.warn("[Recording] Video upload failed (non-fatal):", videoUploadError.message);
+
+          // Add frame as a photo slot
+          const nextIndex = photos.length;
+          onPhotoAdded(frameFile, nextIndex);
+
+          setRecordingStatus("done");
+        } catch (e) {
+          console.error("[Recording] Processing failed:", e);
+          setRecordingError(e instanceof Error ? e.message : "Recording processing failed");
+          setRecordingStatus("error");
+        }
+      };
+
+      recorder.start(100); // collect data every 100ms
+
+      // Auto-stop after 30 seconds
+      recordingTimerRef.current = setTimeout(() => {
+        if (mediaRecorderRef.current?.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      }, 30000);
+    } catch (e) {
+      console.error("[Recording] Failed to start:", e);
+      setIsRecording(false);
+      setRecordingError(e instanceof Error ? e.message : "Could not access camera/microphone");
+      setRecordingStatus("error");
+    }
+  };
+
+  const stopRecording = () => {
+    if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
   const slotLabel = (i: number) => {
     if (i === 0) return { icon: "📸", label: "#1 The Fate Writer ⭐" };
     return { icon: "+", label: `#${i + 1} Awaiting fate 🎭` };
@@ -568,6 +695,41 @@ function StarModeUploader({
           );
         })}
       </div>
+
+      {/* ─── Record yourself button ──────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={isRecording ? stopRecording : () => void startRecording()}
+          disabled={recordingStatus === "processing"}
+          className={cn(
+            "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
+            isRecording
+              ? "border-red-500/60 bg-red-500/15 text-red-300 hover:bg-red-500/25 animate-pulse"
+              : recordingStatus === "processing"
+              ? "border-white/20 bg-white/5 text-white/40 cursor-wait"
+              : "border-white/25 bg-white/5 text-white/70 hover:bg-white/10 hover:border-white/40"
+          )}
+        >
+          {isRecording ? (
+            <>⏹ Stop recording</>
+          ) : recordingStatus === "processing" ? (
+            <>⏳ Processing…</>
+          ) : (
+            <>🎬 Record yourself (30s)</>
+          )}
+        </button>
+        {isRecording && (
+          <span className="text-xs text-red-400/80 animate-pulse">● Recording…</span>
+        )}
+        {recordingStatus === "done" && !isRecording && (
+          <span className="text-xs text-emerald-400/80">✓ Frame captured!</span>
+        )}
+      </div>
+
+      {recordingError && (
+        <p className="text-xs text-red-400">{recordingError}</p>
+      )}
 
       {photos.length > 0 && (
         <p className="text-xs text-white/40 text-center">
