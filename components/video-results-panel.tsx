@@ -551,6 +551,8 @@ export function VideoResultsPanel({
             const processing = isClipProcessing(task);
             const piTid = getTaskIdKey(task);
             if (!piTid) return null;
+            // Star mode: hide all intermediate (processing/pending) cards entirely
+            if (hideIntermediateState && !done && !failed) return null;
             const pollErr = clipPollErrors[piTid] ?? clipPollErrors[task.task_id];
             const unlocked = !!videoUnlocked[piTid];
             return (
@@ -558,11 +560,12 @@ export function VideoResultsPanel({
                 key={piTid}
                 className="rounded-xl border border-white/10 bg-zinc-950/70 p-4"
               >
+                {!hideIntermediateState && (
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                   <span className="font-semibold text-amber-400">
                     Scene {task.beat_number}
                   </span>
-                  {processing && !hideIntermediateState && (
+                  {processing && (
                     <span className="inline-flex items-center gap-1.5 rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium capitalize text-amber-200">
                       <Loader2 className="size-3.5 animate-spin" aria-hidden />
                       Creating...
@@ -579,6 +582,7 @@ export function VideoResultsPanel({
                     </span>
                   )}
                 </div>
+                )}
 
                 {task.error_message && (
                   <p className="mt-2 text-sm text-red-400">{task.error_message}</p>
