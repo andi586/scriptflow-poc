@@ -424,10 +424,11 @@ function appendPromptSafetyAndStyleLock(prompt: string) {
   return `${prompt.trim()}\n\nNo text, no subtitles, no watermarks, no captions. Photorealistic style only. No animation, no cartoon. Both characters must appear as real humans.`.trim();
 }
 
-/** Appends Cinema Glow™ beauty suffix to a prompt (Star Mode only). */
+/** Appends Cinema Glow™ beauty suffix + wardrobe continuity lock to a prompt (Star Mode only). */
 function appendCinemaGlow(prompt: string, tier: string = "cinema"): string {
   const suffix = CINEMA_GLOW_SUFFIXES[tier] ?? CINEMA_GLOW_SUFFIXES.cinema;
-  return `${prompt.trim()}, ${suffix}`.trim();
+  const wardrobeLock = "consistent clothing throughout, same outfit in every scene, wardrobe continuity";
+  return `${prompt.trim()}, ${suffix}, ${wardrobeLock}`.trim();
 }
 
 export async function generateKlingPromptsAction(input: {
