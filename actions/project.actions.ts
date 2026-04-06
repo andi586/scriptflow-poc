@@ -21,8 +21,8 @@ export async function createProjectAction(input: {
     const supabase = createClient();
 
     // episode_number: only set if explicitly provided (Director Mode with series)
-    // Star Mode and default Director Mode → null (no title card)
-    const episodeNumber = input.episodeNumber ?? null;
+    // Star Mode and default Director Mode → default to 1 (avoids NOT NULL violation)
+    const episodeNumber = input.episodeNumber ?? 1;
     console.log("[CREATE PROJECT] episode_number:", episodeNumber, "for user:", input.userId);
 
     const { data, error } = await supabase
