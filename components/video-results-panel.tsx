@@ -356,11 +356,16 @@ export function VideoResultsPanel({
     [sessionId, retrySubmittingByTaskId],
   );
 
-  // Auto-trigger cloud merge (finalize) when all clips succeed
+  // Auto-trigger cloud merge (finalize) when all clips reach a terminal state
+  // Terminal = success | url_missing | failed
+  // Require at least one success so we have something to merge
   useEffect(() => {
     if (cloudMergeTriggeredRef.current) return;
     if (tasks.length === 0) return;
-    if (!tasks.every((t) => t.status === "success")) return;
+    const isTerminal = (s: string) =>
+      s === "success" || s === "url_missing" || s === "failed";
+    if (!tasks.every((t) => isTerminal(t.status))) return;
+    if (!tasks.some((t) => t.status === "success")) return;
 
     cloudMergeTriggeredRef.current = true;
     void (async () => {
@@ -368,9 +373,11 @@ export function VideoResultsPanel({
       setCloudMergeError(null);
       setCloudMergedVideoUrl(null);
       try {
+        // Only include success clips in the merge; skip failed/url_missing
         const clips = tasks
           .slice()
-          .sort((a, b) => a.beat_number - b.beat_number);
+          .sort((a, b) => a.beat_number - b.beat_number)
+          .filter((t) => t.status === "success");
         const videoUrls: string[] = [];
         for (const t of clips) {
           const tid = getTaskIdKey(t);
