@@ -1802,6 +1802,7 @@ export default function Home() {
                     <div className="px-6 pb-6 space-y-4">
                       <p className="text-sm text-amber-200/70">Upload photos. Star in your story. &nbsp;<span className="text-white/30">1 photo = just you · 2–10 = squad</span></p>
                       <p className="text-xs text-white/35 -mt-2">Add friends. Make it chaos.</p>
+                      <p className="text-xs text-amber-300/60 -mt-1">Best results: close-up or bust shot (shoulders &amp; above) 📸</p>
                       {/* ── Saved photos prompt ───────────────────────────── */}
                       {showSavedPhotosPrompt && starPhotos.length === 0 && savedPhotoUrls.length > 0 && (
                         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex flex-col gap-3">
