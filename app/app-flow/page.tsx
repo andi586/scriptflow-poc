@@ -2526,6 +2526,7 @@ export default function Home() {
                   refreshNonce={clipsRefreshNonce}
                   title=""
                   hideIntermediateState={true}
+                  onAllDone={() => setStarVideosDone(true)}
                 />
               </section>
             )}

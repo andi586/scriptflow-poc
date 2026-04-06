@@ -1,4 +1,3 @@
-cd ~/Desktop/scriptflow-poc && git add -A && git commit -m "Fix: Claude translation model ID, page jump, natural expressions" && git push ssh://git@ssh.github.com:443/andi586/scriptflow-poc.git main
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -106,6 +105,7 @@ export function VideoResultsPanel({
   refreshNonce = 0,
   className = "",
   hideIntermediateState = false,
+  onAllDone,
 }: VideoResultsPanelProps) {
   const [tasks, setTasks] = useState<KlingTaskItem[]>([]);
   const [lazyPollBusy, setLazyPollBusy] = useState(false);
@@ -415,16 +415,18 @@ export function VideoResultsPanel({
           throw new Error(data.error || "Finalize failed");
         }
         setCloudMergedVideoUrl(data.finalVideoUrl);
+        onAllDone?.();
       } catch (err) {
         setCloudMergeError(
           err instanceof Error ? err.message : String(err)
         );
         cloudMergeTriggeredRef.current = false;
+        onAllDone?.();
       } finally {
         setCloudMergeBusy(false);
       }
     })();
-  }, [tasks, sessionId, fetchFreshPlaybackUrl]);
+  }, [tasks, sessionId, fetchFreshPlaybackUrl, onAllDone]);
 
   useEffect(() => {
     if (!sessionId.trim() || stillResolvingIds) {
