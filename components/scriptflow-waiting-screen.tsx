@@ -33,10 +33,12 @@ export function ScriptFlowWaitingScreen({
   phase,
   visible,
   estimatedMinutes,
+  keyframeUrl,
 }: {
   phase: PipelinePhase;
   visible: boolean;
   estimatedMinutes?: number | null;
+  keyframeUrl?: string | null;
 }) {
   const [lineIndex, setLineIndex] = useState(0);
   const [fadeIn, setFadeIn] = useState(true);
@@ -93,6 +95,42 @@ export function ScriptFlowWaitingScreen({
   const showFinalLine = remainingSeconds !== null && remainingSeconds <= FINAL_THRESHOLD_S && remainingSeconds >= 0;
 
   const displayLine = showFinalLine ? FINAL_LINE : ROTATING_LINES[lineIndex];
+
+  // When keyframe is available, switch to "Meet your character" layout
+  if (keyframeUrl) {
+    return (
+      <div
+        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black px-6"
+        aria-live="polite"
+        aria-label="Meet your character"
+      >
+        {/* "Meet your character." headline */}
+        <h1
+          style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+          className="text-2xl sm:text-3xl font-light text-white tracking-widest text-center mb-8 select-none"
+        >
+          Meet your character.
+        </h1>
+
+        {/* Character keyframe image */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={keyframeUrl}
+          alt="Your character"
+          className="w-48 sm:w-64 rounded-2xl shadow-2xl shadow-amber-500/20 border border-white/10 object-cover"
+          style={{ maxHeight: "55vh", objectFit: "cover" }}
+        />
+
+        {/* Sub-caption */}
+        <p
+          style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+          className="mt-6 text-sm text-white/40 tracking-widest text-center select-none"
+        >
+          Creating your movie...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

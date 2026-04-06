@@ -1436,6 +1436,9 @@ export default function Home() {
   // ─── Be the Star: estimated wait time ────────────────────────────────────
   const [starEstimatedMinutes, setStarEstimatedMinutes] = useState<number | null>(null);
 
+  // ─── Be the Star: character keyframe preview ──────────────────────────────
+  const [starKeyframeUrl, setStarKeyframeUrl] = useState<string | null>(null);
+
   // ─── Be the Star: pipeline (uploads photos, auto-submits Kling, zero interruption) ──
   const runStarModePipeline = useCallback(async () => {
     const latestIdea = storyIdeaTextareaRef.current?.value ?? storyIdea;
@@ -1609,6 +1612,84 @@ export default function Home() {
       const estimatedMinutes = Math.ceil(estimatedSeconds / 60);
       setStarEstimatedMinutes(estimatedMinutes);
 
+      // 7b. Generate character keyframe preview via Flux img2img (non-blocking, best-effort)
+      // Uses the first uploaded photo + character_bible look description
+      // Runs in parallel with the Kling submission — we fire-and-forget the poll
+      if (uploadedUrls.length > 0) {
+        const piapiKey = process.env.NEXT_PUBLIC_PIAPI_KEY ?? "";
+        const firstPhotoUrl = uploadedUrls[0];
+        // Build a cinematic portrait prompt from the first Kling prompt (or a default)
+        const firstPromptText = Array.isArray(slicedPrompts) && slicedPrompts.length > 0
+          ? (slicedPrompts[0] as any).prompt ?? ""
+          : "cinematic portrait, movie still";
+        const keyframePrompt = `${firstPromptText.slice(0, 200)}, cinematic portrait, movie still, 9:16 vertical, photorealistic, dramatic lighting`;
+
+        // Fire-and-forget: generate keyframe, poll up to 30s, then set state
+        void (async () => {
+          try {
+            const submitRes = await fetch("https://api.piapi.ai/api/v1/task", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": piapiKey,
+              },
+              body: JSON.stringify({
+                model: "Qubico/flux1-schnell",
+                task_type: "img2img",
+                input: {
+                  prompt: keyframePrompt,
+                  image: firstPhotoUrl,
+                  width: 576,
+                  height: 1024,
+                },
+              }),
+            });
+            if (!submitRes.ok) return;
+            const submitData = await submitRes.json() as Record<string, unknown>;
+            const kfTaskId = String(
+              (submitData.data as any)?.task_id ?? submitData.task_id ?? ""
+            );
+            if (!kfTaskId) return;
+
+            // Poll up to 30s (6 × 5s)
+            for (let attempt = 0; attempt < 6; attempt++) {
+              await new Promise((r) => setTimeout(r, 5000));
+              const pollRes = await fetch(`https://api.piapi.ai/api/v1/task/${kfTaskId}`, {
+                headers: { "x-api-key": piapiKey },
+              });
+              if (!pollRes.ok) continue;
+              const pollData = await pollRes.json() as Record<string, unknown>;
+              const nested = (pollData.data ?? pollData) as Record<string, unknown>;
+              const status = String(nested.status ?? "").toLowerCase();
+              if (status.includes("success") || status.includes("complete")) {
+                // Extract image URL from PiAPI response
+                const output = nested.output as Record<string, unknown> | undefined;
+                const imgUrl = String(
+                  (output?.image_url) ??
+                  (Array.isArray(output?.images) ? (output.images as string[])[0] : "") ??
+                  ""
+                );
+                if (imgUrl && /^https?:\/\//i.test(imgUrl)) {
+                  setStarKeyframeUrl(imgUrl);
+                  // Save keyframe URL to project (best-effort)
+                  try {
+                    await fetch(`/api/projects/${pid}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ keyframe_url: imgUrl }),
+                    });
+                  } catch {}
+                }
+                break;
+              }
+              if (status.includes("fail") || status.includes("error")) break;
+            }
+          } catch (e) {
+            console.warn("[StarMode] Keyframe generation failed (non-fatal):", e);
+          }
+        })();
+      }
+
       // 8. Auto-submit to Kling — no Director Review, zero user interruption
       activePhase = "submitting_kling";
       setPipelinePhase("submitting_kling");
@@ -1671,6 +1752,7 @@ export default function Home() {
         phase={pipelinePhase}
         visible={showWaitingScreen}
         estimatedMinutes={entryMode === "star" ? starEstimatedMinutes : null}
+        keyframeUrl={entryMode === "star" ? starKeyframeUrl : null}
       />
 
       {/* ─── Modals ─────────────────────────────────────────────────────────── */}
