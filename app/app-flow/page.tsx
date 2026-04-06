@@ -1572,30 +1572,10 @@ export default function Home() {
           console.warn("[StarMode] Failed to attach star photos:", e);
         }
 
-        // Write photos into character_templates (project-scoped rows) so submitKlingTasksAction
-        // can read them and pass them as Kling Elements (reference images) to lock character faces.
-        // PROJECT_CAST_TABLE = "character_templates" — rows with project_id set are project-scoped.
-        try {
-          const supabaseForCast = createClient();
-          for (let i = 0; i < uploadedUrls.length && i < 4; i++) {
-            const { error: castErr } = await supabaseForCast.from("character_templates").insert({
-              project_id: pid,
-              name: i === 0 ? "Star" : `Character ${i + 1}`,
-              archetype: i === 0 ? "protagonist" : "supporting",
-              style_tags: [],
-              kling_prompt_base: "",
-              role: i === 0 ? "protagonist" : "supporting",
-              appearance: "uploaded photo reference",
-              reference_image_url: uploadedUrls[i],
-            });
-            if (castErr) {
-              console.warn(`[StarMode] Failed to insert character_templates row ${i}:`, castErr.message);
-            }
-          }
-          console.log(`[StarMode] Wrote ${Math.min(uploadedUrls.length, 4)} photo(s) to character_templates`);
-        } catch (e) {
-          console.warn("[StarMode] Failed to write character_templates:", e);
-        }
+        // character_templates insert is now handled by the star-photos API route
+        // (which uses SUPABASE_SERVICE_ROLE_KEY to bypass RLS).
+        // The client-side anon key was silently blocked by RLS — removed.
+        console.log(`[StarMode] character_templates insert delegated to /api/projects/${pid}/star-photos`);
       }
 
       // 5. Generate Kling prompts — pass maxScenes so Claude only generates N beats
