@@ -1815,78 +1815,10 @@ export default function Home() {
                     </div>
                   </button>
 
-                  {/* Expanded content */}
+                  {/* Expanded content — minimal 3-element layout */}
                   {entryMode === "star" && (
-                    <div className="px-6 pb-6 space-y-4">
-                      <p className="text-sm text-amber-200/70">Upload photos. Star in your story. &nbsp;<span className="text-white/30">1 photo = just you · 2–10 = squad</span></p>
-                      <p className="text-xs text-white/35 -mt-2">Add friends. Make it chaos.</p>
-                      <p className="text-xs text-amber-300/60 -mt-1">Best results: close-up or bust shot (shoulders &amp; above) 📸</p>
-                      {/* ── Saved photos prompt ───────────────────────────── */}
-                      {showSavedPhotosPrompt && starPhotos.length === 0 && savedPhotoUrls.length > 0 && (
-                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex flex-col gap-3">
-                          <div className="flex items-center gap-3">
-                            {/* Thumbnail previews */}
-                            <div className="flex gap-1.5">
-                              {savedPhotoUrls.slice(0, 3).map((url, i) => (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img key={i} src={url} alt="" className="w-10 h-10 rounded-lg object-cover border border-amber-500/40" />
-                              ))}
-                              {savedPhotoUrls.length > 3 && (
-                                <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-xs text-white/50">
-                                  +{savedPhotoUrls.length - 3}
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-amber-200">Use your saved photos?</p>
-                              <p className="text-xs text-white/40">{savedPhotoUrls.length} photo{savedPhotoUrls.length > 1 ? "s" : ""} from last time</p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                // Load saved URLs as StarPhoto entries (no File, just URL)
-                                // We create placeholder File objects from the URLs
-                                setShowSavedPhotosPrompt(false);
-                                // Fetch each URL and create a File blob for upload
-                                for (let i = 0; i < savedPhotoUrls.length; i++) {
-                                  const url = savedPhotoUrls[i];
-                                  try {
-                                    const res = await fetch(url);
-                                    const blob = await res.blob();
-                                    const file = new File([blob], `saved_photo_${i}.jpg`, { type: blob.type || "image/jpeg" });
-                                    handleStarPhotoAdded(file, i);
-                                  } catch {
-                                    // If fetch fails, just show the URL as a preview
-                                    setStarPhotos((prev) => {
-                                      const next = [...prev];
-                                      next[i] = { file: new File([], `saved_${i}.jpg`), localUrl: url };
-                                      return next;
-                                    });
-                                  }
-                                }
-                              }}
-                              className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-sm font-bold hover:bg-amber-400 transition-colors"
-                            >
-                              Yes ✓ Use saved
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowSavedPhotosPrompt(false);
-                                setSavedPhotoUrls([]);
-                                try { localStorage.removeItem(STAR_SAVED_PHOTOS_KEY); } catch {}
-                              }}
-                              className="flex-1 py-2 rounded-lg border border-white/20 text-white/60 text-sm hover:bg-white/5 transition-colors"
-                            >
-                              Upload new
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Photo upload slots */}
+                    <div className="px-6 pb-8 space-y-5">
+                      {/* 1. Photo upload slots */}
                       <StarModeUploader
                         photos={starPhotos}
                         onPhotoAdded={handleStarPhotoAdded}
@@ -1895,111 +1827,27 @@ export default function Home() {
                         pipelineRunning={pipelineRunning}
                       />
 
-                      {/* Story input */}
-                      <div className="relative">
-                        <textarea
-                          id="story-input-star"
-                          ref={storyIdeaTextareaRef}
-                          value={storyIdea}
-                          onChange={(e) => {
-                            setStoryIdea(e.target.value);
-                            setTranslatedToEnglish(false);
-                            requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
-                          }}
-                          onInput={() => setStoryFieldTick((n) => n + 1)}
-                          onCompositionEnd={(e) => {
-                            setStoryIdea(e.currentTarget.value);
-                            setStoryFieldTick((n) => n + 1);
-                          }}
-                          onFocus={handleTextareaFocus}
-                          onBlur={handleTextareaBlur}
-                          rows={3}
-                          placeholder={"Speak or type in any language...\n用任何语言说出你的故事"}
-                          className="min-h-[100px] w-full resize-none rounded-xl border border-amber-500/30 bg-black/60 px-4 py-3 pr-36 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
-                        />
-                        {/* Translation success note */}
-                        {translatedToEnglish && (
-                          <p className="absolute bottom-2 left-3 text-[10px] text-emerald-400/80 flex items-center gap-1">
-                            <span>✓</span>
-                            <span>Translated to English for best results</span>
-                          </p>
-                        )}
-                        {/* Spark Chaos button — inset top-right */}
-                        <button
-                          type="button"
-                          onClick={() => setShowChaosSheet(true)}
-                          className={cn(
-                            "absolute top-2 right-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                            "border-amber-500/50 bg-black/60 text-amber-400/80 hover:border-amber-400 hover:text-amber-300 hover:bg-amber-500/10",
-                            sparkFlash && "animate-pulse border-amber-400 text-amber-300 shadow-md shadow-amber-500/40"
-                          )}
-                        >
-                          Spark Chaos ⚡
-                        </button>
-                      </div>
+                      {/* 2. Story input */}
+                      <textarea
+                        id="story-input-star"
+                        ref={storyIdeaTextareaRef}
+                        value={storyIdea}
+                        onChange={(e) => {
+                          setStoryIdea(e.target.value);
+                          setTranslatedToEnglish(false);
+                          requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
+                        }}
+                        onInput={() => setStoryFieldTick((n) => n + 1)}
+                        onCompositionEnd={(e) => {
+                          setStoryIdea(e.currentTarget.value);
+                          setStoryFieldTick((n) => n + 1);
+                        }}
+                        rows={3}
+                        placeholder="Speak or type your story..."
+                        className="min-h-[90px] w-full resize-none rounded-xl border border-amber-500/30 bg-black/60 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
+                      />
 
-                      {showInspirationFollowUps && (
-                        <InspirationFollowUpCards
-                          storyIdeaRaw={storyIdea}
-                          answers={inspirationFollowUpAnswers}
-                          onSetAnswer={setInspirationFollowUpAnswer}
-                        />
-                      )}
-
-                      {/* ── Duration selector ─────────────────────────────── */}
-                      <div className="space-y-2">
-                        <p className="text-xs text-white/40 font-medium tracking-wide">How long is your moment?</p>
-                        <div className="flex gap-2">
-                          {STAR_DURATION_OPTIONS.map((opt) => {
-                            const selected = starDurationTier === opt.id;
-                            return (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => setStarDurationTier(opt.id)}
-                                className={cn(
-                                  "flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 rounded-xl border text-xs font-semibold transition-all",
-                                  selected
-                                    ? "border-amber-400 bg-amber-500/20 text-amber-300 shadow-md shadow-amber-500/30 ring-1 ring-amber-400/50"
-                                    : "border-white/15 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/60"
-                                )}
-                              >
-                                <span className="text-base">{opt.icon}</span>
-                                <span className="leading-tight text-center">{opt.label}</span>
-                                <span className={cn("text-[10px]", selected ? "text-amber-400/80" : "text-white/25")}>{opt.sub}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* ── Cinema Glow™ beauty tier selector ────────────── */}
-                      <div className="space-y-2">
-                        <p className="text-xs text-white/40 font-medium tracking-wide">Cinema Glow™ beauty level</p>
-                        <div className="flex gap-2">
-                          {CINEMA_GLOW_OPTIONS.map((opt) => {
-                            const selected = cinemaGlowTier === opt.id;
-                            return (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => setCinemaGlowTier(opt.id)}
-                                className={cn(
-                                  "flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 rounded-xl border text-xs font-semibold transition-all",
-                                  selected
-                                    ? "border-purple-400 bg-purple-500/20 text-purple-200 shadow-md shadow-purple-500/30 ring-1 ring-purple-400/50"
-                                    : "border-white/15 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/60"
-                                )}
-                              >
-                                <span className="text-base">{opt.icon}</span>
-                                <span className="leading-tight text-center">{opt.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Generate button */}
+                      {/* 3. Make the Movie button */}
                       <button
                         type="button"
                         disabled={pipelineRunning || starPhotos.length === 0}
@@ -2015,11 +1863,7 @@ export default function Home() {
                         {pipelineRunning ? "Working on it…" : "Make the Movie ✨"}
                       </button>
 
-                      {starPhotos.length === 0 && (
-                        <p className="text-center text-xs text-amber-200/60">Upload at least 1 photo to generate</p>
-                      )}
-
-                      {/* Error display only — progress is handled by ScriptFlowWaitingScreen */}
+                      {/* Error display */}
                       {pipelineError && (
                         <p className="text-center text-sm text-red-400" role="alert">
                           {pipelineError}
