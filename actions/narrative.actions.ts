@@ -415,9 +415,9 @@ function appendKlingElementsReferenceInstructions(
 
 /** Cinema Glow™ — beauty enhancement via prompt for Star Mode */
 const CINEMA_GLOW_SUFFIXES: Record<string, string> = {
-  natural: "natural beauty, soft cinematic lighting, healthy skin glow",
-  cinema:  "movie star quality, professional film lighting, perfect complexion",
-  iconic:  "Hollywood film quality, iconic appearance, legendary cinematic presence",
+  natural: "natural beauty, soft cinematic lighting, healthy radiant skin, authentic charming appearance",
+  cinema:  "movie star appearance, dramatic cinematic lighting, flawless complexion, charismatic screen presence, professional Hollywood film quality, strikingly handsome/beautiful",
+  iconic:  "legendary Hollywood icon appearance, perfect symmetrical features, epic cinematic lighting, timeless movie star beauty, larger than life screen presence",
 };
 
 function appendPromptSafetyAndStyleLock(prompt: string) {
