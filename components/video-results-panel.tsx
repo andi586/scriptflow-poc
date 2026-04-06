@@ -31,6 +31,13 @@ export type VideoResultsPanelProps = {
   /** Bump after a new Kling submit so task_ids are reloaded from Supabase. */
   refreshNonce?: number;
   className?: string;
+  /**
+   * When true, hides intermediate-state UI:
+   * - "Your scenes are being created — usually 3–5 minutes." status text
+   * - "Scene X Creating..." per-scene badges
+   * Use in Star mode where the ScriptFlowWaitingScreen handles all progress feedback.
+   */
+  hideIntermediateState?: boolean;
 };
 
 /** DB `video_url` may be expired; success clips still show player after live PiAPI resolve. */
@@ -92,6 +99,7 @@ export function VideoResultsPanel({
   pollIntervalMs = 30_000,
   refreshNonce = 0,
   className = "",
+  hideIntermediateState = false,
 }: VideoResultsPanelProps) {
   const [tasks, setTasks] = useState<KlingTaskItem[]>([]);
   const [lazyPollBusy, setLazyPollBusy] = useState(false);
@@ -515,25 +523,27 @@ export function VideoResultsPanel({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-white">{title}</h3>
         </div>
-        <p className="text-xs text-white/50">
-          {autoPoll && autoPollActive ? (
-            <>
-              Your scenes are being created — usually 3–5 minutes.
-              {lazyPollBusy ? (
-                <Loader2
-                  className="ml-1 inline size-3.5 animate-spin text-amber-400"
-                  aria-hidden
-                />
-              ) : null}
-            </>
-          ) : (
-            <>
-              {tasks.length > 0 && tasks.every((t) => t.status === "success" || t.status === "failed")
-                ? "All scenes finished."
-                : "Your scenes are being created — usually 3–5 minutes."}
-            </>
-          )}
-        </p>
+        {!hideIntermediateState && (
+          <p className="text-xs text-white/50">
+            {autoPoll && autoPollActive ? (
+              <>
+                Your scenes are being created — usually 3–5 minutes.
+                {lazyPollBusy ? (
+                  <Loader2
+                    className="ml-1 inline size-3.5 animate-spin text-amber-400"
+                    aria-hidden
+                  />
+                ) : null}
+              </>
+            ) : (
+              <>
+                {tasks.length > 0 && tasks.every((t) => t.status === "success" || t.status === "failed")
+                  ? "All scenes finished."
+                  : "Your scenes are being created — usually 3–5 minutes."}
+              </>
+            )}
+          </p>
+        )}
         <div className="grid gap-4">
           {tasks.map((task) => {
             const done = isClipDone(task);
@@ -552,7 +562,7 @@ export function VideoResultsPanel({
                   <span className="font-semibold text-amber-400">
                     Scene {task.beat_number}
                   </span>
-                  {processing && (
+                  {processing && !hideIntermediateState && (
                     <span className="inline-flex items-center gap-1.5 rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium capitalize text-amber-200">
                       <Loader2 className="size-3.5 animate-spin" aria-hidden />
                       Creating...

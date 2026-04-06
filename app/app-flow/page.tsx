@@ -2500,6 +2500,7 @@ export default function Home() {
                   taskIds={lastSubmittedClipTaskIds}
                   refreshNonce={clipsRefreshNonce}
                   title=""
+                  hideIntermediateState={true}
                 />
               </section>
             )}
