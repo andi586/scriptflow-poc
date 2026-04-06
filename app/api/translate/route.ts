@@ -16,7 +16,15 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `Translate the following text to English. Return ONLY the translated text, no explanations, no quotes, no extra formatting.\n\n${text.trim()}`,
+          content: `Translate the following story to English for AI video generation.
+IMPORTANT RULES:
+1. The person in the uploaded photo is always the MAIN CHARACTER and PROTAGONIST
+2. They are the one taking action, not the victim
+3. Preserve the original perspective - if the user says 'I discovered...' they are the discoverer
+4. Keep dramatic tension and emotional intensity
+5. Output only the translated English text, nothing else
+
+Story to translate: ${text.trim()}`,
         },
       ],
     });
