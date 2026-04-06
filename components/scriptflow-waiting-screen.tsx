@@ -1,224 +1,125 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-// ─── Pipeline phase → copy mapping ────────────────────────────────────────────
-type WaitingPhase =
+type PipelinePhase =
+  | "idle"
+  | "creating_project"
   | "analyzing_story"
+  | "locking_characters"
   | "generating_prompts"
+  | "director_review"
   | "submitting_kling"
-  | "polling_kling"
-  | "generating_audio"
-  | "merging"
   | "done"
-  | string; // fallback for other phases
+  | "error";
 
-const PHASE_COPY: Record<string, string> = {
-  analyzing_story: "Writing your story…",
-  generating_prompts: "Designing your scenes…",
-  submitting_kling: "Bringing characters to life…",
-  polling_kling: "Your world is taking shape…",
-  generating_audio: "Adding voice & emotion…",
-  merging: "Finalizing your movie…",
-  done: "🎬 Your movie is ready.",
-  // Fallback for phases not in the spec
-  creating_project: "Writing your story…",
-  locking_characters: "Designing your scenes…",
-  director_review: "Designing your scenes…",
-};
+const ROTATING_LINES = [
+  "Leave this world.",
+  "Step through.",
+  "You are becoming.",
+  "A new life begins.",
+  "Your story is forming.",
+  "Fate is rewriting you.",
+  "This is your world.",
+  "You chose this life.",
+  "They will remember you.",
+  "Your world awaits.",
+];
 
-function getPhrasForPhase(phase: string): string {
-  return PHASE_COPY[phase] ?? "Creating your movie…";
-}
-
-// ─── Progress percentage per phase ────────────────────────────────────────────
-const PHASE_PROGRESS: Record<string, number> = {
-  creating_project: 8,
-  analyzing_story: 22,
-  locking_characters: 38,
-  generating_prompts: 52,
-  director_review: 60,
-  submitting_kling: 75,
-  polling_kling: 85,
-  generating_audio: 92,
-  merging: 97,
-  done: 100,
-};
-
-function getProgressForPhase(phase: string): number {
-  return PHASE_PROGRESS[phase] ?? 10;
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
-interface ScriptFlowWaitingScreenProps {
-  phase: string;
-  visible: boolean;
-  /** Optional estimated wait time in minutes (shown in Be the Star mode after prompts are generated) */
-  estimatedMinutes?: number | null;
-}
+const FINAL_LINE = "The curtain rises.";
+const ROTATE_INTERVAL_MS = 15_000;
+const FINAL_THRESHOLD_S = 30;
 
 export function ScriptFlowWaitingScreen({
   phase,
   visible,
   estimatedMinutes,
-}: ScriptFlowWaitingScreenProps) {
-  const [displayedPhrase, setDisplayedPhrase] = useState(() =>
-    getPhrasForPhase(phase)
-  );
-  const [phraseOpacity, setPhraseOpacity] = useState(1);
-  const [screenOpacity, setScreenOpacity] = useState(0);
-  const [screenBrightness, setScreenBrightness] = useState(1);
-  const pendingPhraseRef = useRef<string | null>(null);
-  const transitioningRef = useRef(false);
-  const prevPhaseRef = useRef(phase);
+}: {
+  phase: PipelinePhase;
+  visible: boolean;
+  estimatedMinutes?: number | null;
+}) {
+  const [lineIndex, setLineIndex] = useState(0);
+  const [fadeIn, setFadeIn] = useState(true);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const startRef = useRef<number | null>(null);
+  const rotateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Fade screen in/out ─────────────────────────────────────────────────────
+  // Reset and start timers when visible
   useEffect(() => {
-    if (visible) {
-      // Small delay so the overlay mounts before fading in
-      const t = setTimeout(() => setScreenOpacity(1), 30);
-      return () => clearTimeout(t);
-    } else {
-      setScreenOpacity(0);
-    }
-  }, [visible]);
-
-  // ── Brighten screen when done ──────────────────────────────────────────────
-  useEffect(() => {
-    if (phase === "done") {
-      setScreenBrightness(1.18);
-    } else {
-      setScreenBrightness(1);
-    }
-  }, [phase]);
-
-  // ── Cross-fade phrase when phase changes ──────────────────────────────────
-  useEffect(() => {
-    const newPhrase = getPhrasForPhase(phase);
-    if (newPhrase === displayedPhrase && phase === prevPhaseRef.current) return;
-    prevPhaseRef.current = phase;
-
-    if (transitioningRef.current) {
-      // Queue the next phrase; it will be applied after current transition
-      pendingPhraseRef.current = newPhrase;
+    if (!visible) {
+      if (rotateTimerRef.current) clearInterval(rotateTimerRef.current);
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+      setLineIndex(0);
+      setFadeIn(true);
+      setElapsedSeconds(0);
+      startRef.current = null;
       return;
     }
 
-    transitioningRef.current = true;
-    // Fade out
-    setPhraseOpacity(0);
+    startRef.current = Date.now();
+    setElapsedSeconds(0);
+    setLineIndex(0);
+    setFadeIn(true);
 
-    const fadeOutTimer = setTimeout(() => {
-      setDisplayedPhrase(newPhrase);
-      pendingPhraseRef.current = null;
-      // Fade in
-      setPhraseOpacity(1);
+    // Elapsed seconds ticker
+    elapsedTimerRef.current = setInterval(() => {
+      if (startRef.current !== null) {
+        setElapsedSeconds(Math.floor((Date.now() - startRef.current) / 1000));
+      }
+    }, 1000);
 
-      const fadeInTimer = setTimeout(() => {
-        transitioningRef.current = false;
-        // Apply any queued phrase
-        if (pendingPhraseRef.current) {
-          const queued = pendingPhraseRef.current;
-          pendingPhraseRef.current = null;
-          setDisplayedPhrase(queued);
-        }
+    // Rotating lines: cross-fade every ROTATE_INTERVAL_MS
+    rotateTimerRef.current = setInterval(() => {
+      // Fade out
+      setFadeIn(false);
+      setTimeout(() => {
+        setLineIndex((prev) => (prev + 1) % ROTATING_LINES.length);
+        setFadeIn(true);
       }, 800);
+    }, ROTATE_INTERVAL_MS);
 
-      return () => clearTimeout(fadeInTimer);
-    }, 800);
-
-    return () => clearTimeout(fadeOutTimer);
-  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const progress = getProgressForPhase(phase);
-  const isDone = phase === "done";
+    return () => {
+      if (rotateTimerRef.current) clearInterval(rotateTimerRef.current);
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+    };
+  }, [visible]);
 
   if (!visible) return null;
 
+  // Determine which line to show
+  const totalEstimatedSeconds = estimatedMinutes != null ? estimatedMinutes * 60 : null;
+  const remainingSeconds = totalEstimatedSeconds != null ? totalEstimatedSeconds - elapsedSeconds : null;
+  const showFinalLine = remainingSeconds !== null && remainingSeconds <= FINAL_THRESHOLD_S && remainingSeconds >= 0;
+
+  const displayLine = showFinalLine ? FINAL_LINE : ROTATING_LINES[lineIndex];
+
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
-      style={{
-        backgroundColor: "#0A0A0A",
-        opacity: screenOpacity,
-        filter: `brightness(${screenBrightness})`,
-        transition: "opacity 600ms ease, filter 1200ms ease",
-        pointerEvents: visible ? "auto" : "none",
-      }}
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black"
       aria-live="polite"
       aria-label="Generating your movie"
     >
-      {/* ── Breathing dots ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-5 mb-10">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="block rounded-full bg-white"
-            style={{
-              width: 10,
-              height: 10,
-              animation: `sf-breathe 2s ease-in-out infinite`,
-              animationDelay: `${i * 0.33}s`,
-            }}
-          />
-        ))}
-      </div>
+      {/* Main title — always visible */}
+      <h1
+        style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+        className="text-3xl sm:text-4xl font-light text-white tracking-widest text-center mb-12 select-none"
+      >
+        The door is opening.
+      </h1>
 
-      {/* ── Phrase ──────────────────────────────────────────────────────────── */}
+      {/* Rotating line — cross-fade */}
       <p
-        className="text-center text-lg font-light tracking-wide select-none px-8"
+        key={displayLine}
         style={{
-          color: "rgba(255,255,255,0.88)",
-          opacity: phraseOpacity,
-          transition: "opacity 800ms ease",
-          maxWidth: 360,
-          lineHeight: 1.6,
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          transition: "opacity 0.8s ease",
+          opacity: fadeIn ? 1 : 0,
         }}
+        className="text-lg sm:text-xl font-light text-white/60 tracking-widest text-center select-none"
       >
-        {displayedPhrase}
+        {displayLine}
       </p>
-
-      {/* ── Estimated wait time (shown once known, fades in) ────────────────── */}
-      {estimatedMinutes != null && estimatedMinutes > 0 && (
-        <p
-          className="mt-5 text-center text-sm select-none px-8"
-          style={{
-            color: "rgba(255,255,255,0.38)",
-            maxWidth: 320,
-            lineHeight: 1.5,
-            animation: "sf-fadein 1s ease forwards",
-          }}
-        >
-          Your movie will be ready in approximately {estimatedMinutes} minute{estimatedMinutes !== 1 ? "s" : ""}
-        </p>
-      )}
-
-      {/* ── Progress line ───────────────────────────────────────────────────── */}
-      <div
-        className="absolute bottom-0 left-0 right-0"
-        style={{ height: 2, opacity: 0.2 }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${progress}%`,
-            backgroundColor: "#ffffff",
-            transition: "width 1200ms ease",
-          }}
-        />
-      </div>
-
-      {/* ── Keyframe styles injected inline ─────────────────────────────────── */}
-      <style>{`
-        @keyframes sf-breathe {
-          0%, 100% { opacity: 0.25; transform: scale(0.85); }
-          50%       { opacity: 1;    transform: scale(1.15); }
-        }
-        @keyframes sf-fadein {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }
