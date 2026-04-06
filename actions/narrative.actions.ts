@@ -413,8 +413,17 @@ function appendKlingElementsReferenceInstructions(
   return `${prompt.trim()}\n\n${lines.join("\n")}`.trim();
 }
 
+/** Cinema Glow™ — beauty enhancement via prompt for Star Mode */
+const CINEMA_GLOW_SUFFIX =
+  "cinematic lighting, perfect skin, movie star appearance, professional film quality, flattering angle, soft focus beauty lighting";
+
 function appendPromptSafetyAndStyleLock(prompt: string) {
   return `${prompt.trim()}\n\nNo text, no subtitles, no watermarks, no captions. Photorealistic style only. No animation, no cartoon. Both characters must appear as real humans.`.trim();
+}
+
+/** Appends Cinema Glow™ beauty suffix to a prompt (Star Mode only). */
+function appendCinemaGlow(prompt: string): string {
+  return `${prompt.trim()}, ${CINEMA_GLOW_SUFFIX}`.trim();
 }
 
 export async function generateKlingPromptsAction(input: {
@@ -706,6 +715,16 @@ export async function submitKlingTasksAction(input: {
 
     const supabase = createClient();
     const sceneIndices = input.prompts.map((p) => p.beat_number);
+
+    // Check if this is a Star Mode project (for Cinema Glow™ beauty enhancement)
+    const { data: projectMeta } = await supabase
+      .from("projects")
+      .select("is_star_mode")
+      .eq("id", projectId)
+      .single();
+    const isStarMode = !!(projectMeta as any)?.is_star_mode;
+    console.log("[submitKlingTasksAction] isStarMode:", isStarMode);
+
     const { data: projectCharacters } = await supabase
       .from(PROJECT_CAST_TABLE)
       .select("name, appearance, reference_image_url")
@@ -769,10 +788,13 @@ export async function submitKlingTasksAction(input: {
     for (const item of input.prompts) {
       if (existingMap.has(item.beat_number)) continue;
 
-      const finalPrompt = appendKlingElementsReferenceInstructions(
+      const basePrompt = appendKlingElementsReferenceInstructions(
         injectCharacterReferenceLocks(stripHardcodedAspectRatioFromPrompt(item.prompt), characterRows),
         characterRefs,
       );
+      // Cinema Glow™: apply beauty enhancement for Star Mode projects
+      const finalPrompt = isStarMode ? appendCinemaGlow(basePrompt) : basePrompt;
+      console.log("[submitKlingTasksAction] Cinema Glow applied:", isStarMode, "scene:", item.beat_number);
       const sanitizedPrompt = appendPromptSafetyAndStyleLock(finalPrompt);
 
       // TEMP: disable Veo3 routing; force all scenes through Kling path.
