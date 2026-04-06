@@ -278,6 +278,16 @@ export async function POST(request: NextRequest) {
     // 默认 'en'；Star Mode 从输入检测；Director Mode 从 projects.language 读取
     const userLanguage: string = ((project as any).language ?? 'en').toLowerCase().split('-')[0]
     console.log('[finalize] userLanguage:', userLanguage)
+    console.log('[finalize] project.language raw value:', (project as any).language)
+
+    // ── Debug: dump script_raw structure to trace dialogueBlocks source ──────
+    console.log('[finalize] scriptRaw keys:', scriptRaw ? Object.keys(scriptRaw) : 'null')
+    console.log('[finalize] scriptRaw.structure keys:', scriptRaw?.structure ? Object.keys(scriptRaw.structure) : 'null')
+    console.log('[finalize] episodes count:', (scriptRaw?.structure?.episodes ?? []).length)
+    const _ep0 = (scriptRaw?.structure?.episodes ?? [])[0]
+    console.log('[finalize] episode[0] keys:', _ep0 ? Object.keys(_ep0) : 'null')
+    console.log('[finalize] episode[0].lines count:', Array.isArray(_ep0?.lines) ? _ep0.lines.length : 'no lines array')
+    console.log('[finalize] episode[0].lines sample:', JSON.stringify((_ep0?.lines ?? []).slice(0, 2)))
 
     // ── Step 3: Claude back-translation ──────────────────────────────────────
     // If userLanguage is not English, translate dialogue lines back to user language
