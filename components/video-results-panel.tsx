@@ -1,3 +1,4 @@
+cd ~/Desktop/scriptflow-poc && git add -A && git commit -m "Fix: Claude translation model ID, page jump, natural expressions" && git push ssh://git@ssh.github.com:443/andi586/scriptflow-poc.git main
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +39,11 @@ export type VideoResultsPanelProps = {
    * Use in Star mode where the ScriptFlowWaitingScreen handles all progress feedback.
    */
   hideIntermediateState?: boolean;
+  /**
+   * Called when all tasks reach a terminal state AND finalize has completed (or failed).
+   * Used by Star Mode to dismiss the waiting screen.
+   */
+  onAllDone?: () => void;
 };
 
 /** DB `video_url` may be expired; success clips still show player after live PiAPI resolve. */

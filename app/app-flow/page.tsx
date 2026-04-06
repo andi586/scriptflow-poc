@@ -1651,11 +1651,15 @@ export default function Home() {
     }
   }, []);
 
+  // ─── Star Mode: track when videos are fully done (finalize complete) ──────
+  const [starVideosDone, setStarVideosDone] = useState(false);
+
   // ─── Waiting screen visibility ────────────────────────────────────────────
   // Show the immersive waiting screen whenever the pipeline is actively running
   // (not idle, not error, not done, not director_review pause)
+  // For Star Mode: keep showing until videos are done (finalize triggered)
   const showWaitingScreen =
-    pipelineRunning &&
+    (pipelineRunning || (entryMode === "star" && pipelinePhase === "done" && !starVideosDone)) &&
     pipelinePhase !== "idle" &&
     pipelinePhase !== "error" &&
     pipelinePhase !== "director_review";
