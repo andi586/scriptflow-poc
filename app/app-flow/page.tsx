@@ -1946,8 +1946,9 @@ export default function Home() {
     pipelinePhase !== "error" &&
     pipelinePhase !== "director_review";
 
-  return (
-    <div className="min-h-screen bg-black text-white">
+return (
+<div className="min-h-screen bg-black text-white">
+      <h1 style={{color:'red',fontSize:'48px'}}>NEW VERSION</h1>
       {/* ─── ScriptFlow Immersive Waiting Screen ────────────────────────────── */}
       <ScriptFlowWaitingScreen
         phase={pipelinePhase}
