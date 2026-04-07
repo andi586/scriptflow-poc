@@ -2235,7 +2235,8 @@ return (
         />
       )}
 
-      {showSquadModal && (
+      {/* SquadModal (friend photo upload) — temporarily hidden, code preserved */}
+      {false && showSquadModal && (
         <SquadModal
           onAddFriends={() => {
             setShowSquadModal(false);
