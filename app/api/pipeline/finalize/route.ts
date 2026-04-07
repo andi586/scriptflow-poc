@@ -541,17 +541,73 @@ ${linesJson}`
     console.log('[railway-request] url:', RAILWAY_MERGE_URL)
     console.log('[railway-request] body:', JSON.stringify(mergeBody, null, 2))
 
-    const mergeRes = await fetch(RAILWAY_MERGE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mergeBody),
-    })
+    // ── Railway fetch with retry (3 attempts, 10-min timeout each) ──────────
+    // Root cause of "Cloud merge failed: Load failed":
+    //   - Railway takes 2-5 min for FFmpeg + watermark + QC + upload
+    //   - Without an explicit timeout, Node's default fetch can abort early
+    //   - Network blips cause a single-shot fetch to fail with "Load failed"
+    // Fix: AbortController with 10-min timeout + up to 3 retries with 5s backoff
+    const RAILWAY_TIMEOUT_MS = 10 * 60 * 1000  // 10 minutes
+    const MAX_RETRIES = 3
+    const RETRY_DELAY_MS = 5_000
 
-    const mergeData = await mergeRes.json()
-    console.log('[railway-response]', JSON.stringify(mergeData, null, 2))
-    if (!mergeData.success || !mergeData.finalVideoUrl) {
-      throw new Error(mergeData.error ?? 'Railway merge failed')
+    let mergeData: { success: boolean; finalVideoUrl?: string; error?: string } | null = null
+    let lastError = ''
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), RAILWAY_TIMEOUT_MS)
+
+      try {
+        console.log(`[finalize] Railway attempt ${attempt}/${MAX_RETRIES}...`)
+        const mergeRes = await fetch(RAILWAY_MERGE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(mergeBody),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+
+        const rawText = await mergeRes.text()
+        console.log(`[railway-response] attempt=${attempt} status=${mergeRes.status} body=${rawText.slice(0, 300)}`)
+
+        let parsed: { success: boolean; finalVideoUrl?: string; error?: string }
+        try {
+          parsed = JSON.parse(rawText)
+        } catch {
+          throw new Error(`Railway returned non-JSON (status ${mergeRes.status}): ${rawText.slice(0, 200)}`)
+        }
+
+        if (parsed.success && parsed.finalVideoUrl) {
+          mergeData = parsed
+          break // success — exit retry loop
+        }
+
+        // Railway returned success:false — don't retry (it's a real error)
+        lastError = parsed.error ?? `Railway merge failed (status ${mergeRes.status})`
+        console.error(`[finalize] Railway error (attempt ${attempt}): ${lastError}`)
+        break
+
+      } catch (fetchErr) {
+        clearTimeout(timeoutId)
+        const isAbort = fetchErr instanceof Error && fetchErr.name === 'AbortError'
+        lastError = isAbort
+          ? `Railway timeout after ${RAILWAY_TIMEOUT_MS / 1000}s (attempt ${attempt})`
+          : `Railway fetch error (attempt ${attempt}): ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`
+        console.error(`[finalize] ${lastError}`)
+
+        if (attempt < MAX_RETRIES) {
+          console.log(`[finalize] Retrying in ${RETRY_DELAY_MS / 1000}s...`)
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS))
+        }
+      }
     }
+
+    if (!mergeData?.success || !mergeData.finalVideoUrl) {
+      throw new Error(lastError || 'Railway merge failed after all retries')
+    }
+
+    console.log('[finalize] Railway success, finalVideoUrl:', mergeData.finalVideoUrl)
 
     return NextResponse.json({
       success: true,
