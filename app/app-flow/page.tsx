@@ -456,6 +456,243 @@ async function convertHeicToJpeg(file: File): Promise<File> {
   return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
 }
 
+// ─── Camera Preview ───────────────────────────────────────────────────────────
+function CameraPreview() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then((s) => {
+        stream = s;
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+        }
+      })
+      .catch((e) => {
+        setCameraError(e instanceof Error ? e.message : "Camera unavailable");
+      });
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  return (
+    <div className="relative w-full max-w-sm aspect-[9/16] rounded-2xl overflow-hidden bg-zinc-900 border border-white/10">
+      {cameraError ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <p className="text-xs text-white/40 text-center px-4">{cameraError}</p>
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="w-full h-full object-cover scale-x-[-1]"
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Record Button with segmented captions ────────────────────────────────────
+function RecordButton({
+  pipelineRunning,
+  starPhotos,
+  onPhotoAdded,
+  onPhotoRemoved,
+  currentProjectId,
+  onVoiceCloned,
+  onRecord,
+}: {
+  pipelineRunning: boolean;
+  starPhotos: StarPhoto[];
+  onPhotoAdded: (file: File, index: number) => void;
+  onPhotoRemoved: (index: number) => void;
+  currentProjectId: string | null;
+  onVoiceCloned: (voiceId: string) => void;
+  onRecord: () => void;
+}) {
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingStatus, setRecordingStatus] = useState<"idle" | "recording" | "processing" | "done" | "error">("idle");
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const CAPTIONS = [
+    { from: 0, to: 10, text: "Show your face..." },
+    { from: 10, to: 20, text: "Now show your world..." },
+    { from: 20, to: 30, text: "Keep going..." },
+  ];
+
+  const currentCaption = CAPTIONS.find(
+    (c) => recordingSeconds >= c.from && recordingSeconds < c.to
+  )?.text ?? "";
+
+  const startRecording = async () => {
+    setRecordingError(null);
+    setRecordingStatus("recording");
+    setIsRecording(true);
+    setRecordingSeconds(0);
+    recordedChunksRef.current = [];
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus"
+        : MediaRecorder.isTypeSupported("video/webm")
+        ? "video/webm"
+        : "video/mp4";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
+        setIsRecording(false);
+        setRecordingStatus("processing");
+
+        try {
+          const videoBlob = new Blob(recordedChunksRef.current, { type: mimeType });
+          const videoUrl = URL.createObjectURL(videoBlob);
+          const video = document.createElement("video");
+          video.src = videoUrl;
+          video.muted = true;
+          video.playsInline = true;
+          await new Promise<void>((resolve, reject) => {
+            video.onloadeddata = () => resolve();
+            video.onerror = () => reject(new Error("Failed to load video"));
+            video.load();
+          });
+          video.currentTime = 0;
+          await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
+          const canvas = document.createElement("canvas");
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 480;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas unavailable");
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(videoUrl);
+          const frameBlob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), "image/jpeg", 0.92);
+          });
+          const frameFile = new File([frameBlob], "recording_frame.jpg", { type: "image/jpeg" });
+
+          // Upload to Supabase
+          const supabase = createClient();
+          const ts = Date.now();
+          const framePath = `star-mode/recordings/${ts}_frame.jpg`;
+          await supabase.storage.from("character-images").upload(framePath, frameBlob, { contentType: "image/jpeg", upsert: true });
+
+          const videoExt = mimeType.includes("mp4") ? "mp4" : "webm";
+          const videoPath = `star-mode/recordings/${ts}_recording.${videoExt}`;
+          const { error: vidErr } = await supabase.storage.from("character-images").upload(videoPath, videoBlob, { contentType: mimeType, upsert: true });
+
+          if (!vidErr) {
+            const { data: pub } = supabase.storage.from("character-images").getPublicUrl(videoPath);
+            if (pub?.publicUrl) {
+              void (async () => {
+                try {
+                  const res = await fetch("/api/voice-clone", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ audioUrl: pub.publicUrl, projectId: currentProjectId }),
+                  });
+                  const data = await res.json() as { ok?: boolean; voice_id?: string; success?: boolean };
+                  const vid = data.voice_id;
+                  if (vid) onVoiceCloned(vid);
+                } catch {}
+              })();
+            }
+          }
+
+          onPhotoAdded(frameFile, starPhotos.length);
+          setRecordingStatus("done");
+        } catch (e) {
+          setRecordingError(e instanceof Error ? e.message : "Processing failed");
+          setRecordingStatus("error");
+        }
+      };
+
+      recorder.start(100);
+      timerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+      autoStopRef.current = setTimeout(() => {
+        if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      }, 30000);
+    } catch (e) {
+      setIsRecording(false);
+      setRecordingError(e instanceof Error ? e.message : "Camera unavailable");
+      setRecordingStatus("error");
+    }
+  };
+
+  const stopRecording = () => {
+    if (autoStopRef.current) clearTimeout(autoStopRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-4 mt-6">
+      {/* Segmented caption */}
+      {isRecording && currentCaption && (
+        <p className="text-sm text-white/60 tracking-wide animate-pulse">{currentCaption}</p>
+      )}
+
+      {/* Record / Stop button */}
+      <button
+        type="button"
+        disabled={recordingStatus === "processing" || pipelineRunning}
+        onClick={isRecording ? stopRecording : () => void startRecording()}
+        className={cn(
+          "flex items-center gap-2 rounded-full px-8 py-4 text-base font-semibold transition-all",
+          isRecording
+            ? "bg-red-600 text-white animate-pulse shadow-lg shadow-red-500/40"
+            : recordingStatus === "done"
+            ? "bg-emerald-600 text-white"
+            : "bg-white text-black hover:bg-white/90 shadow-lg"
+        )}
+      >
+        {isRecording ? (
+          <>⏹ Stop</>
+        ) : recordingStatus === "processing" ? (
+          <>⏳ Processing…</>
+        ) : recordingStatus === "done" ? (
+          <>✓ Recorded</>
+        ) : (
+          <>● Record</>
+        )}
+      </button>
+
+      {recordingError && (
+        <p className="text-xs text-red-400">{recordingError}</p>
+      )}
+
+      {/* After recording: show Make Movie button */}
+      {recordingStatus === "done" && starPhotos.length > 0 && (
+        <button
+          type="button"
+          disabled={pipelineRunning}
+          onClick={onRecord}
+          className="mt-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 px-8 py-3 text-base font-bold text-black shadow-lg shadow-amber-500/30 hover:from-amber-400 hover:to-yellow-300 transition-all disabled:opacity-50"
+        >
+          {pipelineRunning ? "Working on it…" : "Make the Movie ✨"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function StarModeUploader({
   photos,
   onPhotoAdded,
@@ -1948,7 +2185,6 @@ export default function Home() {
 
 return (
 <div className="min-h-screen bg-black text-white">
-      <h1 style={{color:'red',fontSize:'48px'}}>NEW VERSION</h1>
       {/* ─── ScriptFlow Immersive Waiting Screen ────────────────────────────── */}
       <ScriptFlowWaitingScreen
         phase={pipelinePhase}
@@ -2049,531 +2285,44 @@ return (
         ) : (
           <>
             {/* ═══════════════════════════════════════════════════════════════
-                STEP 1: Hero Title
+                SINGLE RECORDING INTERFACE
             ═══════════════════════════════════════════════════════════════ */}
-            <div className="text-center pt-4 pb-8">
-              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-                Direct Your Heaven.
-              </h1>
-              <p className="mt-3 text-base sm:text-lg text-white/50 font-light">
-                One sentence. Your movie.
-              </p>
-            </div>
-
-            {/* ═══════════════════════════════════════════════════════════════
-                STEP 2: Two Main Buttons (each expands inline with its own input)
-            ═══════════════════════════════════════════════════════════════ */}
-            <div className="space-y-8 mb-8">
-
-              {/* ── Button 1: Be the Star ─────────────────────────────────── */}
-              <div className={cn(
-                "rounded-2xl transition-all duration-300",
-                entryMode === "star"
-                  ? "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 p-[2px] shadow-2xl shadow-amber-500/50"
-                  : "bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 p-[2px] shadow-xl shadow-amber-500/30 hover:shadow-2xl hover:shadow-amber-500/60"
-              )}>
-                <div className="rounded-2xl bg-gradient-to-b from-amber-500/20 to-black/80">
-                  {/* Header row — always visible, click to toggle */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (entryMode === "star") {
-                        setEntryMode(null);
-                      } else {
-                        handleBeTheStar();
-                      }
-                    }}
-                    className="w-full px-6 py-5 text-left active:scale-[0.99] transition-transform"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">⭐</span>
-                        <div>
-                          <span className="text-xl font-extrabold text-white tracking-tight">Be the Star</span>
-                        </div>
-                      </div>
-                      <span className={cn(
-                        "text-amber-300 text-lg transition-transform duration-200",
-                        entryMode === "star" ? "rotate-180" : ""
-                      )}>▾</span>
-                    </div>
-                  </button>
-
-                  {/* Expanded content — minimal 3-element layout */}
-                  {entryMode === "star" && (
-                    <div className="px-6 pb-8 space-y-5">
-                      {/* 1. Photo upload slots */}
-                      <StarModeUploader
-                        photos={starPhotos}
-                        onPhotoAdded={handleStarPhotoAdded}
-                        onPhotoRemoved={handleStarPhotoRemoved}
-                        onProceed={() => {}}
-                        pipelineRunning={pipelineRunning}
-                        pendingProjectId={currentProjectId}
-                        onVoiceCloned={(voiceId) => {
-                          console.log("[StarMode] Voice cloned, voiceId:", voiceId);
-                          // If project already exists, save immediately
-                          if (currentProjectId) {
-                            void fetch(`/api/projects/${currentProjectId}`, {
-                              method: "PATCH",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ user_voice_id: voiceId }),
-                            }).catch((e) => console.warn("[StarMode] Failed to save user_voice_id:", e));
-                          }
-                        }}
-                      />
-
-                      {/* 2. Story input */}
-                      <textarea
-                        id="story-input-star"
-                        ref={storyIdeaTextareaRef}
-                        value={storyIdea}
-                        onChange={(e) => {
-                          setStoryIdea(e.target.value);
-                          setTranslatedToEnglish(false);
-                          requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
-                        }}
-                        onInput={() => setStoryFieldTick((n) => n + 1)}
-                        onCompositionEnd={(e) => {
-                          setStoryIdea(e.currentTarget.value);
-                          setStoryFieldTick((n) => n + 1);
-                        }}
-                        rows={3}
-                        placeholder="Speak or type your story..."
-                        className="min-h-[90px] w-full resize-none rounded-xl border border-amber-500/30 bg-black/60 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
-                      />
-
-                      {/* 3. Make the Movie button */}
-                      <button
-                        type="button"
-                        disabled={pipelineRunning || starPhotos.length === 0}
-                        onPointerDown={() => {
-                          const el = storyIdeaTextareaRef.current;
-                          if (el && el.value !== storyIdea) {
-                            flushSync(() => setStoryIdea(el.value));
-                          }
-                        }}
-                        onClick={() => void runStarModePipeline()}
-                        className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {pipelineRunning ? "Working on it…" : "Make the Movie ✨"}
-                      </button>
-
-                      {/* Error display */}
-                      {pipelineError && (
-                        <p className="text-center text-sm text-red-400" role="alert">
-                          {pipelineError}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+            {/* ─── Single Recording Interface ──────────────────────────────── */}
+            <div className="flex flex-col items-center justify-center min-h-[80vh] relative">
+              {/* My Projects button — top right */}
+              <div className="absolute top-0 right-0">
+                <MyProjectsPanel onStartNew={startNewLazySession} />
               </div>
 
-              {/* ── Button 2: Be the Director ─────────────────────────────── */}
-              <div className={cn(
-                "rounded-2xl transition-all duration-300",
-                entryMode === "director"
-                  ? "bg-gradient-to-r from-slate-400 via-blue-200 to-slate-500 p-[2px] shadow-2xl shadow-blue-400/40"
-                  : "bg-gradient-to-r from-slate-500 via-slate-300 to-slate-600 p-[2px] shadow-xl shadow-slate-500/25 hover:shadow-2xl hover:shadow-blue-300/40 hover:from-slate-400 hover:via-blue-200 hover:to-slate-500"
-              )}>
-                <div className="rounded-2xl bg-gradient-to-b from-slate-700/40 to-black/80">
-                {/* Header row — always visible, click to toggle */}
-                <button
-                  type="button"
-                  onClick={() => setEntryMode(entryMode === "director" ? null : "director")}
-                  className="w-full px-6 py-5 text-left active:scale-[0.99] transition-transform"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">🎬</span>
-                      <div>
-                        <span className="text-xl font-bold text-white tracking-tight">Be the Director</span>
-                      </div>
-                    </div>
-                    <span className={cn(
-                      "text-slate-300/60 text-lg transition-transform duration-200",
-                      entryMode === "director" ? "rotate-180" : ""
-                    )}>▾</span>
-                  </div>
-                </button>
+              {/* Camera preview area */}
+              <CameraPreview />
 
-                {/* Expanded content */}
-                {entryMode === "director" && (
-                  <div className="px-6 pb-6 space-y-4 border-t border-white/10 pt-4">
-                <p className="text-sm text-slate-300/60">Write your story. Direct your vision.</p>
+              {/* Tell your story */}
+              <p className="mt-6 text-2xl font-light tracking-wide text-white/80">Tell your story.</p>
 
-                {/* Series settings (optional) */}
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                  <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">Series Settings <span className="text-white/25 normal-case font-normal">(optional)</span></p>
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="text-xs text-white/40 mb-1 block">Series Name</label>
-                      <input
-                        type="text"
-                        value={directorSeriesName}
-                        onChange={(e) => setDirectorSeriesName(e.target.value)}
-                        placeholder="e.g. My Family Drama"
-                        className="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-white/30 transition-colors"
-                      />
-                    </div>
-                    <div className="w-24">
-                      <label className="text-xs text-white/40 mb-1 block">Episode #</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={directorEpisodeNum ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setDirectorEpisodeNum(v === "" ? null : parseInt(v, 10));
-                        }}
-                        placeholder="e.g. 1"
-                        className="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-white/30 transition-colors"
-                      />
-                    </div>
-                  </div>
-                  {(directorSeriesName.trim() || directorEpisodeNum) ? (
-                    <p className="text-xs text-amber-300/70">
-                      ✓ Title card will show: <span className="text-white/70">{directorSeriesName.trim() || "Your Story"}{directorEpisodeNum ? ` · Episode ${directorEpisodeNum}` : ""}</span>
-                    </p>
-                  ) : (
-                    <p className="text-xs text-white/25">Leave blank → no title card on your video</p>
-                  )}
-                </div>
+              {/* Record button */}
+              <RecordButton
+                pipelineRunning={pipelineRunning}
+                starPhotos={starPhotos}
+                onPhotoAdded={handleStarPhotoAdded}
+                onPhotoRemoved={handleStarPhotoRemoved}
+                currentProjectId={currentProjectId}
+                onVoiceCloned={(voiceId: string) => {
+                  if (currentProjectId) {
+                    void fetch(`/api/projects/${currentProjectId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ user_voice_id: voiceId }),
+                    }).catch((e) => console.warn("[StarMode] Failed to save user_voice_id:", e));
+                  }
+                }}
+                onRecord={() => void runStarModePipeline()}
+              />
 
-                {/* Story input — Director mode */}
-                <div className="relative">
-                  <textarea
-                    id="story-input-director"
-                    ref={entryMode === "director" ? storyIdeaTextareaRef : undefined}
-                    value={storyIdea}
-                    onChange={(e) => {
-                      setStoryIdea(e.target.value);
-                      requestAnimationFrame(() => adjustStoryIdeaTextareaHeight());
-                    }}
-                    onInput={() => setStoryFieldTick((n) => n + 1)}
-                    onCompositionEnd={(e) => {
-                      setStoryIdea(e.currentTarget.value);
-                      setStoryFieldTick((n) => n + 1);
-                    }}
-                    rows={3}
-                    placeholder="Describe your story..."
-                    className="min-h-[100px] w-full resize-none rounded-xl border border-white/15 bg-zinc-950 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/30 transition-all"
-                  />
-                </div>
-
-                {showInspirationFollowUps && (
-                  <InspirationFollowUpCards
-                    storyIdeaRaw={storyIdea}
-                    answers={inspirationFollowUpAnswers}
-                    onSetAnswer={setInspirationFollowUpAnswer}
-                  />
-                )}
-
-                {/* Cast section */}
-                <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                  <h2 className="text-sm font-semibold text-amber-400">Cast your characters</h2>
-                  <p className="mt-1 text-xs text-white/45">
-                    Choose look templates, then confirm each selected role before generating.
-                  </p>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    {templates.map((tpl) => {
-                      const checked = selectedTemplateIds.includes(tpl.id);
-                      return (
-                        <label
-                          key={tpl.id}
-                          className={`cursor-pointer rounded-xl border p-3 text-sm ${
-                            checked ? "border-amber-500 bg-amber-500/10" : "border-white/10 bg-zinc-950/70"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="mr-2"
-                            checked={checked}
-                            onChange={(e) => {
-                              setSelectedTemplateIds((prev) =>
-                                e.target.checked ? [...prev, tpl.id] : prev.filter((id) => id !== tpl.id),
-                              );
-                            }}
-                          />
-                          {tpl.label}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {selectedTemplates.length > 0 && (
-                    <div className="mt-5 space-y-3">
-                      <input
-                        ref={castHomeFileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp,image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          const templateId =
-                            castUploadPickTargetIdRef.current ?? castUploadForTemplateId;
-                          e.target.value = "";
-                          castUploadPickTargetIdRef.current = null;
-                          setCastUploadForTemplateId(null);
-                          if (!file || !templateId) return;
-                          if (!isJpgPngWebpFile(file)) return;
-
-                          const tpl = templates.find((t) => t.id === templateId);
-                          const isUuid =
-                            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-                              templateId,
-                            );
-                          setUploadingCastId(templateId);
-                          void (async () => {
-                            try {
-                              setCastConfirmations((prev) => {
-                                const prevEntry = prev[templateId];
-                                if (prevEntry?.localPreviewUrl) {
-                                  URL.revokeObjectURL(prevEntry.localPreviewUrl);
-                                }
-                                const localPreviewUrl = URL.createObjectURL(file);
-                                return {
-                                  ...prev,
-                                  [templateId]: {
-                                    choice: "upload",
-                                    file,
-                                    localPreviewUrl,
-                                    remotePreviewUrl: prevEntry?.remotePreviewUrl,
-                                    libraryTemplateId: templateId.trim(),
-                                  },
-                                };
-                              });
-
-                              if (!isUuid) return;
-                              const { blob, contentType } = await prepareImageForUpload(file);
-                              const supabase = createClient();
-                              const objectName = storageObjectFileName(`reference.${file.name}`, contentType);
-                              const objectPath = `${templateId}/${objectName}`;
-                              const { error: uploadError } = await supabase.storage
-                                .from("character-images")
-                                .upload(objectPath, blob, {
-                                  contentType,
-                                  upsert: true,
-                                });
-                              if (uploadError) throw new Error(uploadError.message);
-                              const { data: pub } = supabase.storage.from("character-images").getPublicUrl(objectPath);
-                              const url = pub.publicUrl;
-                              if (!url) throw new Error("Could not get public URL for uploaded image");
-
-                              const patchRes = await fetch(`/api/character-templates/${templateId}`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ reference_image_url: url }),
-                                cache: "no-store",
-                              });
-                              if (!patchRes.ok) {
-                                const body = (await patchRes.json().catch(() => ({}))) as { error?: string };
-                                throw new Error(body.error ?? `Update failed (${patchRes.status})`);
-                              }
-
-                              setTemplates((prev) =>
-                                prev.map((t) =>
-                                  t.id === templateId ? { ...t, reference_image_url: url } : t,
-                                ),
-                              );
-                              setCastConfirmations((prev) => {
-                                const existing = prev[templateId];
-                                if (!existing) return prev;
-                                return {
-                                  ...prev,
-                                  [templateId]: {
-                                    ...existing,
-                                    choice: "upload",
-                                    remotePreviewUrl: url,
-                                  },
-                                };
-                              });
-                            } catch (err) {
-                              console.error("[ScriptFlow] immediate cast image persist failed", err);
-                            } finally {
-                              setUploadingCastId((prev) => (prev === templateId ? null : prev));
-                            }
-                          })();
-                        }}
-                      />
-                      <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-                        <p className="text-xs text-amber-200">
-                          ⚠️ <strong>For best results:</strong> Use a close-up portrait (face and shoulders only). Full-body photos reduce character consistency in video generation.
-                        </p>
-                      </div>
-                      <p className="text-xs text-amber-200/90">
-                        Confirm each selected role: choose template look or upload your own photo.
-                      </p>
-                      {selectedTemplates.map((tpl) => {
-                        const c = castConfirmations[tpl.id];
-                        const confirmed =
-                          !!c &&
-                          (c.choice === "template" ||
-                            (c.choice === "upload" && (!!c.file || !!c.remotePreviewUrl)));
-                        const cardImageSrc =
-                          c?.choice === "upload" && c.localPreviewUrl
-                            ? c.localPreviewUrl
-                            : c?.choice === "upload" && c.remotePreviewUrl
-                              ? c.remotePreviewUrl
-                            : resolveRenderableImageSrc(tpl.reference_image_url, CAST_IMAGE_PLACEHOLDER_URL);
-                        return (
-                          <div
-                            key={`confirm-${tpl.id}`}
-                            className={cn(
-                              "rounded-xl border bg-zinc-950/70 p-3",
-                              confirmed ? "border-emerald-500/40" : "border-amber-500/40",
-                            )}
-                          >
-                            <div className="flex flex-col gap-3 sm:flex-row">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                key={c?.localPreviewUrl ?? c?.remotePreviewUrl ?? `${tpl.id}-${c?.choice}-ref`}
-                                src={cardImageSrc}
-                                alt={tpl.label}
-                                className="h-28 w-24 rounded-lg border border-white/10 object-cover"
-                                referrerPolicy="no-referrer"
-                                onError={(e) => {
-                                  const img = e.currentTarget;
-                                  if (img.dataset.fallbackApplied === "1") return;
-                                  img.dataset.fallbackApplied = "1";
-                                  img.src = "https://placehold.co/240x320?text=Image+Unavailable";
-                                }}
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold text-white">{tpl.label}</p>
-                                <p className="mt-1 text-xs text-white/50">
-                                  {confirmed ? "Confirmed" : "Pending confirmation"}
-                                </p>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    className={cn(
-                                      "rounded-lg border px-3 py-1.5 text-xs font-medium",
-                                      c?.choice === "template"
-                                        ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-200"
-                                        : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
-                                    )}
-                                    onClick={() => {
-                                      setCastConfirmations((prev) => {
-                                        const cur = prev[tpl.id];
-                                        if (cur?.localPreviewUrl) {
-                                          URL.revokeObjectURL(cur.localPreviewUrl);
-                                        }
-                                        return {
-                                          ...prev,
-                                          [tpl.id]: {
-                                            choice: "template",
-                                            libraryTemplateId: tpl.id.trim(),
-                                          },
-                                        };
-                                      });
-                                    }}
-                                  >
-                                    Use this look
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={pipelineRunning || !!uploadingCastId}
-                                    className={cn(
-                                      "rounded-lg border px-3 py-1.5 text-xs font-medium",
-                                      c?.choice === "upload"
-                                        ? "border-amber-500/60 bg-amber-500/15 text-amber-200"
-                                        : "border-white/15 bg-white/5 text-white/70 hover:bg-white/10",
-                                      (pipelineRunning || !!uploadingCastId) && "cursor-not-allowed opacity-50",
-                                    )}
-                                    onClick={() => {
-                                      if (pipelineRunning || uploadingCastId) return;
-                                      castUploadPickTargetIdRef.current = tpl.id;
-                                      requestAnimationFrame(() => castHomeFileInputRef.current?.click());
-                                    }}
-                                  >
-                                    Upload my own photo
-                                  </button>
-                                </div>
-                                {c?.choice === "upload" && (
-                                  <p className="mt-2 text-xs text-white/55">
-                                    {c.file ? `Uploaded: ${c.file.name}` : "Please upload a photo to confirm."}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-
-                {/* Generate buttons */}
-                <div className="space-y-2">
-                  <Button
-                    type="button"
-                    className={cn(
-                      "h-12 w-full bg-amber-500 text-base font-semibold text-black transition-all hover:bg-amber-400",
-                      inspirationGenerateReady &&
-                        !pipelineRunning &&
-                        "ring-2 ring-amber-200 ring-offset-2 ring-offset-zinc-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400",
-                    )}
-                    onPointerDown={() => {
-                      const el = storyIdeaTextareaRef.current;
-                      if (el && el.value !== storyIdea) {
-                        flushSync(() => setStoryIdea(el.value));
-                      }
-                    }}
-                    onClick={() => void runDramaPipeline()}
-                  >
-                    {pipelineRunning && !directorModeActive ? "Working on it…" : "Make the Movie ✨"}
-                  </Button>
-
-                  {/* Director Mode button */}
-                  <button
-                    type="button"
-                    disabled={pipelineRunning}
-                    className="w-full py-3 border border-white text-white text-sm rounded-lg hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    onPointerDown={() => {
-                      const el = storyIdeaTextareaRef.current;
-                      if (el && el.value !== storyIdea) {
-                        flushSync(() => setStoryIdea(el.value));
-                      }
-                    }}
-                    onClick={() => void runDirectorModePipeline()}
-                  >
-                    {pipelineRunning && directorModeActive ? "Working on it…" : "🎬 Director Mode — Review Each Step"}
-                  </button>
-
-                  {!canRunDramaLive && !pipelineRunning && (
-                    <p className="text-center text-xs text-white/40">
-                      Short ideas: add 8+ characters. Long scripts: 50+ characters skips formatting.
-                    </p>
-                  )}
-                  {canRunDramaLive && hasSelectedCast && !allSelectedCastConfirmed && !pipelineRunning && (
-                    <p className="text-center text-xs text-amber-200/90">
-                      Please confirm your cast first
-                    </p>
-                  )}
-                  {canRunDramaLive && !pipelineRunning && (
-                    <p className={cn("text-center text-xs", inspirationGenerateReady ? "text-amber-200/90" : "text-white/35")}>
-                      {inspirationGenerateReady
-                        ? "Your idea is rich enough — Generate is highlighted, ready to shoot."
-                        : "Add ~50 characters including protagonist, conflict, and resolution cues."}
-                    </p>
-                  )}
-                </div>
-
-                {/* Error display only — progress is handled by ScriptFlowWaitingScreen */}
-                {pipelineError && (
-                  <p className="text-center text-sm text-red-400" role="alert">
-                    {pipelineError}
-                  </p>
-                )}
-
-                  </div>
-                )}
-                </div>
-              </div>
-
+              {pipelineError && (
+                <p className="mt-4 text-sm text-red-400 text-center max-w-xs">{pipelineError}</p>
+              )}
             </div>
-            {/* ── End Two Main Buttons ─────────────────────────────────────── */}
 
             {/* ═══════════════════════════════════════════════════════════════
                 DIRECTOR MODE: Review panels (outside the button card)
