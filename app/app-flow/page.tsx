@@ -2032,9 +2032,40 @@ export default function Home() {
         console.log(`[StarMode] character_templates insert delegated to /api/projects/${pid}/star-photos`);
       }
 
-      // 5. Generate Kling prompts — pass maxScenes so Claude only generates N beats
+      // 5. Verify script_raw and beats exist in DB before generating prompts
+      //    If missing, re-run analyzeScriptAction to ensure they are written.
       activePhase = "generating_prompts";
       setPipelinePhase("generating_prompts");
+      try {
+        const verifyRes = await fetch(`/api/projects/${pid}/script-raw`).catch(() => null);
+        if (verifyRes?.ok) {
+          const verifyData = await verifyRes.json().catch(() => ({})) as { script_raw?: unknown };
+          const script_raw = verifyData.script_raw ?? null;
+          console.log('[pipeline] script_raw:', script_raw);
+
+          // Check beats in story_memory via a separate endpoint
+          const smRes = await fetch(`/api/projects/${pid}/story-memory`).catch(() => null);
+          let beats: unknown[] = [];
+          if (smRes?.ok) {
+            const smData = await smRes.json().catch(() => ({})) as { beats?: unknown[] };
+            beats = Array.isArray(smData.beats) ? smData.beats : [];
+          }
+          console.log('[pipeline] beats:', beats);
+
+          if (!script_raw || beats.length === 0) {
+            console.warn('[pipeline] script_raw or beats missing — re-running analyzeScriptAction');
+            const reAnalyze = await analyzeScriptAction({ projectId: pid, scriptText: nelScript, nelProfile: "lazy" });
+            if (!reAnalyze.success) {
+              console.error('[pipeline] re-analyze failed:', errMsg(reAnalyze.error));
+            } else {
+              console.log('[pipeline] re-analyze succeeded');
+            }
+          }
+        }
+      } catch (verifyErr) {
+        console.warn('[pipeline] script_raw/beats verification failed (non-fatal):', verifyErr);
+      }
+
       const selectedTier = STAR_DURATION_OPTIONS.find((o) => o.id === starDurationTier) ?? STAR_DURATION_OPTIONS[1];
       const gr = await generateKlingPromptsAction({ projectId: pid, maxScenes: selectedTier.maxScenes });
       if (!gr.success) throw new Error(errMsg(gr.error));
