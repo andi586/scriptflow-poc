@@ -401,20 +401,54 @@ export function VideoResultsPanel({
                 });
           videoUrls.push(url);
         }
-        const res = await fetch("/api/pipeline/finalize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId: sessionId, videoUrls }),
-        });
-        const data = (await res.json()) as {
-          success: boolean;
-          finalVideoUrl?: string;
-          error?: string;
-        };
-        if (!data.success || !data.finalVideoUrl) {
-          throw new Error(data.error || "Finalize failed");
+        // ── Frontend fetch with 12-min timeout + 3 retries ──────────────────
+        // The finalize API itself has 10-min Railway timeout + 3 retries.
+        // We add a 12-min client-side timeout so the browser doesn't abort early.
+        const FINALIZE_TIMEOUT_MS = 12 * 60 * 1000;
+        const FINALIZE_MAX_RETRIES = 3;
+        const FINALIZE_RETRY_DELAY_MS = 5_000;
+        let finalizeData: { success: boolean; finalVideoUrl?: string; error?: string } | null = null;
+        let finalizeLastError = '';
+
+        for (let attempt = 1; attempt <= FINALIZE_MAX_RETRIES; attempt++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), FINALIZE_TIMEOUT_MS);
+          try {
+            console.log(`[video-results] finalize attempt ${attempt}/${FINALIZE_MAX_RETRIES}...`);
+            const res = await fetch("/api/pipeline/finalize", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ projectId: sessionId, videoUrls }),
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            const data = (await res.json()) as { success: boolean; finalVideoUrl?: string; error?: string };
+            if (data.success && data.finalVideoUrl) {
+              finalizeData = data;
+              break;
+            }
+            // Real error from server — don't retry
+            finalizeLastError = data.error || `Finalize failed (status ${res.status})`;
+            console.error(`[video-results] finalize server error (attempt ${attempt}): ${finalizeLastError}`);
+            break;
+          } catch (fetchErr) {
+            clearTimeout(timeoutId);
+            const isAbort = fetchErr instanceof Error && fetchErr.name === 'AbortError';
+            finalizeLastError = isAbort
+              ? `Finalize timeout after ${FINALIZE_TIMEOUT_MS / 1000}s (attempt ${attempt})`
+              : `Finalize fetch error (attempt ${attempt}): ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`;
+            console.error(`[video-results] ${finalizeLastError}`);
+            if (attempt < FINALIZE_MAX_RETRIES) {
+              console.log(`[video-results] Retrying finalize in ${FINALIZE_RETRY_DELAY_MS / 1000}s...`);
+              await new Promise(r => setTimeout(r, FINALIZE_RETRY_DELAY_MS));
+            }
+          }
         }
-        setCloudMergedVideoUrl(data.finalVideoUrl);
+
+        if (!finalizeData?.success || !finalizeData.finalVideoUrl) {
+          throw new Error(finalizeLastError || 'Finalize failed after all retries');
+        }
+        setCloudMergedVideoUrl(finalizeData.finalVideoUrl);
         onAllDone?.();
       } catch (err) {
         setCloudMergeError(
