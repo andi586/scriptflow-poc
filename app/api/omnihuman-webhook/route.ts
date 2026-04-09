@@ -11,13 +11,17 @@ const WEBHOOK_SECRET = 'scriptflow-webhook-2026'
  *
  * Receives PiAPI OmniHuman task completion callbacks.
  *
- * Expected payload from PiAPI:
+ * PiAPI payload shape:
  * {
  *   task_id: string,
- *   status: 'completed' | 'failed' | 'processing' | ...,
- *   output?: { video_url?: string, url?: string },
- *   error?: string,
- *   secret?: string   // optional: sent in webhook_config.secret
+ *   status: string,
+ *   data: {
+ *     task_id: string,
+ *     status: string,
+ *     output: {
+ *       video: string   // ← actual video URL
+ *     }
+ *   }
  * }
  *
  * On success: updates omnihuman_jobs row with status + result_video_url
@@ -27,7 +31,6 @@ export async function POST(request: NextRequest) {
 
   try {
     // ── Verify secret ─────────────────────────────────────────────────────────
-    // PiAPI sends the secret either as a header or in the body
     const headerSecret = request.headers.get('x-webhook-secret')
     const rawBody = await request.text()
 
@@ -39,6 +42,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
     }
 
+    // Print full callback for debugging
+    console.log('[webhook] full body:', JSON.stringify(body))
+
     const bodySecret = body.secret as string | undefined
     const receivedSecret = headerSecret ?? bodySecret ?? ''
 
@@ -48,9 +54,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Extract fields ────────────────────────────────────────────────────────
+    // PiAPI nests the real data under body.data
+    const data = body.data as Record<string, unknown> | undefined
+
     const taskId: string =
+      (data?.task_id as string) ??
       (body.task_id as string) ??
-      ((body.data as any)?.task_id as string) ??
       ''
 
     if (!taskId) {
@@ -60,25 +69,25 @@ export async function POST(request: NextRequest) {
 
     // Normalise status
     const rawStatus: string =
+      (data?.status as string) ??
       (body.status as string) ??
-      ((body.data as any)?.status as string) ??
       'unknown'
 
     const isCompleted = rawStatus === 'completed' || rawStatus === 'success'
     const isFailed = rawStatus === 'failed' || rawStatus === 'error'
-
     const normalizedStatus = isCompleted ? 'completed' : isFailed ? 'failed' : rawStatus
 
-    // Extract video URL from various PiAPI response shapes
-    const output = (body.output ?? (body.data as any)?.output) as Record<string, unknown> | undefined
+    // Extract video URL — PiAPI puts it at data.output.video
+    const output = data?.output as Record<string, unknown> | undefined
     const resultVideoUrl: string | null =
+      (output?.video as string) ??
       (output?.video_url as string) ??
       (output?.url as string) ??
       null
 
     console.log('[omnihuman-webhook] task_id:', taskId, 'status:', normalizedStatus, 'videoUrl:', resultVideoUrl)
 
-    // ── Update omnihuman_jobs table ───────────────────────────────────────────
+    // ── UPDATE omnihuman_jobs ─────────────────────────────────────────────────
     const updatePayload: Record<string, unknown> = {
       status: normalizedStatus,
       updated_at: new Date().toISOString(),
@@ -95,11 +104,11 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error('[omnihuman-webhook] DB update error:', dbError.message)
-      // Return 200 so PiAPI doesn't retry — we log the error but don't fail
+      // Return 200 so PiAPI doesn't retry
       return NextResponse.json({ received: true, warning: dbError.message })
     }
 
-    console.log('[omnihuman-webhook] DB updated, rows affected:', count)
+    console.log('[omnihuman-webhook] DB updated, rows affected:', count, '| result_video_url:', resultVideoUrl)
 
     return NextResponse.json({ received: true, task_id: taskId, status: normalizedStatus })
   } catch (error) {
