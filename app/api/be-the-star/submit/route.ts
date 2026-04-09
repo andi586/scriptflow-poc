@@ -88,6 +88,10 @@ export async function POST(request: NextRequest) {
         prompt: 'person speaks naturally cinematic',
         fast_mode: true,
       },
+      webhook_config: {
+        endpoint: 'https://getscriptflow.com/api/omnihuman-webhook',
+        secret: 'scriptflow-webhook-2026',
+      },
     }
 
     console.log('[submit] imageUrl:', imageUrl)
@@ -114,6 +118,25 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[be-the-star/submit] task submitted, taskId:', taskId)
+
+    // ── Step 4: Insert job record into omnihuman_jobs ─────────────────────────
+    try {
+      const { createClient: createSupabaseClient } = await import('@supabase/supabase-js')
+      const supabase = createSupabaseClient(supabaseUrl, serviceKey)
+      const { error: insertError } = await supabase
+        .from('omnihuman_jobs')
+        .insert({
+          task_id: taskId,
+          status: 'pending',
+        })
+      if (insertError) {
+        console.warn('[be-the-star/submit] omnihuman_jobs insert error (non-fatal):', insertError.message)
+      } else {
+        console.log('[be-the-star/submit] omnihuman_jobs row created for taskId:', taskId)
+      }
+    } catch (dbErr) {
+      console.warn('[be-the-star/submit] omnihuman_jobs insert failed (non-fatal):', dbErr instanceof Error ? dbErr.message : dbErr)
+    }
 
     // Return immediately — frontend will poll
     return NextResponse.json({ success: true, taskId, audioUrl })
