@@ -85,17 +85,19 @@ export async function POST(request: NextRequest) {
       input: {
         image_url: imageUrl,
         audio_url: audioUrl,
-        prompt: 'person speaks naturally cinematic',
         fast_mode: true,
       },
-      webhook_config: {
-        endpoint: 'https://getscriptflow.com/api/omnihuman-webhook',
-        secret: 'scriptflow-webhook-2026',
+      config: {
+        webhook_config: {
+          endpoint: 'https://getscriptflow.com/api/omnihuman-webhook',
+          secret: 'scriptflow-webhook-2026',
+        },
       },
     }
 
     console.log('[submit] imageUrl:', imageUrl)
     console.log('[submit] audioUrl:', audioUrl)
+    console.log('[submit] piapi payload:', JSON.stringify(taskPayload))
     console.log('[be-the-star/submit] submitting OmniHuman task')
     const submitRes = await fetch(`${PIAPI_BASE}/task`, {
       method: 'POST',
