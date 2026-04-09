@@ -276,18 +276,23 @@ export default function AppFlowPage() {
         console.warn("[app-flow] pipeline/start error (non-fatal):", e);
       }
 
-      // Step 4: Voice clone — send audio + projectId as FormData (no manual Content-Type)
+      // Step 4: Voice clone — send audioUrl as JSON (no file upload, avoids 413)
       let voiceId: string | null = null;
-      try {
-        const vcForm = new FormData();
-        vcForm.append("audio", blob, "recording.webm");
-        if (projectId) vcForm.append("projectId", projectId);
-        const vcRes  = await fetch("/api/voice-clone", { method: "POST", body: vcForm });
-        const vcData = await vcRes.json();
-        voiceId = vcData.voice_id ?? null;
-        console.log("[app-flow] voice_id:", voiceId ?? "none");
-      } catch (e) {
-        console.warn("[app-flow] voice-clone error (non-fatal):", e);
+      if (audioUrl) {
+        try {
+          const vcRes  = await fetch("/api/voice-clone", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audioUrl, projectId }),
+          });
+          const vcData = await vcRes.json();
+          voiceId = vcData.voice_id ?? null;
+          console.log("[app-flow] voice_id:", voiceId ?? "none");
+        } catch (e) {
+          console.warn("[app-flow] voice-clone error (non-fatal):", e);
+        }
+      } else {
+        console.warn("[app-flow] skipping voice-clone: no audioUrl");
       }
 
       // Step 5: Call OmniHuman with real HTTPS URLs

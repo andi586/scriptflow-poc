@@ -8,39 +8,31 @@ export const maxDuration = 60
  * Voice Clone API
  *
  * Flow:
- * 1. Receive audio blob (recorded video audio) + projectId
- * 2. Call ElevenLabs voice clone API to create a voice from the audio
- * 3. Store the returned voice_id in projects.user_voice_id
- * 4. Return voice_id to client
- *
- * The finalize pipeline reads projects.user_voice_id and uses it for TTS.
+ * 1. Receive JSON { audioUrl, projectId } — audioUrl is a Supabase Storage public URL
+ * 2. Download the audio from Supabase Storage (server-side fetch, no size limit)
+ * 3. Call ElevenLabs voice clone API to create a voice from the audio
+ * 4. Store the returned voice_id in projects.user_voice_id
+ * 5. Return voice_id to client
  */
 export async function POST(request: NextRequest) {
   console.log('[voice-clone] ENTER', new Date().toISOString())
 
   try {
-    const formData = await request.formData()
-    const audioFile = formData.get('audio') as File | null
-    const projectId = formData.get('projectId') as string | null
-    const voiceStyle = (formData.get('voiceStyle') as string | null) ?? 'natural'
+    const body = await request.json()
+    const audioUrl = body.audioUrl as string | null
+    const projectId = body.projectId as string | null
+    const voiceStyle = (body.voiceStyle as string | null) ?? 'natural'
 
-    console.log('[voice-clone] params:', {
-      hasAudio: !!audioFile,
-      audioSize: audioFile?.size ?? 0,
-      audioType: audioFile?.type ?? 'unknown',
-      projectId,
-      voiceStyle,
-    })
+    console.log('[voice-clone] params:', { audioUrl: audioUrl?.slice(0, 80), projectId, voiceStyle })
 
-    if (!audioFile) {
-      console.error('[voice-clone] ERROR: no audio file provided')
-      return NextResponse.json({ error: 'audio file is required' }, { status: 400 })
+    if (!audioUrl) {
+      console.error('[voice-clone] ERROR: no audioUrl provided')
+      return NextResponse.json({ error: 'audioUrl is required' }, { status: 400 })
     }
 
     const elevenLabsKey = process.env.ELEVENLABS_API_KEY
     if (!elevenLabsKey) {
       console.error('[voice-clone] ERROR: ELEVENLABS_API_KEY not set')
-      // Return a stub voice_id so the pipeline can continue without crashing
       return NextResponse.json({
         success: false,
         error: 'ELEVENLABS_API_KEY not configured',
@@ -49,12 +41,27 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // ── Step 1: Upload audio to ElevenLabs voice clone endpoint ──────────────
+    // ── Step 1: Download audio from Supabase Storage ──────────────────────────
+    console.log('[voice-clone] downloading audio from Supabase:', audioUrl.slice(0, 80))
+    const audioRes = await fetch(audioUrl)
+    if (!audioRes.ok) {
+      console.error('[voice-clone] failed to download audio:', audioRes.status)
+      return NextResponse.json({
+        success: false,
+        error: `Failed to download audio: ${audioRes.status}`,
+        voice_id: null,
+      }, { status: 502 })
+    }
+    const audioBuffer = await audioRes.arrayBuffer()
+    const audioBlob = new Blob([audioBuffer], { type: audioRes.headers.get('content-type') || 'video/webm' })
+    console.log('[voice-clone] downloaded audio, size:', audioBlob.size)
+
+    // ── Step 2: Upload audio to ElevenLabs voice clone endpoint ──────────────
     console.log('[voice-clone] uploading audio to ElevenLabs...')
     const cloneForm = new FormData()
     cloneForm.append('name', `scriptflow_user_${projectId ?? Date.now()}`)
     cloneForm.append('description', 'ScriptFlow user voice clone')
-    cloneForm.append('files', audioFile, 'recording.webm')
+    cloneForm.append('files', audioBlob, 'recording.webm')
     cloneForm.append('remove_background_noise', 'true')
 
     const cloneRes = await fetch('https://api.elevenlabs.io/v1/voices/add', {
@@ -71,16 +78,6 @@ export async function POST(request: NextRequest) {
       const errText = await cloneRes.text().catch(() => 'unknown')
       console.error('[voice-clone] ElevenLabs error status:', cloneRes.status)
       console.error('[voice-clone] ElevenLabs error body:', errText)
-      console.error('[voice-clone] ElevenLabs request headers sent:', JSON.stringify({
-        'xi-api-key': elevenLabsKey ? elevenLabsKey.slice(0, 8) + '...' : 'MISSING',
-      }))
-      console.error('[voice-clone] FormData fields: name, description, files, remove_background_noise')
-      console.error('[voice-clone] audio file info:', {
-        size: audioFile.size,
-        type: audioFile.type,
-        name: audioFile.name,
-      })
-      // Try to parse JSON error detail
       try {
         const errJson = JSON.parse(errText)
         console.error('[voice-clone] ElevenLabs error detail:', JSON.stringify(errJson))
@@ -98,7 +95,7 @@ export async function POST(request: NextRequest) {
     const voiceId: string = cloneData.voice_id
     console.log('[voice-clone] ElevenLabs voice_id:', voiceId)
 
-    // ── Step 2: Store voice_id in projects.user_voice_id ─────────────────────
+    // ── Step 3: Store voice_id in projects.user_voice_id ─────────────────────
     if (projectId && voiceId) {
       console.log('[voice-clone] storing voice_id in projects table, projectId:', projectId)
       try {
