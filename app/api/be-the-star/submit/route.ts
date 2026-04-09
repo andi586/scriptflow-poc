@@ -34,15 +34,61 @@ export async function POST(request: NextRequest) {
     if (!elevenLabsKey) return NextResponse.json({ error: 'ELEVENLABS_API_KEY not configured' }, { status: 500 })
     if (!piApiKey) return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
 
-    // ── Step 1: ElevenLabs TTS → mp3 ─────────────────────────────────────────
-    const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM' // Luna
-    // Use Chinese text if firstLine is not provided or is the default English placeholder
+    // ── Step 1: Voice clone (optional) + ElevenLabs TTS → mp3 ────────────────
+    const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM' // Luna (fallback)
     const chineseDefaultLine = '我从来没有想到，这一天会来临。但我已经准备好了。'
     const ttsText = firstLine || chineseDefaultLine
-    console.log('[be-the-star/submit] TTS for:', ttsText.slice(0, 60))
+
+    // If user provided a voice recording, clone it first to get a voice_id
+    let ttsVoiceId = DEFAULT_VOICE_ID
+    const voiceRecordingUrl = body.voiceRecordingUrl as string | null
+
+    if (voiceRecordingUrl) {
+      console.log('[be-the-star/submit] voice recording provided, cloning voice...')
+      try {
+        // Download the recording
+        const recRes = await fetch(voiceRecordingUrl)
+        if (recRes.ok) {
+          const recBuffer = await recRes.arrayBuffer()
+          const contentType = recRes.headers.get('content-type') || 'audio/webm'
+          const ext = contentType.includes('mp4') ? 'mp4' : 'webm'
+          const recBlob = new Blob([recBuffer], { type: contentType })
+
+          // Call ElevenLabs voice clone API
+          const cloneForm = new FormData()
+          cloneForm.append('name', `user-voice-${Date.now()}`)
+          cloneForm.append('files', recBlob, `recording.${ext}`)
+          cloneForm.append('remove_background_noise', 'true')
+
+          const cloneRes = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+            method: 'POST',
+            headers: { 'xi-api-key': elevenLabsKey },
+            body: cloneForm,
+          })
+
+          if (cloneRes.ok) {
+            const cloneData = await cloneRes.json()
+            const clonedVoiceId: string = cloneData.voice_id
+            if (clonedVoiceId) {
+              ttsVoiceId = clonedVoiceId
+              console.log('[be-the-star/submit] voice cloned, voice_id:', clonedVoiceId)
+            }
+          } else {
+            const errText = await cloneRes.text().catch(() => 'unknown')
+            console.warn('[be-the-star/submit] voice clone failed (non-fatal):', cloneRes.status, errText)
+            // Fall through to default voice
+          }
+        }
+      } catch (cloneErr) {
+        console.warn('[be-the-star/submit] voice clone error (non-fatal):', cloneErr instanceof Error ? cloneErr.message : cloneErr)
+        // Fall through to default voice
+      }
+    }
+
+    console.log('[be-the-star/submit] TTS voice_id:', ttsVoiceId, 'text:', ttsText.slice(0, 60))
 
     const ttsRes = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${DEFAULT_VOICE_ID}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${ttsVoiceId}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'xi-api-key': elevenLabsKey },

@@ -16,6 +16,7 @@ const POLL_INTERVAL_MS = 5000;
 const MAX_POLL_ATTEMPTS = 120; // 120 × 5s = 10 minutes max
 
 type Phase = "upload" | "submitting" | "polling" | "result";
+type RecordingStatus = "idle" | "recording" | "processing" | "done" | "error";
 
 export default function BeTheStarPage() {
   const [phase, setPhase] = useState<Phase>("upload");
@@ -28,15 +29,25 @@ export default function BeTheStarPage() {
   const [step, setStep] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // ── Voice recording state ──────────────────────────────────────────────────
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("idle");
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [voiceRecordingUrl, setVoiceRecordingUrl] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollAttemptsRef = useRef(0);
 
-  // ── Cleanup poll timer on unmount ──────────────────────────────────────────
+  // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
     };
   }, []);
 
@@ -65,6 +76,86 @@ export default function BeTheStarPage() {
     } catch (err) {
       setError("Upload error: " + (err instanceof Error ? err.message : String(err)));
     }
+  }, []);
+
+  // ── Voice recording ────────────────────────────────────────────────────────
+  const startRecording = useCallback(async () => {
+    setRecordingError(null);
+    setRecordingStatus("recording");
+    setIsRecording(true);
+    recordedChunksRef.current = [];
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/mp4";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setIsRecording(false);
+        setRecordingStatus("processing");
+
+        try {
+          const audioBlob = new Blob(recordedChunksRef.current, { type: mimeType });
+          const supabase = createClient();
+          const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+          const audioPath = `be-the-star/voice_${Date.now()}.${ext}`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from("recordings")
+            .upload(audioPath, audioBlob, { contentType: mimeType, upsert: true });
+
+          if (uploadErr) throw new Error("Voice upload failed: " + uploadErr.message);
+
+          const { data: pub } = supabase.storage.from("recordings").getPublicUrl(audioPath);
+          const url = pub.publicUrl;
+          setVoiceRecordingUrl(url);
+          setRecordingStatus("done");
+          console.log("[be-the-star] voice recording uploaded:", url);
+        } catch (e) {
+          console.error("[be-the-star] voice upload failed:", e);
+          setRecordingError(e instanceof Error ? e.message : "Upload failed");
+          setRecordingStatus("error");
+        }
+      };
+
+      recorder.start(100);
+
+      // Auto-stop after 30 seconds
+      recordingTimerRef.current = setTimeout(() => {
+        if (mediaRecorderRef.current?.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      }, 30000);
+    } catch (e) {
+      console.error("[be-the-star] recording failed:", e);
+      setIsRecording(false);
+      setRecordingError(e instanceof Error ? e.message : "Could not access microphone");
+      setRecordingStatus("error");
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
+  const clearVoiceRecording = useCallback(() => {
+    setVoiceRecordingUrl(null);
+    setRecordingStatus("idle");
+    setRecordingError(null);
   }, []);
 
   // ── Poll OmniHuman status ──────────────────────────────────────────────────
@@ -121,7 +212,11 @@ export default function BeTheStarPage() {
       const res = await fetch("/api/be-the-star/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: photoUrl, firstLine }),
+        body: JSON.stringify({
+          imageUrl: photoUrl,
+          firstLine,
+          voiceRecordingUrl: voiceRecordingUrl ?? undefined,
+        }),
       });
 
       const data = await res.json();
@@ -139,7 +234,7 @@ export default function BeTheStarPage() {
       setError(err instanceof Error ? err.message : "Submit failed");
       setPhase("upload");
     }
-  }, [photoUrl, firstLine, schedulePoll]);
+  }, [photoUrl, firstLine, voiceRecordingUrl, schedulePoll]);
 
   // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
@@ -273,6 +368,63 @@ export default function BeTheStarPage() {
           </label>
         </div>
 
+        {/* ── Voice recording section ──────────────────────────────────────── */}
+        <div className="w-full mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-purple-400 mb-1">
+            🎙️ Clone Your Voice <span className="text-white/30 normal-case font-normal">(optional)</span>
+          </p>
+          <p className="text-xs text-white/40 mb-3">
+            Record 10–30 seconds of your voice to make the character sound like you.
+          </p>
+
+          {recordingStatus === "done" && voiceRecordingUrl ? (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 flex items-center gap-2 rounded-xl border border-green-500/40 bg-green-500/10 px-3 py-2">
+                <span className="text-green-400 text-sm">✓</span>
+                <span className="text-green-300 text-xs font-medium">Voice recorded!</span>
+              </div>
+              <button
+                type="button"
+                onClick={clearVoiceRecording}
+                className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs text-white/50 hover:bg-white/10 transition"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={isRecording ? stopRecording : () => void startRecording()}
+                disabled={recordingStatus === "processing"}
+                className={[
+                  "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
+                  isRecording
+                    ? "border-red-500/60 bg-red-500/15 text-red-300 hover:bg-red-500/25 animate-pulse"
+                    : recordingStatus === "processing"
+                    ? "border-white/20 bg-white/5 text-white/40 cursor-wait"
+                    : "border-purple-500/50 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20",
+                ].join(" ")}
+              >
+                {isRecording ? (
+                  <>⏹ Stop</>
+                ) : recordingStatus === "processing" ? (
+                  <>⏳ Uploading…</>
+                ) : (
+                  <>🎙️ Record (max 30s)</>
+                )}
+              </button>
+              {isRecording && (
+                <span className="text-xs text-red-400/80 animate-pulse">● Recording…</span>
+              )}
+            </div>
+          )}
+
+          {recordingError && (
+            <p className="mt-2 text-xs text-red-400">{recordingError}</p>
+          )}
+        </div>
+
         {/* First line selector */}
         <div className="w-full mb-6">
           <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Your character&apos;s first line</p>
@@ -311,6 +463,10 @@ export default function BeTheStarPage() {
         >
           {photoUrl ? "✨ Generate My Character" : "Upload a photo first"}
         </button>
+
+        {voiceRecordingUrl && (
+          <p className="mt-2 text-xs text-purple-400/70 text-center">🎙️ Using your cloned voice</p>
+        )}
       </main>
     </div>
   );
