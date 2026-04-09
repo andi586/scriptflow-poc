@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -6,8 +7,11 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/be-the-star/poll?taskId=xxx
  *
- * Query OmniHuman task status once and return immediately.
- * Frontend calls this every 5 seconds until status === 'completed'.
+ * Strategy (in order):
+ * 1. Check omnihuman_jobs table — if status=completed and result_video_url exists, return immediately.
+ *    This handles the case where the webhook already delivered the result but the frontend
+ *    lost the connection and never received it.
+ * 2. Fall back to polling PiAPI directly for live status.
  *
  * Returns: { status: 'pending' | 'processing' | 'completed' | 'failed', videoUrl?: string, error?: string }
  */
@@ -18,6 +22,32 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'taskId is required' }, { status: 400 })
   }
 
+  // ── Step 1: Check omnihuman_jobs table first ──────────────────────────────
+  try {
+    const { data: jobRow, error: dbError } = await supabaseAdmin
+      .from('omnihuman_jobs')
+      .select('status, result_video_url')
+      .eq('task_id', taskId)
+      .maybeSingle()
+
+    if (!dbError && jobRow) {
+      console.log(`[be-the-star/poll] DB row found: taskId=${taskId} status=${jobRow.status} videoUrl=${jobRow.result_video_url}`)
+
+      if (jobRow.status === 'completed' && jobRow.result_video_url) {
+        // Webhook already delivered the result — return immediately
+        return NextResponse.json({ status: 'completed', videoUrl: jobRow.result_video_url, source: 'db' })
+      }
+
+      if (jobRow.status === 'failed') {
+        return NextResponse.json({ status: 'failed', error: 'Task failed (from DB)', source: 'db' })
+      }
+    }
+  } catch (dbErr) {
+    // Non-fatal — fall through to PiAPI poll
+    console.warn('[be-the-star/poll] DB check failed (non-fatal):', dbErr instanceof Error ? dbErr.message : dbErr)
+  }
+
+  // ── Step 2: Fall back to PiAPI direct poll ────────────────────────────────
   const piApiKey = process.env.PIAPI_API_KEY ?? process.env.KLING_API_KEY
   if (!piApiKey) {
     return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
@@ -36,22 +66,32 @@ export async function GET(request: NextRequest) {
 
     const pollData = await pollRes.json()
     const rawStatus: string = pollData?.data?.status ?? pollData?.status ?? 'unknown'
-    console.log(`[be-the-star/poll] taskId=${taskId} status=${rawStatus}`)
+    console.log(`[be-the-star/poll] PiAPI taskId=${taskId} status=${rawStatus}`)
 
     if (rawStatus === 'completed' || rawStatus === 'success') {
       const videoUrl: string | null =
+        pollData?.data?.output?.video ??
         pollData?.data?.output?.video_url ??
         pollData?.data?.output?.url ??
+        pollData?.output?.video ??
         pollData?.output?.video_url ??
         pollData?.output?.url ??
         null
 
       if (!videoUrl) {
-        console.warn('[be-the-star/poll] completed but no videoUrl in response:', JSON.stringify(pollData).slice(0, 300))
+        console.warn('[be-the-star/poll] completed but no videoUrl in PiAPI response:', JSON.stringify(pollData).slice(0, 300))
         return NextResponse.json({ status: 'processing' })
       }
 
-      return NextResponse.json({ status: 'completed', videoUrl })
+      // Also update DB in case webhook was missed
+      try {
+        await supabaseAdmin
+          .from('omnihuman_jobs')
+          .update({ status: 'completed', result_video_url: videoUrl, updated_at: new Date().toISOString() })
+          .eq('task_id', taskId)
+      } catch {}
+
+      return NextResponse.json({ status: 'completed', videoUrl, source: 'piapi' })
     }
 
     if (rawStatus === 'failed' || rawStatus === 'error') {
