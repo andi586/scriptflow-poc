@@ -5,11 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 
 // ─── First lines ───────────────────────────────────────────────────────────────
 const FIRST_LINES = [
-  "I never thought this day would come... but here I am.",
-  "They said I wasn't good enough. They were wrong.",
-  "Every story has a beginning. This is mine.",
-  "I've been waiting for this moment my entire life.",
-  "The world is about to change. And I'm the one changing it.",
+  "我从来没有想到，这一天会来临。但我已经准备好了。",
+  "他们说我不够好。但他们错了。",
+  "每个故事都有开始。这是我的故事。",
+  "我等待这一刻，等待了我整个人生。",
+  "世界即将改变。而改变它的人，就是我。",
 ];
 
 const POLL_INTERVAL_MS = 5000;
