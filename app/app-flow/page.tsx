@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
 // import { PRICING } from "@/lib/generation-tiers"; // Hidden until Stripe is activated
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -199,21 +200,26 @@ export default function AppFlowPage() {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
   }, []);
 
-  // ── helper: upload blob to Supabase Storage via /api/upload ───────────────
+  // ── helper: upload blob directly to Supabase Storage (bypasses /api/upload to avoid 413) ──
   const uploadBlob = useCallback(async (blob: Blob, filename: string): Promise<string | null> => {
     try {
-      const form = new FormData();
-      form.append("file", blob, filename);
-      form.append("bucket", "recordings");
-      form.append("folder", "tmp");
-      const res  = await fetch("/api/upload", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok || !data.url) {
-        console.warn("[app-flow] upload failed:", data.error ?? res.status);
+      const supabase = createClient();
+      const filePath = `tmp/${Date.now()}_${filename}`;
+      const { data, error } = await supabase.storage
+        .from("recordings")
+        .upload(filePath, blob, {
+          contentType: blob.type || "video/webm",
+          upsert: true,
+        });
+      if (error) {
+        console.warn("[app-flow] supabase upload failed:", error.message);
         return null;
       }
-      console.log("[app-flow] uploaded", filename, "→", data.url);
-      return data.url as string;
+      const audioUrl = supabase.storage
+        .from("recordings")
+        .getPublicUrl(data.path).data.publicUrl;
+      console.log("[app-flow] uploaded", filename, "→", audioUrl);
+      return audioUrl;
     } catch (e) {
       console.warn("[app-flow] upload error:", e);
       return null;
