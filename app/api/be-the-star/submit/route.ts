@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           text: firstLine,
           model_id: 'eleven_multilingual_v2',
-          output_format: 'mp3_44100_128',
+          output_format: 'mp3_44100_128', // must be mp3 for OmniHuman
           voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0, use_speaker_boost: true },
         }),
       }
@@ -90,6 +90,8 @@ export async function POST(request: NextRequest) {
       },
     }
 
+    console.log('[submit] imageUrl:', imageUrl)
+    console.log('[submit] audioUrl:', audioUrl)
     console.log('[be-the-star/submit] submitting OmniHuman task')
     const submitRes = await fetch(`${PIAPI_BASE}/task`, {
       method: 'POST',
