@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// ─── First lines NEL would generate ───────────────────────────────────────────
+// ─── First lines ───────────────────────────────────────────────────────────────
 const FIRST_LINES = [
   "I never thought this day would come... but here I am.",
   "They said I wasn't good enough. They were wrong.",
@@ -12,25 +12,39 @@ const FIRST_LINES = [
   "The world is about to change. And I'm the one changing it.",
 ];
 
-type Phase = "upload" | "generating" | "result";
+const POLL_INTERVAL_MS = 5000;
+const MAX_POLL_ATTEMPTS = 60; // 60 × 5s = 5 minutes max
+
+type Phase = "upload" | "submitting" | "polling" | "result";
 
 export default function BeTheStarPage() {
   const [phase, setPhase] = useState<Phase>("upload");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [firstLine, setFirstLine] = useState(FIRST_LINES[0]);
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [pollCount, setPollCount] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [step, setStep] = useState("");
   const [error, setError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollAttemptsRef = useRef(0);
+
+  // ── Cleanup poll timer on unmount ──────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
 
   // ── Upload photo directly to Supabase ──────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show local preview immediately
     const localUrl = URL.createObjectURL(file);
     setPhotoPreview(localUrl);
     setError(null);
@@ -43,10 +57,7 @@ export default function BeTheStarPage() {
         .from("recordings")
         .upload(filePath, file, { contentType: file.type, upsert: true });
 
-      if (uploadErr) {
-        setError("Photo upload failed: " + uploadErr.message);
-        return;
-      }
+      if (uploadErr) { setError("Photo upload failed: " + uploadErr.message); return; }
 
       const url = supabase.storage.from("recordings").getPublicUrl(data.path).data.publicUrl;
       setPhotoUrl(url);
@@ -56,64 +67,117 @@ export default function BeTheStarPage() {
     }
   }, []);
 
-  // ── Generate preview video ─────────────────────────────────────────────────
-  const handleGenerate = useCallback(async () => {
-    if (!photoUrl) {
-      setError("Please upload a photo first.");
-      return;
-    }
+  // ── Poll OmniHuman status ──────────────────────────────────────────────────
+  const schedulePoll = useCallback((tid: string) => {
+    pollTimerRef.current = setTimeout(async () => {
+      pollAttemptsRef.current += 1;
+      setPollCount(pollAttemptsRef.current);
 
-    setPhase("generating");
+      if (pollAttemptsRef.current > MAX_POLL_ATTEMPTS) {
+        setError("Generation timed out after 5 minutes. Please try again.");
+        setPhase("upload");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/be-the-star/poll?taskId=${encodeURIComponent(tid)}`);
+        const data = await res.json();
+        console.log(`[be-the-star] poll #${pollAttemptsRef.current} status:`, data.status);
+
+        if (data.status === "completed" && data.videoUrl) {
+          setVideoUrl(data.videoUrl);
+          setPhase("result");
+          setTimeout(() => { videoRef.current?.play().catch(() => {}); }, 300);
+          return;
+        }
+
+        if (data.status === "failed") {
+          setError("Generation failed: " + (data.error ?? "unknown error"));
+          setPhase("upload");
+          return;
+        }
+
+        // Still processing — schedule next poll
+        schedulePoll(tid);
+      } catch (err) {
+        console.warn("[be-the-star] poll error:", err);
+        // Network error — keep trying
+        schedulePoll(tid);
+      }
+    }, POLL_INTERVAL_MS);
+  }, []);
+
+  // ── Submit job ─────────────────────────────────────────────────────────────
+  const handleGenerate = useCallback(async () => {
+    if (!photoUrl) { setError("Please upload a photo first."); return; }
+
+    setPhase("submitting");
     setError(null);
     setStep("Generating your character voice...");
+    pollAttemptsRef.current = 0;
+    setPollCount(0);
 
     try {
-      const res = await fetch("/api/be-the-star/preview", {
+      const res = await fetch("/api/be-the-star/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageUrl: photoUrl, firstLine }),
       });
 
-      setStep("Animating your character...");
       const data = await res.json();
 
-      if (!res.ok || !data.videoUrl) {
-        throw new Error(data.error ?? "Generation failed");
+      if (!res.ok || !data.taskId) {
+        throw new Error(data.error ?? "Submit failed");
       }
 
-      setVideoUrl(data.videoUrl);
-      setPhase("result");
-
-      // Auto-play after short delay
-      setTimeout(() => {
-        videoRef.current?.play().catch(() => {});
-      }, 300);
+      console.log("[be-the-star] task submitted, taskId:", data.taskId);
+      setTaskId(data.taskId);
+      setStep("Animating your character...");
+      setPhase("polling");
+      schedulePoll(data.taskId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generation failed");
+      setError(err instanceof Error ? err.message : "Submit failed");
       setPhase("upload");
     }
-  }, [photoUrl, firstLine]);
+  }, [photoUrl, firstLine, schedulePoll]);
 
   // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     setPhase("upload");
     setPhotoUrl(null);
     setPhotoPreview(null);
     setVideoUrl(null);
+    setTaskId(null);
     setError(null);
     setStep("");
+    setPollCount(0);
+    pollAttemptsRef.current = 0;
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: GENERATING
+  // PHASE: SUBMITTING / POLLING
   // ════════════════════════════════════════════════════════════════════════════
-  if (phase === "generating") {
+  if (phase === "submitting" || phase === "polling") {
+    const elapsed = pollCount * (POLL_INTERVAL_MS / 1000);
     return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6">
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6 px-6">
         <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
-        <p className="text-white/70 text-sm tracking-wide">{step || "Creating your character..."}</p>
-        <p className="text-white/30 text-xs">This takes about 30–60 seconds</p>
+        <p className="text-white/70 text-sm tracking-wide text-center">
+          {step || "Creating your character..."}
+        </p>
+        {phase === "polling" && (
+          <p className="text-white/30 text-xs">
+            {elapsed > 0 ? `${elapsed}s elapsed` : "Starting..."} · checking every 5s
+          </p>
+        )}
+        {phase === "submitting" && (
+          <p className="text-white/30 text-xs">Preparing audio & submitting...</p>
+        )}
+        {taskId && (
+          <p className="text-white/20 text-xs font-mono">task: {taskId.slice(0, 16)}…</p>
+        )}
       </div>
     );
   }
@@ -127,10 +191,7 @@ export default function BeTheStarPage() {
         <video
           ref={videoRef}
           src={videoUrl}
-          playsInline
-          autoPlay
-          controls
-          loop
+          playsInline autoPlay controls loop
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
@@ -188,31 +249,22 @@ export default function BeTheStarPage() {
             className="hidden"
             id="photo-input"
           />
-          <label
-            htmlFor="photo-input"
-            className="block w-full cursor-pointer"
-          >
+          <label htmlFor="photo-input" className="block w-full cursor-pointer">
             {photoPreview ? (
               <div className="relative w-full aspect-[3/4] max-h-72 rounded-2xl overflow-hidden border-2 border-purple-500/50">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photoPreview}
-                  alt="Your photo"
-                  className="w-full h-full object-cover"
-                />
+                <img src={photoPreview} alt="Your photo" className="w-full h-full object-cover" />
                 {!photoUrl && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <div className="w-6 h-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                   </div>
                 )}
                 {photoUrl && (
-                  <div className="absolute top-3 right-3 bg-green-500 rounded-full w-6 h-6 flex items-center justify-center text-xs">
-                    ✓
-                  </div>
+                  <div className="absolute top-3 right-3 bg-green-500 rounded-full w-6 h-6 flex items-center justify-center text-xs">✓</div>
                 )}
               </div>
             ) : (
-              <div className="w-full aspect-[3/4] max-h-72 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center justify-center gap-3 hover:border-purple-500/50 hover:bg-white/8 transition">
+              <div className="w-full aspect-[3/4] max-h-72 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 flex flex-col items-center justify-center gap-3 hover:border-purple-500/50 transition">
                 <div className="text-4xl">📸</div>
                 <p className="text-white/60 text-sm">Tap to upload your photo</p>
                 <p className="text-white/30 text-xs">JPG, PNG, WEBP</p>

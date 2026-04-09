@@ -1,0 +1,123 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+/**
+ * POST /api/be-the-star/submit
+ *
+ * 1. Call ElevenLabs TTS → mp3 buffer
+ * 2. Upload mp3 to Supabase Storage → HTTPS URL
+ * 3. Submit OmniHuman task (fast_mode: true)
+ * 4. Return { taskId } immediately — do NOT poll
+ *
+ * Frontend polls /api/be-the-star/poll?taskId=xxx separately.
+ */
+export async function POST(request: NextRequest) {
+  console.log('[be-the-star/submit] ENTER', new Date().toISOString())
+
+  try {
+    const body = await request.json()
+    const imageUrl = body.imageUrl as string | null
+    const firstLine = body.firstLine as string | null
+
+    if (!imageUrl) return NextResponse.json({ error: 'imageUrl is required' }, { status: 400 })
+    if (!firstLine) return NextResponse.json({ error: 'firstLine is required' }, { status: 400 })
+
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY
+    const piApiKey = process.env.PIAPI_API_KEY ?? process.env.KLING_API_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+    if (!elevenLabsKey) return NextResponse.json({ error: 'ELEVENLABS_API_KEY not configured' }, { status: 500 })
+    if (!piApiKey) return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
+
+    // ── Step 1: ElevenLabs TTS → mp3 ─────────────────────────────────────────
+    const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM' // Luna
+    console.log('[be-the-star/submit] TTS for:', firstLine.slice(0, 60))
+
+    const ttsRes = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${DEFAULT_VOICE_ID}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'xi-api-key': elevenLabsKey },
+        body: JSON.stringify({
+          text: firstLine,
+          model_id: 'eleven_multilingual_v2',
+          output_format: 'mp3_44100_128',
+          voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0, use_speaker_boost: true },
+        }),
+      }
+    )
+
+    if (!ttsRes.ok) {
+      const errText = await ttsRes.text().catch(() => 'unknown')
+      console.error('[be-the-star/submit] TTS error:', ttsRes.status, errText)
+      return NextResponse.json({ error: `TTS failed: ${ttsRes.status}` }, { status: 502 })
+    }
+
+    const audioBuffer = Buffer.from(await ttsRes.arrayBuffer())
+    console.log('[be-the-star/submit] TTS audio bytes:', audioBuffer.length)
+
+    // ── Step 2: Upload mp3 to Supabase Storage ────────────────────────────────
+    const supabase = createClient(supabaseUrl, serviceKey)
+    const audioPath = `be-the-star/preview_${Date.now()}.mp3`
+
+    const { error: uploadError } = await supabase.storage
+      .from('recordings')
+      .upload(audioPath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+
+    if (uploadError) {
+      console.error('[be-the-star/submit] Supabase upload error:', uploadError.message)
+      return NextResponse.json({ error: `Audio upload failed: ${uploadError.message}` }, { status: 500 })
+    }
+
+    const audioUrl = supabase.storage.from('recordings').getPublicUrl(audioPath).data.publicUrl
+    console.log('[be-the-star/submit] audioUrl:', audioUrl)
+
+    // ── Step 3: Submit OmniHuman task (no polling) ────────────────────────────
+    const PIAPI_BASE = 'https://api.piapi.ai/api/v1'
+    const taskPayload = {
+      model: 'omni-human',
+      task_type: 'omni-human-1.5',
+      input: {
+        image_url: imageUrl,
+        audio_url: audioUrl,
+        prompt: 'person speaks naturally cinematic',
+        fast_mode: true,
+      },
+    }
+
+    console.log('[be-the-star/submit] submitting OmniHuman task')
+    const submitRes = await fetch(`${PIAPI_BASE}/task`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
+      body: JSON.stringify(taskPayload),
+    })
+
+    if (!submitRes.ok) {
+      const errText = await submitRes.text().catch(() => 'unknown')
+      console.error('[be-the-star/submit] OmniHuman submit failed:', submitRes.status, errText)
+      return NextResponse.json({ error: `OmniHuman submit failed: ${submitRes.status}` }, { status: 502 })
+    }
+
+    const submitData = await submitRes.json()
+    const taskId: string = submitData?.data?.task_id ?? submitData?.task_id
+
+    if (!taskId) {
+      console.error('[be-the-star/submit] no task_id:', JSON.stringify(submitData))
+      return NextResponse.json({ error: 'No task_id from OmniHuman' }, { status: 502 })
+    }
+
+    console.log('[be-the-star/submit] task submitted, taskId:', taskId)
+
+    // Return immediately — frontend will poll
+    return NextResponse.json({ success: true, taskId, audioUrl })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[be-the-star/submit] FATAL:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
