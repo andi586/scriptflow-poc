@@ -426,9 +426,13 @@ ${linesJson}`
         const apiKey = process.env.ELEVENLABS_API_KEY
         console.error("[finalize] apiKey prefix=", apiKey?.slice(0,8))
         // Pass language_code to ElevenLabs for multilingual TTS
-        const ttsBody: Record<string, any> = { text: block.text, model_id: ELEVENLABS_MODEL_ID }
+        // For Chinese: use eleven_multilingual_v2 which has best zh support
+        const modelId = userLanguage === 'zh'
+          ? 'eleven_multilingual_v2'
+          : ELEVENLABS_MODEL_ID
+        const ttsBody: Record<string, any> = { text: block.text, model_id: modelId }
         if (userLanguage !== 'en') {
-          ttsBody.language_code = userLanguage
+          ttsBody.language_code = 'zh'
         }
         const res = await fetch(`${ELEVENLABS_WITH_TIMESTAMPS_BASE_URL}/${voiceId}/with-timestamps`, {
           method: 'POST',
