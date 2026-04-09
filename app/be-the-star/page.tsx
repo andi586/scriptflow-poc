@@ -13,7 +13,7 @@ const FIRST_LINES = [
 ];
 
 const POLL_INTERVAL_MS = 5000;
-const MAX_POLL_ATTEMPTS = 60; // 60 × 5s = 5 minutes max
+const MAX_POLL_ATTEMPTS = 120; // 120 × 5s = 10 minutes max
 
 type Phase = "upload" | "submitting" | "polling" | "result";
 
@@ -74,7 +74,7 @@ export default function BeTheStarPage() {
       setPollCount(pollAttemptsRef.current);
 
       if (pollAttemptsRef.current > MAX_POLL_ATTEMPTS) {
-        setError("Generation timed out after 5 minutes. Please try again.");
+        setError("Generation timed out after 10 minutes. Please try again.");
         setPhase("upload");
         return;
       }
