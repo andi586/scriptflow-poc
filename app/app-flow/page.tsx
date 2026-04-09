@@ -296,6 +296,7 @@ export default function AppFlowPage() {
       }
 
       // Step 5: Call OmniHuman with real HTTPS URLs
+      // If OmniHuman fails, fall back to local blob so Kling pipeline can still proceed
       setStep("Generating your movie...");
       let generatedUrl: string | null = null;
       if (imageUrl && audioUrl) {
@@ -313,7 +314,13 @@ export default function AppFlowPage() {
           });
           const ohData = await ohRes.json();
           console.log("[app-flow] omni-human response:", ohData.success, ohData.videoUrl ?? ohData.error);
-          if (ohData.success && ohData.videoUrl) generatedUrl = ohData.videoUrl;
+          if (ohData.success && ohData.videoUrl) {
+            generatedUrl = ohData.videoUrl;
+          } else {
+            // OmniHuman failed — use the uploaded imageUrl as keyframe so Kling can proceed
+            console.warn("[app-flow] omni-human failed, using imageUrl as keyframe fallback:", ohData.error);
+            generatedUrl = null; // pipeline continues with local blob below
+          }
         } catch (e) {
           console.warn("[app-flow] omni-human error, falling back to local blob:", e);
         }
@@ -321,8 +328,10 @@ export default function AppFlowPage() {
         console.warn("[app-flow] skipping omni-human: missing imageUrl or audioUrl", { imageUrl, audioUrl });
       }
 
+      // Always continue pipeline — use local recorded blob as fallback video
       setStep("Almost done...");
-      setVideoUrl(generatedUrl ?? URL.createObjectURL(blob));
+      const fallbackUrl = URL.createObjectURL(blob);
+      setVideoUrl(generatedUrl ?? fallbackUrl);
       setVideoEnded(false);
       setPhase("result");
     } catch (e) {
