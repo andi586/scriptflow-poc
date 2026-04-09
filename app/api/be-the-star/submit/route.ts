@@ -36,7 +36,10 @@ export async function POST(request: NextRequest) {
 
     // ── Step 1: ElevenLabs TTS → mp3 ─────────────────────────────────────────
     const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM' // Luna
-    console.log('[be-the-star/submit] TTS for:', firstLine.slice(0, 60))
+    // Use Chinese text if firstLine is not provided or is the default English placeholder
+    const chineseDefaultLine = '我从来没有想到，这一天会来临。但我已经准备好了。'
+    const ttsText = firstLine || chineseDefaultLine
+    console.log('[be-the-star/submit] TTS for:', ttsText.slice(0, 60))
 
     const ttsRes = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${DEFAULT_VOICE_ID}`,
@@ -44,8 +47,9 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'xi-api-key': elevenLabsKey },
         body: JSON.stringify({
-          text: firstLine,
+          text: ttsText,
           model_id: 'eleven_multilingual_v2',
+          language_code: 'zh',
           output_format: 'mp3_44100_128', // must be mp3 for OmniHuman
           voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0, use_speaker_boost: true },
         }),
