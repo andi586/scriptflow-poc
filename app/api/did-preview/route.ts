@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         input: text,
         provider: {
           type: 'microsoft',
-          voice_id: 'zh-CN-XiaoxiaoNeural'
+          voice_id: 'zh-CN-YunxiNeural'
         }
       }
     })
