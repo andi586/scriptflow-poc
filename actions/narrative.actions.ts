@@ -741,6 +741,7 @@ Rules: 2-4 lines per scene, character must be: caius/luna/marcus/narrator (lower
 function getKlingConfig() {
   const base = process.env.KLING_API_BASE ?? "";
   const key = process.env.KLING_API_KEY ?? "";
+  console.log('[kling] key prefix:', key?.slice(0, 8))
   if (!base) throw new Error("Missing KLING_API_BASE");
   if (!key) throw new Error("Missing KLING_API_KEY");
   return { base, key };
