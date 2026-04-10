@@ -85,6 +85,32 @@ export default function BeTheStarPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [phase]);
 
+  // ── Crop image to square (face-centered) using canvas ─────────────────────
+  const cropToSquare = useCallback((file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const canvas = document.createElement("canvas");
+        const size = Math.min(img.width, img.height);
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("canvas not supported")); return; }
+        const offsetX = (img.width - size) / 2;
+        const offsetY = (img.height - size) / 3; // bias upward to keep face
+        ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("canvas toBlob failed"));
+        }, "image/jpeg", 0.92);
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
+      img.src = objectUrl;
+    });
+  }, []);
+
   // ── Upload photo directly to Supabase ──────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -96,21 +122,23 @@ export default function BeTheStarPage() {
 
     try {
       const supabase = createClient();
-      const ext = file.type.includes("png") ? "png" : "jpg";
-      const filePath = `be-the-star/${Date.now()}_photo.${ext}`;
+
+      // Crop to square before uploading
+      const croppedBlob = await cropToSquare(file);
+      const filePath = `be-the-star/${Date.now()}_photo.jpg`;
       const { data, error: uploadErr } = await supabase.storage
         .from("recordings")
-        .upload(filePath, file, { contentType: file.type, upsert: true });
+        .upload(filePath, croppedBlob, { contentType: "image/jpeg", upsert: true });
 
       if (uploadErr) { setError("Photo upload failed: " + uploadErr.message); return; }
 
       const url = supabase.storage.from("recordings").getPublicUrl(data.path).data.publicUrl;
       setPhotoUrl(url);
-      console.log("[be-the-star] photo uploaded:", url);
+      console.log("[be-the-star] photo uploaded (cropped square):", url);
     } catch (err) {
       setError("Upload error: " + (err instanceof Error ? err.message : String(err)));
     }
-  }, []);
+  }, [cropToSquare]);
 
   // ── Voice recording ────────────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
