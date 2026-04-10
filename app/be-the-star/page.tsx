@@ -58,6 +58,11 @@ export default function BeTheStarPage() {
   const [showUpsell, setShowUpsell] = useState(false);
   const upsellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── My Videos state ────────────────────────────────────────────────────────
+  const [showMyVideos, setShowMyVideos] = useState(false);
+  const [myVideos, setMyVideos] = useState<{ url: string; created_at: string; type: "hd" | "preview" }[]>([]);
+  const [myVideosLoading, setMyVideosLoading] = useState(false);
+
   // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -328,6 +333,49 @@ export default function BeTheStarPage() {
     }
   }, [photoUrl, firstLine, voiceRecordingUrl, schedulePoll, scheduleDIDPoll]);
 
+  // ── Load My Videos ─────────────────────────────────────────────────────────
+  const handleOpenMyVideos = useCallback(async () => {
+    setShowMyVideos(true);
+    setMyVideosLoading(true);
+    try {
+      const supabase = createClient();
+
+      // HD videos from omnihuman_jobs
+      const { data: jobs } = await supabase
+        .from("omnihuman_jobs")
+        .select("result_video_url, created_at")
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      // D-ID preview videos from storage listing
+      const { data: storageFiles } = await supabase.storage
+        .from("recordings")
+        .list("did-preview", { limit: 10, sortBy: { column: "created_at", order: "desc" } });
+
+      const hdVideos = (jobs ?? [])
+        .filter((j) => j.result_video_url)
+        .map((j) => ({ url: j.result_video_url as string, created_at: j.created_at as string, type: "hd" as const }));
+
+      const previewVideos = (storageFiles ?? [])
+        .filter((f) => f.name.endsWith(".mp4"))
+        .map((f) => ({
+          url: supabase.storage.from("recordings").getPublicUrl(`did-preview/${f.name}`).data.publicUrl,
+          created_at: f.created_at ?? "",
+          type: "preview" as const,
+        }));
+
+      const all = [...hdVideos, ...previewVideos].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setMyVideos(all);
+    } catch (e) {
+      console.error("[my-videos] load error:", e);
+    } finally {
+      setMyVideosLoading(false);
+    }
+  }, []);
+
   // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
@@ -511,11 +559,78 @@ export default function BeTheStarPage() {
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-lg mx-auto w-full">
         {/* Header */}
-        <div className="mb-8 text-center">
+        <div className="mb-8 text-center relative w-full">
           <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-purple-400">ScriptFlow</p>
           <h1 className="text-3xl font-extrabold tracking-tight">Be the Star 🌟</h1>
           <p className="mt-2 text-white/50 text-sm">Upload your photo and hear your character speak</p>
+          {/* My Videos button */}
+          <button
+            type="button"
+            onClick={() => void handleOpenMyVideos()}
+            className="absolute top-0 right-0 flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/60 hover:bg-white/10 hover:text-white/80 transition"
+          >
+            🎬 My Videos
+          </button>
         </div>
+
+        {/* ── My Videos modal ──────────────────────────────────────────────── */}
+        {showMyVideos && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <p className="text-white font-bold text-base">🎬 My Videos</p>
+              <button
+                type="button"
+                onClick={() => setShowMyVideos(false)}
+                className="text-white/40 hover:text-white text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              {myVideosLoading ? (
+                <div className="flex flex-col items-center justify-center h-40 gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
+                  <p className="text-white/40 text-xs">Loading your videos…</p>
+                </div>
+              ) : myVideos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 gap-2">
+                  <p className="text-white/40 text-sm">No videos yet</p>
+                  <p className="text-white/20 text-xs">Generate your first character above!</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {myVideos.map((v, i) => (
+                    <div key={i} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                      <div className="px-3 py-2 flex items-center gap-2 border-b border-white/10">
+                        <span className="text-xs font-semibold">
+                          {v.type === "hd" ? "🎬 HD Version" : "⚡ Quick Preview"}
+                        </span>
+                        <span className="ml-auto text-white/30 text-[10px]">
+                          {v.created_at ? new Date(v.created_at).toLocaleDateString() : ""}
+                        </span>
+                      </div>
+                      <video
+                        src={v.url}
+                        playsInline
+                        controls
+                        className="w-full aspect-video object-cover"
+                      />
+                      <div className="px-3 py-2">
+                        <a
+                          href={v.url}
+                          download={`character-${i + 1}.mp4`}
+                          className="block w-full text-center py-2 rounded-xl bg-purple-600/80 text-white text-xs font-semibold hover:bg-purple-500 transition"
+                        >
+                          ⬇️ Download
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── What's your story? ─────────────────────────────────────────────── */}
         <div className="w-full mb-6">
