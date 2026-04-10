@@ -334,6 +334,37 @@ export default function BeTheStarPage() {
           <p className="mt-2 text-white/50 text-sm">Upload your photo and hear your character speak</p>
         </div>
 
+        {/* ── What's your story? ─────────────────────────────────────────────── */}
+        <div className="w-full mb-6">
+          <p className="text-sm font-semibold text-white mb-2">What&apos;s your story?</p>
+          <textarea
+            value={firstLine}
+            onChange={(e) => setFirstLine(e.target.value)}
+            rows={3}
+            placeholder="Tell your story in one sentence..."
+            className="w-full resize-none rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/20 transition-all"
+          />
+          {/* Preset lines */}
+          <p className="text-xs text-white/30 mt-2 mb-1.5">Or pick a line:</p>
+          <div className="flex flex-col gap-1.5">
+            {FIRST_LINES.map((line, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setFirstLine(line)}
+                className={[
+                  "w-full text-left px-3 py-2 rounded-lg border text-xs transition",
+                  firstLine === line
+                    ? "border-purple-500 bg-purple-500/10 text-white"
+                    : "border-white/10 bg-white/5 text-white/50 hover:border-white/20 hover:text-white/70",
+                ].join(" ")}
+              >
+                &ldquo;{line}&rdquo;
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Photo upload */}
         <div className="w-full mb-6">
           <input
@@ -423,28 +454,6 @@ export default function BeTheStarPage() {
           {recordingError && (
             <p className="mt-2 text-xs text-red-400">{recordingError}</p>
           )}
-        </div>
-
-        {/* First line selector */}
-        <div className="w-full mb-6">
-          <p className="text-xs text-white/40 uppercase tracking-widest mb-2">Your character&apos;s first line</p>
-          <div className="flex flex-col gap-2">
-            {FIRST_LINES.map((line, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setFirstLine(line)}
-                className={[
-                  "w-full text-left px-4 py-3 rounded-xl border text-sm transition",
-                  firstLine === line
-                    ? "border-purple-500 bg-purple-500/10 text-white"
-                    : "border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white/80",
-                ].join(" ")}
-              >
-                &ldquo;{line}&rdquo;
-              </button>
-            ))}
-          </div>
         </div>
 
         {error && <p className="mb-4 text-sm text-red-400 text-center">{error}</p>}
