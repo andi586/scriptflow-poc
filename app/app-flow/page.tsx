@@ -1908,32 +1908,84 @@ export default function Home() {
       setLastSubmittedClipTaskIds(submittedIds);
       setClipsRefreshNonce((n) => n + 1);
 
-      // 9. Fire-and-forget OmniHuman — animate the first uploaded photo with the first Kling prompt
-      // Uses /api/be-the-star/submit which handles TTS + OmniHuman submission + omnihuman_jobs insert
-      // Webhook at /api/omnihuman-webhook will update omnihuman_jobs when PiAPI completes
+      // 9. OmniHuman Keyframe Locking — submit OmniHuman, wait for completion, extract last frame,
+      //    then use that frame as start_image for ALL Kling scenes (face + outfit locked).
+      //
+      //    Flow:
+      //    a) Submit OmniHuman task via /api/be-the-star/submit (TTS + OmniHuman → taskId)
+      //    b) Call /api/omnihuman-keyframe (waits up to 5 min, extracts last frame, uploads to Supabase)
+      //    c) Re-submit Kling tasks with omnihumanKeyframeUrl injected as primary reference
+      //
+      //    This runs AFTER the initial Kling submit (which used the raw photo as reference).
+      //    The re-submit replaces the initial tasks with keyframe-locked versions.
+      //    Non-blocking: if OmniHuman fails, the original Kling tasks remain.
       if (uploadedUrls.length > 0) {
         const firstLine = Array.isArray(slicedPrompts) && slicedPrompts.length > 0
           ? String((slicedPrompts[0] as any).prompt ?? "").slice(0, 120)
           : "我从来没有想到，这一天会来临。但我已经准备好了。";
-        void fetch("/api/be-the-star/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageUrl: uploadedUrls[0],
-            firstLine,
-          }),
-        })
-          .then((r) => r.json())
-          .then((d: any) => {
-            if (d.taskId) {
-              console.log("[StarMode] OmniHuman task submitted, taskId:", d.taskId);
-            } else {
-              console.warn("[StarMode] OmniHuman submit returned no taskId:", d);
+
+        // Fire-and-forget the entire keyframe locking pipeline
+        void (async () => {
+          try {
+            // Step a: Submit OmniHuman task
+            const submitRes = await fetch("/api/be-the-star/submit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageUrl: uploadedUrls[0],
+                firstLine,
+              }),
+            });
+            const submitData = await submitRes.json() as { taskId?: string; error?: string };
+            if (!submitData.taskId) {
+              console.warn("[StarMode] OmniHuman submit returned no taskId:", submitData);
+              return;
             }
-          })
-          .catch((e) => {
-            console.warn("[StarMode] OmniHuman fire-and-forget failed (non-fatal):", e);
-          });
+            console.log("[StarMode] OmniHuman task submitted, taskId:", submitData.taskId);
+
+            // Step b: Wait for OmniHuman to complete and extract keyframe
+            // /api/omnihuman-keyframe polls PiAPI up to 5 min, extracts last frame via ffmpeg,
+            // uploads to Supabase Storage, returns keyframeUrl
+            const keyframeRes = await fetch("/api/omnihuman-keyframe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                taskId: submitData.taskId,
+                projectId: pid,
+              }),
+            });
+            const keyframeData = await keyframeRes.json() as { keyframeUrl?: string; error?: string };
+            if (!keyframeData.keyframeUrl) {
+              console.warn("[StarMode] OmniHuman keyframe extraction failed:", keyframeData.error);
+              return;
+            }
+            console.log("[StarMode] OmniHuman keyframe ready:", keyframeData.keyframeUrl);
+
+            // Step c: Re-submit Kling tasks with keyframe as primary reference (face + outfit lock)
+            // This replaces the initial Kling tasks with keyframe-locked versions
+            const { submitKlingTasksAction: resubmit } = await import("@/actions/narrative.actions");
+            const resubmitResult = await resubmit({
+              projectId: pid,
+              prompts: slicedPrompts as any,
+              cinemaGlowTier,
+              omnihumanKeyframeUrl: keyframeData.keyframeUrl,
+            });
+            if (resubmitResult.success) {
+              const newIds = resubmitResult.data.tasks
+                .map((t: any) => t.task_id.trim())
+                .filter((id: string) => id.length > 0);
+              if (newIds.length > 0) {
+                console.log("[StarMode] Kling re-submitted with keyframe lock, new taskIds:", newIds);
+                setLastSubmittedClipTaskIds(newIds);
+                setClipsRefreshNonce((n) => n + 1);
+              }
+            } else {
+              console.warn("[StarMode] Kling re-submit with keyframe failed:", resubmitResult.error);
+            }
+          } catch (e) {
+            console.warn("[StarMode] OmniHuman keyframe pipeline failed (non-fatal):", e instanceof Error ? e.message : e);
+          }
+        })();
       }
 
       // Done — VideoResultsPanel will auto-render
