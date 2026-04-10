@@ -54,14 +54,31 @@ export default function BeTheStarPage() {
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollAttemptsRef = useRef(0);
 
+  // ── Upsell card state ──────────────────────────────────────────────────────
+  const [showUpsell, setShowUpsell] = useState(false);
+  const upsellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
       if (didPollTimerRef.current) clearTimeout(didPollTimerRef.current);
+      if (upsellTimerRef.current) clearTimeout(upsellTimerRef.current);
     };
   }, []);
+
+  // ── Beforeunload warning while HD is rendering ─────────────────────────────
+  useEffect(() => {
+    if (phase !== "polling" && phase !== "submitting") return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Your HD version is still rendering. Don't close - it'll be ready soon!";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [phase]);
 
   // ── Upload photo directly to Supabase ──────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -347,10 +364,14 @@ export default function BeTheStarPage() {
         )}
 
         {didPhase === "ready" && didVideoUrl && (
-          <div className="w-full max-w-sm rounded-2xl border border-yellow-500/40 bg-yellow-500/5 overflow-hidden">
-            <div className="px-4 py-2 flex items-center gap-2 border-b border-yellow-500/20">
-              <span className="text-yellow-400 text-xs font-semibold uppercase tracking-widest">⚡ Quick Preview</span>
-              <span className="ml-auto text-white/30 text-xs">D-ID</span>
+          <div className="w-full max-w-sm rounded-2xl border border-yellow-500/40 bg-yellow-500/5 overflow-hidden relative">
+            {/* Label overlay */}
+            <div className="absolute top-0 left-0 right-0 z-10 px-3 py-2 flex items-start justify-between bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
+              <div>
+                <p className="text-yellow-400 text-xs font-bold">⚡ Quick Preview</p>
+                <p className="text-white/50 text-[10px]">HD version ready in ~4 min</p>
+              </div>
+              <span className="text-white/20 text-[10px]">D-ID</span>
             </div>
             <video
               ref={didVideoRef}
@@ -360,29 +381,75 @@ export default function BeTheStarPage() {
               loop
               muted={false}
               className="w-full aspect-video object-cover"
+              onTimeUpdate={(e) => {
+                if ((e.currentTarget.currentTime >= 10) && !showUpsell) {
+                  setShowUpsell(true);
+                }
+              }}
             />
+            {/* Progress steps */}
+            <div className="px-4 py-3 border-t border-yellow-500/20 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-green-400">✅</span>
+                <span className="text-white/70 font-medium">Scene Preview</span>
+                <span className="ml-auto text-green-400 text-[10px]">done</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-yellow-400 animate-pulse">⏳</span>
+                <span className="text-white/70 font-medium">HD Version</span>
+                <span className="ml-auto text-yellow-400/70 text-[10px]">generating...</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs opacity-40">
+                <span>🔒</span>
+                <span className="text-white/70 font-medium">Full Movie</span>
+                <span className="ml-auto text-white/40 text-[10px]">$9.99</span>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ── OmniHuman HD status ────────────────────────────────────────── */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
-          <p className="text-white/70 text-sm tracking-wide text-center">
-            {step || "Creating your character..."}
-          </p>
-          <p className="text-purple-400/60 text-xs font-semibold">🎬 HD Version — coming in ~4 min</p>
-          {phase === "polling" && (
-            <p className="text-white/30 text-xs">
-              {elapsed > 0 ? `${elapsed}s elapsed` : "Starting..."} · checking every 5s
+        {didPhase !== "ready" && (
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
+            <p className="text-white/70 text-sm tracking-wide text-center">
+              {step || "Creating your character..."}
             </p>
-          )}
-          {phase === "submitting" && (
-            <p className="text-white/30 text-xs">Preparing audio & submitting...</p>
-          )}
-          {taskId && (
-            <p className="text-white/20 text-xs font-mono">task: {taskId.slice(0, 16)}…</p>
-          )}
-        </div>
+            <p className="text-purple-400/60 text-xs font-semibold">🎬 HD Version — coming in ~4 min</p>
+            {phase === "polling" && (
+              <p className="text-white/30 text-xs">
+                {elapsed > 0 ? `${elapsed}s elapsed` : "Starting..."} · checking every 5s
+              </p>
+            )}
+            {phase === "submitting" && (
+              <p className="text-white/30 text-xs">Preparing audio & submitting...</p>
+            )}
+            {taskId && (
+              <p className="text-white/20 text-xs font-mono">task: {taskId.slice(0, 16)}…</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Upsell card (appears after 10s of preview) ─────────────────── */}
+        {showUpsell && (
+          <div className="w-full max-w-sm rounded-2xl border border-purple-500/40 bg-black/90 backdrop-blur p-5 flex flex-col gap-3 shadow-2xl shadow-purple-500/20">
+            <p className="text-white font-bold text-base text-center">This is just the beginning...</p>
+            <p className="text-white/50 text-xs text-center">Upgrade to get the full HD cinematic version of your character</p>
+            <button
+              type="button"
+              className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-500 transition shadow-lg shadow-purple-500/30"
+            >
+              🎬 Upgrade to HD — $4.99
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowUpsell(false)}
+              className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs hover:bg-white/10 transition"
+            >
+              Continue watching free
+            </button>
+          </div>
+        )}
       </div>
     );
   }
