@@ -15,6 +15,9 @@ const FIRST_LINES = [
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLL_ATTEMPTS = 120; // 120 × 5s = 10 minutes max
 
+const DID_POLL_INTERVAL_MS = 3000;
+const DID_MAX_POLL_ATTEMPTS = 20; // 20 × 3s = 60s max
+
 type Phase = "upload" | "submitting" | "polling" | "result";
 type RecordingStatus = "idle" | "recording" | "processing" | "done" | "error";
 
@@ -28,6 +31,13 @@ export default function BeTheStarPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [step, setStep] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // ── D-ID quick preview state ───────────────────────────────────────────────
+  const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
+  const [didPhase, setDidPhase] = useState<"idle" | "loading" | "ready">("idle");
+  const didPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didPollAttemptsRef = useRef(0);
+  const didVideoRef = useRef<HTMLVideoElement>(null);
 
   // ── Voice recording state ──────────────────────────────────────────────────
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("idle");
@@ -48,6 +58,7 @@ export default function BeTheStarPage() {
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+      if (didPollTimerRef.current) clearTimeout(didPollTimerRef.current);
     };
   }, []);
 
@@ -158,6 +169,42 @@ export default function BeTheStarPage() {
     setRecordingError(null);
   }, []);
 
+  // ── Poll D-ID video status ─────────────────────────────────────────────────
+  const scheduleDIDPoll = useCallback((talkId: string) => {
+    didPollTimerRef.current = setTimeout(async () => {
+      didPollAttemptsRef.current += 1;
+
+      if (didPollAttemptsRef.current > DID_MAX_POLL_ATTEMPTS) {
+        console.warn("[did-poll] timed out");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/did-poll?talkId=${encodeURIComponent(talkId)}`);
+        const data = await res.json();
+        console.log(`[did-poll] attempt #${didPollAttemptsRef.current} status:`, data.status);
+
+        if (data.status === "done" && data.result_url) {
+          setDidVideoUrl(data.result_url);
+          setDidPhase("ready");
+          setTimeout(() => { didVideoRef.current?.play().catch(() => {}); }, 300);
+          return;
+        }
+
+        if (data.status === "error") {
+          console.warn("[did-poll] D-ID generation error:", data);
+          return;
+        }
+
+        // Still processing — keep polling
+        scheduleDIDPoll(talkId);
+      } catch (err) {
+        console.warn("[did-poll] network error:", err);
+        scheduleDIDPoll(talkId);
+      }
+    }, DID_POLL_INTERVAL_MS);
+  }, []);
+
   // ── Poll OmniHuman status ──────────────────────────────────────────────────
   const schedulePoll = useCallback((tid: string) => {
     pollTimerRef.current = setTimeout(async () => {
@@ -207,7 +254,32 @@ export default function BeTheStarPage() {
     setStep("Generating your character voice...");
     pollAttemptsRef.current = 0;
     setPollCount(0);
+    setDidVideoUrl(null);
+    setDidPhase("loading");
+    didPollAttemptsRef.current = 0;
 
+    // ── Step 1: D-ID quick preview (fire immediately) ──────────────────────
+    fetch("/api/did-preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl: photoUrl, text: firstLine }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.talkId) {
+          console.log("[did-preview] talkId:", d.talkId);
+          scheduleDIDPoll(d.talkId);
+        } else {
+          console.warn("[did-preview] no talkId returned:", d);
+          setDidPhase("idle");
+        }
+      })
+      .catch((e) => {
+        console.warn("[did-preview] request failed:", e);
+        setDidPhase("idle");
+      });
+
+    // ── Step 2: OmniHuman HD (background, takes 4-5 min) ──────────────────
     try {
       const res = await fetch("/api/be-the-star/submit", {
         method: "POST",
@@ -234,11 +306,12 @@ export default function BeTheStarPage() {
       setError(err instanceof Error ? err.message : "Submit failed");
       setPhase("upload");
     }
-  }, [photoUrl, firstLine, voiceRecordingUrl, schedulePoll]);
+  }, [photoUrl, firstLine, voiceRecordingUrl, schedulePoll, scheduleDIDPoll]);
 
   // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    if (didPollTimerRef.current) clearTimeout(didPollTimerRef.current);
     setPhase("upload");
     setPhotoUrl(null);
     setPhotoPreview(null);
@@ -248,6 +321,9 @@ export default function BeTheStarPage() {
     setStep("");
     setPollCount(0);
     pollAttemptsRef.current = 0;
+    setDidVideoUrl(null);
+    setDidPhase("idle");
+    didPollAttemptsRef.current = 0;
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
@@ -258,27 +334,58 @@ export default function BeTheStarPage() {
     const elapsed = pollCount * (POLL_INTERVAL_MS / 1000);
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6 px-6">
-        <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
-        <p className="text-white/70 text-sm tracking-wide text-center">
-          {step || "Creating your character..."}
-        </p>
-        {phase === "polling" && (
-          <p className="text-white/30 text-xs">
-            {elapsed > 0 ? `${elapsed}s elapsed` : "Starting..."} · checking every 5s
+        {/* ── D-ID Quick Preview ─────────────────────────────────────────── */}
+        {didPhase === "loading" && !didVideoUrl && (
+          <div className="w-full max-w-sm rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 flex flex-col items-center gap-3">
+            <p className="text-yellow-400 text-xs font-semibold uppercase tracking-widest">⚡ Quick Preview</p>
+            <div className="w-8 h-8 rounded-full border-2 border-yellow-500/30 border-t-yellow-400 animate-spin" />
+            <p className="text-white/40 text-xs">Generating preview (~30s)…</p>
+          </div>
+        )}
+
+        {didPhase === "ready" && didVideoUrl && (
+          <div className="w-full max-w-sm rounded-2xl border border-yellow-500/40 bg-yellow-500/5 overflow-hidden">
+            <div className="px-4 py-2 flex items-center gap-2 border-b border-yellow-500/20">
+              <span className="text-yellow-400 text-xs font-semibold uppercase tracking-widest">⚡ Quick Preview</span>
+              <span className="ml-auto text-white/30 text-xs">D-ID</span>
+            </div>
+            <video
+              ref={didVideoRef}
+              src={didVideoUrl}
+              playsInline
+              autoPlay
+              loop
+              muted={false}
+              className="w-full aspect-video object-cover"
+            />
+          </div>
+        )}
+
+        {/* ── OmniHuman HD status ────────────────────────────────────────── */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
+          <p className="text-white/70 text-sm tracking-wide text-center">
+            {step || "Creating your character..."}
           </p>
-        )}
-        {phase === "submitting" && (
-          <p className="text-white/30 text-xs">Preparing audio & submitting...</p>
-        )}
-        {taskId && (
-          <p className="text-white/20 text-xs font-mono">task: {taskId.slice(0, 16)}…</p>
-        )}
+          <p className="text-purple-400/60 text-xs font-semibold">🎬 HD Version — coming in ~4 min</p>
+          {phase === "polling" && (
+            <p className="text-white/30 text-xs">
+              {elapsed > 0 ? `${elapsed}s elapsed` : "Starting..."} · checking every 5s
+            </p>
+          )}
+          {phase === "submitting" && (
+            <p className="text-white/30 text-xs">Preparing audio & submitting...</p>
+          )}
+          {taskId && (
+            <p className="text-white/20 text-xs font-mono">task: {taskId.slice(0, 16)}…</p>
+          )}
+        </div>
       </div>
     );
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: RESULT
+  // PHASE: RESULT (OmniHuman HD ready)
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === "result" && videoUrl) {
     return (
@@ -290,6 +397,12 @@ export default function BeTheStarPage() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+
+        <div className="absolute top-4 left-4 right-4 z-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-purple-600/80 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
+            🎬 HD Version Ready
+          </div>
+        </div>
 
         <div className="absolute bottom-0 left-0 right-0 p-8 flex flex-col items-center gap-4 z-10">
           <p className="text-white text-xl font-bold text-center drop-shadow-lg">
