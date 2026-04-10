@@ -60,7 +60,7 @@ export default function BeTheStarPage() {
 
   // ── My Videos state ────────────────────────────────────────────────────────
   const [showMyVideos, setShowMyVideos] = useState(false);
-  const [myVideos, setMyVideos] = useState<{ url: string; created_at: string; type: "hd" | "preview" }[]>([]);
+  const [myVideos, setMyVideos] = useState<{ url: string; created_at: string; type: "hd" | "preview"; storagePath?: string; jobId?: string }[]>([]);
   const [myVideosLoading, setMyVideosLoading] = useState(false);
 
   // ── Cleanup on unmount ─────────────────────────────────────────────────────
@@ -333,37 +333,61 @@ export default function BeTheStarPage() {
     }
   }, [photoUrl, firstLine, voiceRecordingUrl, schedulePoll, scheduleDIDPoll]);
 
-  // ── Load My Videos ─────────────────────────────────────────────────────────
-  const handleOpenMyVideos = useCallback(async () => {
-    setShowMyVideos(true);
+  // ── Load My Videos (with auto-cleanup: keep latest 10) ────────────────────
+  const loadMyVideos = useCallback(async () => {
     setMyVideosLoading(true);
     try {
       const supabase = createClient();
 
       // HD videos from omnihuman_jobs
-      const { data: jobs } = await supabase
+      const { data: allJobs } = await supabase
         .from("omnihuman_jobs")
-        .select("result_video_url, created_at")
+        .select("id, result_video_url, created_at")
         .eq("status", "completed")
-        .order("created_at", { ascending: false })
-        .limit(10);
+        .order("created_at", { ascending: false });
+
+      // Auto-cleanup: delete oldest HD jobs beyond 10
+      if (allJobs && allJobs.length > 10) {
+        const toDelete = allJobs.slice(10);
+        for (const job of toDelete) {
+          await supabase.from("omnihuman_jobs").delete().eq("id", job.id);
+        }
+      }
+
+      const jobs = (allJobs ?? []).slice(0, 10);
 
       // D-ID preview videos from storage listing
-      const { data: storageFiles } = await supabase.storage
+      const { data: allStorageFiles } = await supabase.storage
         .from("recordings")
-        .list("did-preview", { limit: 10, sortBy: { column: "created_at", order: "desc" } });
+        .list("did-preview", { limit: 100, sortBy: { column: "created_at", order: "desc" } });
 
-      const hdVideos = (jobs ?? [])
+      const mp4Files = (allStorageFiles ?? []).filter((f) => f.name.endsWith(".mp4"));
+
+      // Auto-cleanup: delete oldest preview files beyond 10
+      if (mp4Files.length > 10) {
+        const toDelete = mp4Files.slice(10);
+        await supabase.storage
+          .from("recordings")
+          .remove(toDelete.map((f) => `did-preview/${f.name}`));
+      }
+
+      const storageFiles = mp4Files.slice(0, 10);
+
+      const hdVideos = jobs
         .filter((j) => j.result_video_url)
-        .map((j) => ({ url: j.result_video_url as string, created_at: j.created_at as string, type: "hd" as const }));
-
-      const previewVideos = (storageFiles ?? [])
-        .filter((f) => f.name.endsWith(".mp4"))
-        .map((f) => ({
-          url: supabase.storage.from("recordings").getPublicUrl(`did-preview/${f.name}`).data.publicUrl,
-          created_at: f.created_at ?? "",
-          type: "preview" as const,
+        .map((j) => ({
+          url: j.result_video_url as string,
+          created_at: j.created_at as string,
+          type: "hd" as const,
+          jobId: j.id as string,
         }));
+
+      const previewVideos = storageFiles.map((f) => ({
+        url: supabase.storage.from("recordings").getPublicUrl(`did-preview/${f.name}`).data.publicUrl,
+        created_at: f.created_at ?? "",
+        type: "preview" as const,
+        storagePath: `did-preview/${f.name}`,
+      }));
 
       const all = [...hdVideos, ...previewVideos].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -375,6 +399,27 @@ export default function BeTheStarPage() {
       setMyVideosLoading(false);
     }
   }, []);
+
+  const handleOpenMyVideos = useCallback(async () => {
+    setShowMyVideos(true);
+    await loadMyVideos();
+  }, [loadMyVideos]);
+
+  // ── Delete a video ─────────────────────────────────────────────────────────
+  const handleDeleteVideo = useCallback(async (v: typeof myVideos[0]) => {
+    try {
+      const supabase = createClient();
+      if (v.type === "preview" && v.storagePath) {
+        await supabase.storage.from("recordings").remove([v.storagePath]);
+      } else if (v.type === "hd" && v.jobId) {
+        await supabase.from("omnihuman_jobs").delete().eq("id", v.jobId);
+      }
+      // Refresh list
+      await loadMyVideos();
+    } catch (e) {
+      console.error("[my-videos] delete error:", e);
+    }
+  }, [loadMyVideos, myVideos]);
 
   // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
@@ -605,9 +650,17 @@ export default function BeTheStarPage() {
                         <span className="text-xs font-semibold">
                           {v.type === "hd" ? "🎬 HD Version" : "⚡ Quick Preview"}
                         </span>
-                        <span className="ml-auto text-white/30 text-[10px]">
+                        <span className="text-white/30 text-[10px]">
                           {v.created_at ? new Date(v.created_at).toLocaleDateString() : ""}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteVideo(v)}
+                          className="ml-auto text-white/30 hover:text-red-400 text-sm transition"
+                          title="Delete"
+                        >
+                          🗑️
+                        </button>
                       </div>
                       <video
                         src={v.url}
