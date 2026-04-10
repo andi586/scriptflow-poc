@@ -944,18 +944,13 @@ export async function submitKlingTasksAction(input: {
       const useVeo3 = false;
       const modelUsed = useVeo3 ? "veo3" : "kling";
 
-      // OmniHuman keyframe locking: if provided, REPLACE the first reference image with the keyframe.
-      // This ensures the keyframe is always @image_1 (start_image) for every Kling scene,
-      // locking face + outfit. We do NOT append — we substitute position 0 so the keyframe
-      // is the dominant reference and existing character refs follow at @image_2, @image_3, etc.
-      let effectiveRefUrls: string[];
+      // Always use the original character reference images (uploaded photos).
+      // OmniHuman produces .mp4 video URLs which Kling does NOT accept as image references.
+      // The omnihumanKeyframeUrl parameter is intentionally ignored here to prevent
+      // passing a video URL to Kling's elements[].image_url field.
+      const effectiveRefUrls = multiRefUrls;
       if (input.omnihumanKeyframeUrl) {
-        // Replace first slot with keyframe; keep remaining character refs (up to 3 more = 4 total)
-        const remainingRefs = multiRefUrls.slice(1); // drop original first ref
-        effectiveRefUrls = [input.omnihumanKeyframeUrl, ...remainingRefs].slice(0, 4);
-        console.log("[submitKlingTasksAction] OmniHuman keyframe REPLACES first ref:", input.omnihumanKeyframeUrl, "| total refs:", effectiveRefUrls.length);
-      } else {
-        effectiveRefUrls = multiRefUrls;
+        console.log("[submitKlingTasksAction] omnihumanKeyframeUrl ignored (video URL not accepted by Kling elements) — using original character refs:", effectiveRefUrls.length);
       }
 
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
