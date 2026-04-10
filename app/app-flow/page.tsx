@@ -1908,7 +1908,35 @@ export default function Home() {
       setLastSubmittedClipTaskIds(submittedIds);
       setClipsRefreshNonce((n) => n + 1);
 
-      // 8. Done — VideoResultsPanel will auto-render
+      // 9. Fire-and-forget OmniHuman — animate the first uploaded photo with the first Kling prompt
+      // Uses /api/be-the-star/submit which handles TTS + OmniHuman submission + omnihuman_jobs insert
+      // Webhook at /api/omnihuman-webhook will update omnihuman_jobs when PiAPI completes
+      if (uploadedUrls.length > 0) {
+        const firstLine = Array.isArray(slicedPrompts) && slicedPrompts.length > 0
+          ? String((slicedPrompts[0] as any).prompt ?? "").slice(0, 120)
+          : "我从来没有想到，这一天会来临。但我已经准备好了。";
+        void fetch("/api/be-the-star/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: uploadedUrls[0],
+            firstLine,
+          }),
+        })
+          .then((r) => r.json())
+          .then((d: any) => {
+            if (d.taskId) {
+              console.log("[StarMode] OmniHuman task submitted, taskId:", d.taskId);
+            } else {
+              console.warn("[StarMode] OmniHuman submit returned no taskId:", d);
+            }
+          })
+          .catch((e) => {
+            console.warn("[StarMode] OmniHuman fire-and-forget failed (non-fatal):", e);
+          });
+      }
+
+      // Done — VideoResultsPanel will auto-render
       setPipelinePhase("done");
     } catch (e) {
       setPipelinePhase("error");
