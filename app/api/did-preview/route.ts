@@ -5,7 +5,7 @@ const POLL_INTERVAL_MS = 3000
 const MAX_POLL_ATTEMPTS = 10 // 10 × 3s = 30s max
 
 export async function POST(req: NextRequest) {
-  const { imageUrl, text } = await req.json()
+  const { imageUrl, text, voiceId } = await req.json()
 
   const apiKey = process.env.DID_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'DID_API_KEY not set' }, { status: 500 })
@@ -30,10 +30,16 @@ export async function POST(req: NextRequest) {
       script: {
         type: 'text',
         input: text,
-        provider: {
-          type: 'microsoft',
-          voice_id: 'zh-CN-YunxiNeural'
-        }
+        provider: voiceId
+          ? {
+              type: 'elevenlabs',
+              voice_id: voiceId,
+              model_id: 'eleven_multilingual_v2'
+            }
+          : {
+              type: 'microsoft',
+              voice_id: 'zh-CN-YunxiNeural'
+            }
       }
     })
   })

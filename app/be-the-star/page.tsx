@@ -43,6 +43,7 @@ export default function BeTheStarPage() {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("idle");
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [voiceRecordingUrl, setVoiceRecordingUrl] = useState<string | null>(null);
+  const [clonedVoiceId, setClonedVoiceId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -262,7 +263,7 @@ export default function BeTheStarPage() {
     fetch("/api/did-preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl: photoUrl, text: firstLine }),
+      body: JSON.stringify({ imageUrl: photoUrl, text: firstLine, voiceId: clonedVoiceId ?? undefined }),
     })
       .then((r) => r.json())
       .then((d) => {
