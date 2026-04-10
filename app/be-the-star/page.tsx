@@ -258,7 +258,7 @@ export default function BeTheStarPage() {
     setDidPhase("loading");
     didPollAttemptsRef.current = 0;
 
-    // ── Step 1: D-ID quick preview (fire immediately) ──────────────────────
+    // ── Step 1: D-ID quick preview (fire immediately, server handles polling) ─
     fetch("/api/did-preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -266,11 +266,13 @@ export default function BeTheStarPage() {
     })
       .then((r) => r.json())
       .then((d) => {
-        if (d.talkId) {
-          console.log("[did-preview] talkId:", d.talkId);
-          scheduleDIDPoll(d.talkId);
+        if (d.videoUrl) {
+          console.log("[did-preview] videoUrl:", d.videoUrl);
+          setDidVideoUrl(d.videoUrl);
+          setDidPhase("ready");
+          setTimeout(() => { didVideoRef.current?.play().catch(() => {}); }, 300);
         } else {
-          console.warn("[did-preview] no talkId returned:", d);
+          console.warn("[did-preview] no videoUrl returned:", d);
           setDidPhase("idle");
         }
       })
