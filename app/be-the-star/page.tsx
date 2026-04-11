@@ -143,33 +143,7 @@ export default function BeTheStarPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [stage]);
 
-  // ── Crop image to square (face-centered) using canvas ─────────────────────
-  const cropToSquare = useCallback((file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        const canvas = document.createElement("canvas");
-        const size = Math.min(img.width, img.height);
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { reject(new Error("canvas not supported")); return; }
-        const offsetX = (img.width - size) / 2;
-        const offsetY = (img.height - size) / 4;
-        ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error("canvas toBlob failed"));
-        }, "image/jpeg", 0.92);
-      };
-      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("image load failed")); };
-      img.src = objectUrl;
-    });
-  }, []);
-
-  // ── Upload photo directly to Supabase ──────────────────────────────────────
+  // ── Upload photo directly to Supabase (NO crop, NO canvas, original file) ──
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -180,21 +154,23 @@ export default function BeTheStarPage() {
 
     try {
       const supabase = createClient();
-      const croppedBlob = await cropToSquare(file);
-      const filePath = `be-the-star/${Date.now()}_photo.jpg`;
+      // Upload original file as-is — no cropping, no re-encoding
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const filePath = `be-the-star/${Date.now()}_photo.${ext}`;
       const { data, error: uploadErr } = await supabase.storage
         .from("recordings")
-        .upload(filePath, croppedBlob, { contentType: "image/jpeg", upsert: true });
+        .upload(filePath, file, { contentType: file.type, upsert: true });
 
       if (uploadErr) { setError("Photo upload failed: " + uploadErr.message); return; }
 
       const url = supabase.storage.from("recordings").getPublicUrl(data.path).data.publicUrl;
       setPhotoUrl(url);
-      console.log("[be-the-star] photo uploaded:", url);
+      // Verify: original uploaded URL (must match what's sent to D-ID)
+      console.log("[be-the-star] original uploaded image URL:", url);
     } catch (err) {
       setError("Upload error: " + (err instanceof Error ? err.message : String(err)));
     }
-  }, [cropToSquare]);
+  }, []);
 
   // ── Voice recording ────────────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
@@ -334,6 +310,9 @@ export default function BeTheStarPage() {
     // Build full prompt from selected template
     const selectedTpl = STORY_TEMPLATES.find((t) => t.line === firstLine) ?? STORY_TEMPLATES[0];
     const fullPrompt = buildPrompt(selectedTpl);
+
+    // Verify: imageUrl sent to D-ID must match original uploaded URL
+    console.log("[be-the-star] imageUrl sent to D-ID:", photoUrl);
 
     // D-ID quick preview only — OmniHuman HD is NOT triggered here
     fetch("/api/did-preview", {
