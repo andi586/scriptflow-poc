@@ -44,17 +44,14 @@ const STORY_TEMPLATES: StoryTemplate[] = [
   },
 ];
 
-// Emotion cues per template — short acting direction only, no explanatory sentences
-const EMOTION_CUES: Record<string, string> = {
-  death: "breathing fast, whispering",
-  betrayal: "low voice, angry",
-  power: "calm, slight smile",
-};
-
-/** Build a short reactive text for D-ID (≤80 chars, emotion tag + line only) */
+/** Build a short reactive text for D-ID — broken sentence, emotional collapse */
 function buildPrompt(tpl: StoryTemplate): string {
-  const cue = EMOTION_CUES[tpl.id] ?? "natural";
-  return `(${cue}) ${tpl.line}`;
+  const prompts: Record<string, string> = {
+    death:    "(breathing fast, whispering) ……不可能…只剩60秒？",
+    betrayal: "(low voice, shaking) ……你连这个…都在骗我？",
+    power:    "(calm, slow) ……现在才看懂？太晚了。",
+  };
+  return prompts[tpl.id] ?? `(natural) ${tpl.line}`;
 }
 
 const DID_POLL_INTERVAL_MS = 3000;
