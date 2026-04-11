@@ -549,31 +549,41 @@ export default function BeTheStarPage() {
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === "polling" && didPhase === "ready" && didVideoUrl) {
     return (
-      <div className="fixed inset-0 bg-black">
-        {/* ── Video — always rendered, muted for autoplay compat ── */}
-        <video
-          ref={didVideoRef}
-          src={didVideoUrl}
-          playsInline
-          autoPlay
-          muted
-          controls
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }}
-          onTimeUpdate={(e) => {
-            const vid = e.currentTarget;
-            if (vid.duration > 0 && vid.currentTime / vid.duration >= PREVIEW_CUTOFF_RATIO) {
-              vid.pause();
-              setStage("paywall");
-            }
-          }}
-          onLoadedData={(e) => {
-            console.log("[video] loaded, duration:", e.currentTarget.duration);
-            e.currentTarget.play().catch((err) => console.warn("[video] play() failed:", err));
-          }}
-          onError={(e) => {
-            console.error("[video] error:", e.currentTarget.error);
-          }}
-        />
+      <div style={{ background: "black", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+
+        {/* ── BARE VIDEO — bypasses all stage/style logic for debugging ── */}
+        {didVideoUrl && (
+          <video
+            ref={didVideoRef}
+            src={didVideoUrl}
+            autoPlay
+            muted
+            controls
+            playsInline
+            style={{
+              width: "300px",
+              height: "auto",
+              display: "block",
+              margin: "20px auto",
+              objectFit: "contain",
+              background: "black",
+            }}
+            onLoadedData={(e) => {
+              console.log("[video] loaded, duration:", e.currentTarget.duration);
+              e.currentTarget.play().catch((err) => console.warn("[video] play() failed:", err));
+            }}
+            onError={(e) => {
+              console.error("[video] error:", e.currentTarget.error);
+            }}
+            onTimeUpdate={(e) => {
+              const vid = e.currentTarget;
+              if (vid.duration > 0 && vid.currentTime / vid.duration >= PREVIEW_CUTOFF_RATIO) {
+                vid.pause();
+                setStage("paywall");
+              }
+            }}
+          />
+        )}
 
         {/* ── Preview label (only while playing) ── */}
         {stage === "preview" && (
