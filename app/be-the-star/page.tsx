@@ -99,7 +99,7 @@ export default function BeTheStarPage() {
         const ctx = canvas.getContext("2d");
         if (!ctx) { reject(new Error("canvas not supported")); return; }
         const offsetX = (img.width - size) / 2;
-        const offsetY = (img.height - size) / 3; // bias upward to keep face
+        const offsetY = (img.height - size) / 4; // bias upward to keep face
         ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
