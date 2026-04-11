@@ -44,21 +44,31 @@ const STORY_TEMPLATES: StoryTemplate[] = [
   },
 ];
 
-/** Build a short reactive text for D-ID — broken sentence, emotional collapse */
+/** Build a short reactive text for D-ID — emotional syllables only */
 function buildPrompt(tpl: StoryTemplate): string {
   const prompts: Record<string, string> = {
-    death:    "(breathing fast, whispering) ……不可能…只剩60秒？",
-    betrayal: "(low voice, shaking) ……你连这个…都在骗我？",
-    power:    "(calm, slow) ……现在才看懂？太晚了。",
+    death:    "(breathing fast) ……不……不……",
+    betrayal: "(shaking) ……你……",
+    power:    "(calm) ……现在……",
   };
   return prompts[tpl.id] ?? `(natural) ${tpl.line}`;
 }
+
+/** Signal text shown before video — "external world" event */
+const SIGNAL_TEXT: Record<string, string> = {
+  death:    "00:59",
+  betrayal: "他刚说了你的名字",
+  power:    "他们终于知道了",
+};
+
+/** How long (ms) to show the signal screen before video plays */
+const SIGNAL_MS = 1800;
 
 const DID_POLL_INTERVAL_MS = 3000;
 const DID_MAX_POLL_ATTEMPTS = 20; // 20 × 3s = 60s max
 
 // How far into the preview video (0–1) before we cut to paywall
-const PREVIEW_CUTOFF_RATIO = 0.60; // 60% — cut early, right after key info
+const PREVIEW_CUTOFF_RATIO = 0.35; // 35% — cut early, right after emotional peak
 
 // Stripe Payment Link
 // success_url = https://getscriptflow.com/be-the-star/success
@@ -94,6 +104,8 @@ export default function BeTheStarPage() {
   // ── D-ID quick preview state ───────────────────────────────────────────────
   const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
   const [didPhase, setDidPhase] = useState<"idle" | "loading" | "ready">("idle");
+  const [showSignal, setShowSignal] = useState(false);
+  const [imageUrlSentToDID, setImageUrlSentToDID] = useState<string | null>(null);
   const didPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didPollAttemptsRef = useRef(0);
   const didVideoRef = useRef<HTMLVideoElement>(null);
@@ -313,6 +325,7 @@ export default function BeTheStarPage() {
 
     // Verify: imageUrl sent to D-ID must match original uploaded URL
     console.log("[be-the-star] imageUrl sent to D-ID:", photoUrl);
+    setImageUrlSentToDID(photoUrl);
 
     // D-ID quick preview only — OmniHuman HD is NOT triggered here
     fetch("/api/did-preview", {
@@ -333,18 +346,22 @@ export default function BeTheStarPage() {
           console.log("[did-preview] resolved videoUrl:", resolvedUrl);
           setDidVideoUrl(resolvedUrl);
           setDidPhase("ready");
-          // Start in "preview" — video plays first, paywall triggers via onTimeUpdate
           setStage("preview");
           setPhase("polling");
           // 📊 埋点
           console.log("[analytics] paywall_view");
+          // Show signal screen first, then play video after SIGNAL_MS
+          setShowSignal(true);
           setTimeout(() => {
-            const vid = didVideoRef.current;
-            if (vid) {
-              vid.currentTime = 0; // ensure starts from beginning
-              vid.play().catch((e) => console.warn("[did-preview] autoplay blocked:", e));
-            }
-          }, 300);
+            setShowSignal(false);
+            setTimeout(() => {
+              const vid = didVideoRef.current;
+              if (vid) {
+                vid.currentTime = 0;
+                vid.play().catch((e) => console.warn("[did-preview] autoplay blocked:", e));
+              }
+            }, 100);
+          }, SIGNAL_MS);
         } else {
           console.warn("[did-preview] preview failed — no videoUrl in response:", d);
           setDidPhase("idle");
@@ -524,26 +541,39 @@ export default function BeTheStarPage() {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: POLLING — D-ID preview ready (MINIMAL DEBUG RENDER)
+  // PHASE: SIGNAL — show "external world" event before video
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === "polling" && didPhase === "ready" && showSignal) {
+    const selectedTpl = STORY_TEMPLATES.find((t) => t.line === firstLine) ?? STORY_TEMPLATES[0];
+    const signalText = SIGNAL_TEXT[selectedTpl.id] ?? "";
+    return (
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <p
+          className="text-white font-black text-center leading-tight animate-pulse"
+          style={{ fontSize: "clamp(2.5rem, 12vw, 5rem)", letterSpacing: "-0.02em", maxWidth: "80vw" }}
+        >
+          {signalText}
+        </p>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PHASE: POLLING — D-ID preview ready (cinematic fullscreen + debug images)
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === "polling" && didPhase === "ready" && didVideoUrl) {
     return (
-      <div style={{ textAlign: "center", background: "#000", minHeight: "100vh", paddingTop: "40px" }}>
-        <p style={{ color: "#aaa", fontSize: "12px", marginBottom: "8px" }}>
-          videoUrl: {didVideoUrl.slice(0, 60)}…
-        </p>
+      <div className="fixed inset-0 bg-black flex flex-col">
+        {/* ── Cinematic video — fullscreen, no crop, no controls ────────── */}
         <video
           ref={didVideoRef}
           src={didVideoUrl}
           autoPlay
           muted
-          controls
           playsInline
           style={{
-            width: "320px",
-            height: "auto",
-            display: "block",
-            margin: "0 auto",
+            width: "100vw",
+            height: "100vh",
             objectFit: "contain",
             background: "black",
           }}
@@ -556,15 +586,35 @@ export default function BeTheStarPage() {
             console.error("[video] error code:", err?.code, "message:", err?.message);
           }}
         />
-        <p style={{ color: "#666", fontSize: "11px", marginTop: "8px" }}>
-          stage: {stage}
-        </p>
-        <button
-          onClick={handleReset}
-          style={{ marginTop: "16px", color: "#888", fontSize: "12px", background: "none", border: "1px solid #333", padding: "6px 16px", borderRadius: "8px", cursor: "pointer" }}
-        >
-          Start Over
-        </button>
+
+        {/* ── Debug overlay: 3-image comparison (top strip) ─────────────── */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex gap-2 justify-center p-2 bg-black/60 backdrop-blur-sm">
+          <div className="text-center">
+            <p className="text-[9px] text-white/40 mb-0.5">① local</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {photoPreview && <img src={photoPreview} alt="local" className="w-14 h-14 object-cover rounded" />}
+          </div>
+          <div className="text-center">
+            <p className="text-[9px] text-white/40 mb-0.5">② supabase</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {photoUrl && <img src={photoUrl} alt="supabase" className="w-14 h-14 object-cover rounded" />}
+          </div>
+          <div className="text-center">
+            <p className="text-[9px] text-white/40 mb-0.5">③ → D-ID</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {imageUrlSentToDID && <img src={imageUrlSentToDID} alt="sent to DID" className="w-14 h-14 object-cover rounded" />}
+          </div>
+        </div>
+
+        {/* ── Bottom: Start Over button ──────────────────────────────────── */}
+        <div className="absolute bottom-8 left-0 right-0 z-10 flex justify-center">
+          <button
+            onClick={handleReset}
+            className="rounded-xl border border-white/20 bg-black/40 backdrop-blur px-5 py-2.5 text-xs text-white/50 hover:text-white/80 hover:bg-black/60 transition"
+          >
+            Start Over
+          </button>
+        </div>
       </div>
     );
   }

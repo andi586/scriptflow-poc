@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
     const auth = Buffer.from(`${apiKey}:`).toString('base64')
 
     // ── Step 1: Create D-ID talk ─────────────────────────────────────────────
+    console.log('[did-preview] DID input image:', imageUrl)
     const createRes = await fetch('https://api.d-id.com/talks', {
       method: 'POST',
       headers: {
@@ -91,34 +92,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'preview_failed' })
     }
 
-    // ── Step 3: Download video from D-ID ─────────────────────────────────────
-    const videoRes = await fetch(resultUrl)
+    // ── Step 3: Download video from D-ID (strict binary) ─────────────────────
+    const videoRes = await fetch(resultUrl, { cache: 'no-store' })
     if (!videoRes.ok) {
-      console.error('[did-preview] Failed to download D-ID video:', videoRes.status)
-      return NextResponse.json({ success: false, error: 'preview_failed' })
+      throw new Error(`D-ID download failed: ${videoRes.status}`)
     }
-    const videoBuffer = await videoRes.arrayBuffer()
+    if (videoRes.redirected) {
+      console.log('[did-preview] redirected to:', videoRes.url)
+    }
+    const arrayBuffer = await videoRes.arrayBuffer()
+    const uint8 = new Uint8Array(arrayBuffer)
+    console.log('[did-preview] video bytes:', uint8.byteLength)
+
+    // ── Step 3.5: Validate minimum size (guard against empty/truncated) ───────
+    if (uint8.byteLength < 50000) {
+      throw new Error('Video too small, likely corrupted')
+    }
 
     // ── Step 4: Upload to Supabase Storage ───────────────────────────────────
     const supabase = createClient(supabaseUrl, serviceRoleKey)
-    const filePath = `did-preview/${Date.now()}.mp4`
+    const filePath = `did-preview/${Date.now()}-${Math.random().toString(36).slice(2)}.mp4`
 
-    const { data: uploadData, error: uploadErr } = await supabase.storage
+    const { error: uploadErr } = await supabase.storage
       .from('recordings')
-      .upload(filePath, Buffer.from(videoBuffer), {
+      .upload(filePath, uint8, {
         contentType: 'video/mp4',
-        upsert: true,
+        upsert: false,
       })
 
     if (uploadErr) {
-      console.error('[did-preview] Supabase upload error:', uploadErr.message)
-      return NextResponse.json({ success: false, error: 'preview_failed' })
+      throw new Error(`Supabase upload failed: ${uploadErr.message}`)
     }
 
-    const { data: pub } = supabase.storage.from('recordings').getPublicUrl(uploadData.path)
-    console.log('[did-preview] uploaded to supabase:', pub.publicUrl)
+    const { data: pub } = supabase.storage.from('recordings').getPublicUrl(filePath)
+    const finalUrl = pub.publicUrl
+    console.log('[did-preview] final URL:', finalUrl)
 
-    return NextResponse.json({ success: true, videoUrl: pub.publicUrl })
+    return NextResponse.json({ success: true, videoUrl: finalUrl })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[did-preview] unexpected error:', msg)
