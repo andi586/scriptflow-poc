@@ -12,14 +12,27 @@ const FIRST_LINES = [
   "世界即将改变。而改变它的人，就是我。",
 ];
 
-const POLL_INTERVAL_MS = 5000;
-const MAX_POLL_ATTEMPTS = 120; // 120 × 5s = 10 minutes max
-
 const DID_POLL_INTERVAL_MS = 3000;
 const DID_MAX_POLL_ATTEMPTS = 20; // 20 × 3s = 60s max
 
+// How far into the preview video (0–1) before we cut to paywall
+const PREVIEW_CUTOFF_RATIO = 0.75; // 75%
+
+// Stripe Payment Link
+// success_url = https://getscriptflow.com/be-the-star/success
+// cancel_url  = https://getscriptflow.com/be-the-star
+const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/REPLACE_ME"; // TODO: replace with real link
+const UNLOCK_PARAMS_KEY = "bts_unlock_params";
+
+// Polling interval for OmniHuman status after unlock
+const HD_POLL_INTERVAL_MS = 3000;
+const HD_MAX_POLL_ATTEMPTS = 200; // 200 × 3s = 10 min max
+
 type Phase = "upload" | "submitting" | "polling" | "result";
 type RecordingStatus = "idle" | "recording" | "processing" | "done" | "error";
+
+// Stage drives the HD-unlock flow
+type Stage = "idle" | "generating" | "preview" | "paywall" | "processing" | "done";
 
 export default function BeTheStarPage() {
   const [phase, setPhase] = useState<Phase>("upload");
@@ -27,10 +40,14 @@ export default function BeTheStarPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [firstLine, setFirstLine] = useState(FIRST_LINES[0]);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [pollCount, setPollCount] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [step, setStep] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // ── Stage state for HD unlock flow ────────────────────────────────────────
+  const [stage, setStage] = useState<Stage>("idle");
+  const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
+  const [paywallLoading, setPaywallLoading] = useState(false);
 
   // ── D-ID quick preview state ───────────────────────────────────────────────
   const [didVideoUrl, setDidVideoUrl] = useState<string | null>(null);
@@ -38,6 +55,12 @@ export default function BeTheStarPage() {
   const didPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didPollAttemptsRef = useRef(0);
   const didVideoRef = useRef<HTMLVideoElement>(null);
+
+  // ── HD status polling ──────────────────────────────────────────────────────
+  const hdPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hdPollAttemptsRef = useRef(0);
+  const hdPollCountRef = useRef(0);
+  const [hdPollElapsed, setHdPollElapsed] = useState(0);
 
   // ── Voice recording state ──────────────────────────────────────────────────
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("idle");
@@ -51,12 +74,6 @@ export default function BeTheStarPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollAttemptsRef = useRef(0);
-
-  // ── Upsell card state ──────────────────────────────────────────────────────
-  const [showUpsell, setShowUpsell] = useState(false);
-  const upsellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── My Videos state ────────────────────────────────────────────────────────
   const [showMyVideos, setShowMyVideos] = useState(false);
@@ -66,16 +83,15 @@ export default function BeTheStarPage() {
   // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
       if (didPollTimerRef.current) clearTimeout(didPollTimerRef.current);
-      if (upsellTimerRef.current) clearTimeout(upsellTimerRef.current);
+      if (hdPollTimerRef.current) clearTimeout(hdPollTimerRef.current);
     };
   }, []);
 
   // ── Beforeunload warning while HD is rendering ─────────────────────────────
   useEffect(() => {
-    if (phase !== "polling" && phase !== "submitting") return;
+    if (stage !== "processing") return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "Your HD version is still rendering. Don't close - it'll be ready soon!";
@@ -83,7 +99,7 @@ export default function BeTheStarPage() {
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [phase]);
+  }, [stage]);
 
   // ── Crop image to square (face-centered) using canvas ─────────────────────
   const cropToSquare = useCallback((file: File): Promise<Blob> => {
@@ -99,7 +115,7 @@ export default function BeTheStarPage() {
         const ctx = canvas.getContext("2d");
         if (!ctx) { reject(new Error("canvas not supported")); return; }
         const offsetX = (img.width - size) / 2;
-        const offsetY = (img.height - size) / 4; // bias upward to keep face
+        const offsetY = (img.height - size) / 4;
         ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
@@ -122,8 +138,6 @@ export default function BeTheStarPage() {
 
     try {
       const supabase = createClient();
-
-      // Crop to square before uploading
       const croppedBlob = await cropToSquare(file);
       const filePath = `be-the-star/${Date.now()}_photo.jpg`;
       const { data, error: uploadErr } = await supabase.storage
@@ -134,7 +148,7 @@ export default function BeTheStarPage() {
 
       const url = supabase.storage.from("recordings").getPublicUrl(data.path).data.publicUrl;
       setPhotoUrl(url);
-      console.log("[be-the-star] photo uploaded (cropped square):", url);
+      console.log("[be-the-star] photo uploaded:", url);
     } catch (err) {
       setError("Upload error: " + (err instanceof Error ? err.message : String(err)));
     }
@@ -180,10 +194,9 @@ export default function BeTheStarPage() {
           if (uploadErr) throw new Error("Voice upload failed: " + uploadErr.message);
 
           const { data: pub } = supabase.storage.from("recordings").getPublicUrl(audioPath);
-          const url = pub.publicUrl;
-          setVoiceRecordingUrl(url);
+          setVoiceRecordingUrl(pub.publicUrl);
           setRecordingStatus("done");
-          console.log("[be-the-star] voice recording uploaded:", url);
+          console.log("[be-the-star] voice recording uploaded:", pub.publicUrl);
         } catch (e) {
           console.error("[be-the-star] voice upload failed:", e);
           setRecordingError(e instanceof Error ? e.message : "Upload failed");
@@ -193,7 +206,6 @@ export default function BeTheStarPage() {
 
       recorder.start(100);
 
-      // Auto-stop after 30 seconds
       recordingTimerRef.current = setTimeout(() => {
         if (mediaRecorderRef.current?.state === "recording") {
           mediaRecorderRef.current.stop();
@@ -220,96 +232,64 @@ export default function BeTheStarPage() {
     setRecordingError(null);
   }, []);
 
-  // ── Poll D-ID video status ─────────────────────────────────────────────────
-  const scheduleDIDPoll = useCallback((talkId: string) => {
-    didPollTimerRef.current = setTimeout(async () => {
-      didPollAttemptsRef.current += 1;
+  // ── Poll OmniHuman status (after unlock) ──────────────────────────────────
+  const scheduleHDPoll = useCallback((tid: string) => {
+    hdPollTimerRef.current = setTimeout(async () => {
+      hdPollAttemptsRef.current += 1;
+      hdPollCountRef.current += 1;
+      setHdPollElapsed(hdPollCountRef.current * (HD_POLL_INTERVAL_MS / 1000));
 
-      if (didPollAttemptsRef.current > DID_MAX_POLL_ATTEMPTS) {
-        console.warn("[did-poll] timed out");
+      if (hdPollAttemptsRef.current > HD_MAX_POLL_ATTEMPTS) {
+        setError("HD generation timed out after 10 minutes. Please try again.");
+        setStage("paywall");
         return;
       }
 
       try {
-        const res = await fetch(`/api/did-poll?talkId=${encodeURIComponent(talkId)}`);
+        const res = await fetch(`/api/omnihuman-status?taskId=${encodeURIComponent(tid)}`);
         const data = await res.json();
-        console.log(`[did-poll] attempt #${didPollAttemptsRef.current} status:`, data.status);
+        console.log(`[hd-poll] attempt #${hdPollAttemptsRef.current} status:`, data.status);
 
-        if (data.status === "done" && data.result_url) {
-          setDidVideoUrl(data.result_url);
-          setDidPhase("ready");
-          setTimeout(() => { didVideoRef.current?.play().catch(() => {}); }, 300);
-          return;
-        }
-
-        if (data.status === "error") {
-          console.warn("[did-poll] D-ID generation error:", data);
-          return;
-        }
-
-        // Still processing — keep polling
-        scheduleDIDPoll(talkId);
-      } catch (err) {
-        console.warn("[did-poll] network error:", err);
-        scheduleDIDPoll(talkId);
-      }
-    }, DID_POLL_INTERVAL_MS);
-  }, []);
-
-  // ── Poll OmniHuman status ──────────────────────────────────────────────────
-  const schedulePoll = useCallback((tid: string) => {
-    pollTimerRef.current = setTimeout(async () => {
-      pollAttemptsRef.current += 1;
-      setPollCount(pollAttemptsRef.current);
-
-      if (pollAttemptsRef.current > MAX_POLL_ATTEMPTS) {
-        setError("Generation timed out after 10 minutes. Please try again.");
-        setPhase("upload");
-        return;
-      }
-
-      try {
-        const res = await fetch(`/api/be-the-star/poll?taskId=${encodeURIComponent(tid)}`);
-        const data = await res.json();
-        console.log(`[be-the-star] poll #${pollAttemptsRef.current} status:`, data.status);
-
-        if (data.status === "completed" && data.videoUrl) {
-          setVideoUrl(data.videoUrl);
+        if (data.status === "completed" && data.result_video_url) {
+          setVideoUrl(data.result_video_url);
+          setStage("done");
           setPhase("result");
           setTimeout(() => { videoRef.current?.play().catch(() => {}); }, 300);
           return;
         }
 
         if (data.status === "failed") {
-          setError("Generation failed: " + (data.error ?? "unknown error"));
-          setPhase("upload");
+          setError("HD generation failed. Please try again.");
+          setStage("paywall");
           return;
         }
 
-        // Still processing — schedule next poll
-        schedulePoll(tid);
+        // Still pending/processing — keep polling
+        scheduleHDPoll(tid);
       } catch (err) {
-        console.warn("[be-the-star] poll error:", err);
-        // Network error — keep trying
-        schedulePoll(tid);
+        console.warn("[hd-poll] network error:", err);
+        scheduleHDPoll(tid);
       }
-    }, POLL_INTERVAL_MS);
+    }, HD_POLL_INTERVAL_MS);
   }, []);
 
-  // ── Submit job ─────────────────────────────────────────────────────────────
+  // ── Submit job (D-ID preview only — no auto OmniHuman) ────────────────────
   const handleGenerate = useCallback(async () => {
     if (!photoUrl) { setError("Please upload a photo first."); return; }
 
+    // 📊 埋点
+    console.log("[analytics] generate_click");
+
     setPhase("submitting");
+    setStage("generating");
     setError(null);
-    setStep("Generating your character voice...");
-    pollAttemptsRef.current = 0;
-    setPollCount(0);
+    setStep("Generating your preview...");
     setDidVideoUrl(null);
     setDidPhase("loading");
     didPollAttemptsRef.current = 0;
+    setGeneratedAudioUrl(null);
 
-    // ── Step 1: D-ID quick preview (fire immediately, server handles polling) ─
+    // D-ID quick preview only — OmniHuman HD is NOT triggered here
     fetch("/api/did-preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -321,24 +301,45 @@ export default function BeTheStarPage() {
           console.log("[did-preview] videoUrl:", d.videoUrl);
           setDidVideoUrl(d.videoUrl);
           setDidPhase("ready");
+          // Move to preview stage — paywall will show after cutoff
+          setStage("preview");
+          setPhase("polling");
+          // 📊 埋点
+          console.log("[analytics] paywall_view");
           setTimeout(() => { didVideoRef.current?.play().catch(() => {}); }, 300);
         } else {
           console.warn("[did-preview] no videoUrl returned:", d);
           setDidPhase("idle");
+          setStage("idle");
+          setPhase("upload");
+          setError("Preview generation failed. Please try again.");
         }
       })
       .catch((e) => {
         console.warn("[did-preview] request failed:", e);
         setDidPhase("idle");
+        setStage("idle");
+        setPhase("upload");
+        setError("Preview generation failed. Please try again.");
       });
+  }, [photoUrl, firstLine, clonedVoiceId]);
 
-    // ── Step 2: OmniHuman HD (background, takes 4-5 min) ──────────────────
+  // ── Unlock HD (called when user clicks the paywall button) ────────────────
+  const handleUnlockHD = useCallback(async () => {
+    if (!photoUrl) return;
+    setStage("processing");
+    setError(null);
+    hdPollAttemptsRef.current = 0;
+    hdPollCountRef.current = 0;
+    setHdPollElapsed(0);
+
     try {
-      const res = await fetch("/api/be-the-star/submit", {
+      const res = await fetch("/api/unlock-hd", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: photoUrl,
+          audioUrl: generatedAudioUrl ?? undefined,
           firstLine,
           voiceRecordingUrl: voiceRecordingUrl ?? undefined,
         }),
@@ -347,34 +348,34 @@ export default function BeTheStarPage() {
       const data = await res.json();
 
       if (!res.ok || !data.taskId) {
-        throw new Error(data.error ?? "Submit failed");
+        throw new Error(data.error ?? "Unlock HD failed");
       }
 
-      console.log("[be-the-star] task submitted, taskId:", data.taskId);
+      console.log("[unlock-hd] task submitted, taskId:", data.taskId);
       setTaskId(data.taskId);
-      setStep("Animating your character...");
-      setPhase("polling");
-      schedulePoll(data.taskId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Submit failed");
-      setPhase("upload");
-    }
-  }, [photoUrl, firstLine, voiceRecordingUrl, schedulePoll, scheduleDIDPoll]);
+      if (data.audioUrl) setGeneratedAudioUrl(data.audioUrl);
+      setStep("Animating your character in HD...");
 
-  // ── Load My Videos (with auto-cleanup: keep latest 10) ────────────────────
+      // Start polling /api/omnihuman-status
+      scheduleHDPoll(data.taskId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unlock HD failed");
+      setStage("paywall"); // revert to paywall so user can retry
+    }
+  }, [photoUrl, firstLine, voiceRecordingUrl, generatedAudioUrl, scheduleHDPoll]);
+
+  // ── Load My Videos ─────────────────────────────────────────────────────────
   const loadMyVideos = useCallback(async () => {
     setMyVideosLoading(true);
     try {
       const supabase = createClient();
 
-      // HD videos from omnihuman_jobs
       const { data: allJobs } = await supabase
         .from("omnihuman_jobs")
         .select("id, result_video_url, created_at")
         .eq("status", "completed")
         .order("created_at", { ascending: false });
 
-      // Auto-cleanup: delete oldest HD jobs beyond 10
       if (allJobs && allJobs.length > 10) {
         const toDelete = allJobs.slice(10);
         for (const job of toDelete) {
@@ -384,14 +385,12 @@ export default function BeTheStarPage() {
 
       const jobs = (allJobs ?? []).slice(0, 10);
 
-      // D-ID preview videos from storage listing
       const { data: allStorageFiles } = await supabase.storage
         .from("recordings")
         .list("did-preview", { limit: 100, sortBy: { column: "created_at", order: "desc" } });
 
       const mp4Files = (allStorageFiles ?? []).filter((f) => f.name.endsWith(".mp4"));
 
-      // Auto-cleanup: delete oldest preview files beyond 10
       if (mp4Files.length > 10) {
         const toDelete = mp4Files.slice(10);
         await supabase.storage
@@ -433,7 +432,6 @@ export default function BeTheStarPage() {
     await loadMyVideos();
   }, [loadMyVideos]);
 
-  // ── Delete a video ─────────────────────────────────────────────────────────
   const handleDeleteVideo = useCallback(async (v: typeof myVideos[0]) => {
     try {
       const supabase = createClient();
@@ -442,7 +440,6 @@ export default function BeTheStarPage() {
       } else if (v.type === "hd" && v.jobId) {
         await supabase.from("omnihuman_jobs").delete().eq("id", v.jobId);
       }
-      // Refresh list
       await loadMyVideos();
     } catch (e) {
       console.error("[my-videos] delete error:", e);
@@ -451,46 +448,57 @@ export default function BeTheStarPage() {
 
   // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     if (didPollTimerRef.current) clearTimeout(didPollTimerRef.current);
+    if (hdPollTimerRef.current) clearTimeout(hdPollTimerRef.current);
     setPhase("upload");
+    setStage("idle");
     setPhotoUrl(null);
     setPhotoPreview(null);
     setVideoUrl(null);
     setTaskId(null);
     setError(null);
     setStep("");
-    setPollCount(0);
-    pollAttemptsRef.current = 0;
     setDidVideoUrl(null);
     setDidPhase("idle");
     didPollAttemptsRef.current = 0;
+    hdPollAttemptsRef.current = 0;
+    hdPollCountRef.current = 0;
+    setHdPollElapsed(0);
+    setGeneratedAudioUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: SUBMITTING / POLLING
+  // PHASE: SUBMITTING (waiting for D-ID)
   // ════════════════════════════════════════════════════════════════════════════
-  if (phase === "submitting" || phase === "polling") {
-    const elapsed = pollCount * (POLL_INTERVAL_MS / 1000);
+  if (phase === "submitting") {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6 px-6">
-        {/* ── D-ID Quick Preview ─────────────────────────────────────────── */}
-        {didPhase === "loading" && !didVideoUrl && (
-          <div className="w-full max-w-sm rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 flex flex-col items-center gap-3">
-            <p className="text-yellow-400 text-xs font-semibold uppercase tracking-widest">⚡ Quick Preview</p>
-            <div className="w-8 h-8 rounded-full border-2 border-yellow-500/30 border-t-yellow-400 animate-spin" />
-            <p className="text-white/40 text-xs">Generating preview (~30s)…</p>
-          </div>
-        )}
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-14 h-14 rounded-full border-2 border-yellow-500/30 border-t-yellow-400 animate-spin" />
+          <p className="text-white/70 text-sm tracking-wide text-center">
+            Generating your preview…
+          </p>
+          <p className="text-yellow-400/60 text-xs font-semibold">⚡ Quick Preview — coming in ~30s</p>
+        </div>
+      </div>
+    );
+  }
 
-        {didPhase === "ready" && didVideoUrl && (
+  // ════════════════════════════════════════════════════════════════════════════
+  // PHASE: POLLING — D-ID preview ready
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === "polling" && didPhase === "ready" && didVideoUrl) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6 px-6 overflow-y-auto py-8">
+
+        {/* ── D-ID Quick Preview (only shown in preview stage, hidden in paywall/processing) ── */}
+        {stage === "preview" && (
           <div className="w-full max-w-sm rounded-2xl border border-yellow-500/40 bg-yellow-500/5 overflow-hidden relative">
-            {/* Label overlay */}
             <div className="absolute top-0 left-0 right-0 z-10 px-3 py-2 flex items-start justify-between bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
               <div>
                 <p className="text-yellow-400 text-xs font-bold">⚡ Quick Preview</p>
-                <p className="text-white/50 text-[10px]">HD version ready in ~4 min</p>
+                <p className="text-white/50 text-[10px]">Unlock HD for the full cinematic version</p>
               </div>
               <span className="text-white/20 text-[10px]">D-ID</span>
             </div>
@@ -499,76 +507,124 @@ export default function BeTheStarPage() {
               src={didVideoUrl}
               playsInline
               autoPlay
-              loop
               muted={false}
               className="w-full aspect-video object-cover"
               onTimeUpdate={(e) => {
-                if ((e.currentTarget.currentTime >= 10) && !showUpsell) {
-                  setShowUpsell(true);
+                const vid = e.currentTarget;
+                if (vid.duration > 0 && vid.currentTime / vid.duration >= PREVIEW_CUTOFF_RATIO) {
+                  // Cut to paywall — pause and hide video
+                  vid.pause();
+                  setStage("paywall");
                 }
               }}
             />
-            {/* Progress steps */}
-            <div className="px-4 py-3 border-t border-yellow-500/20 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-green-400">✅</span>
-                <span className="text-white/70 font-medium">Scene Preview</span>
-                <span className="ml-auto text-green-400 text-[10px]">done</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-yellow-400 animate-pulse">⏳</span>
-                <span className="text-white/70 font-medium">HD Version</span>
-                <span className="ml-auto text-yellow-400/70 text-[10px]">generating...</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs opacity-40">
-                <span>🔒</span>
-                <span className="text-white/70 font-medium">Full Movie</span>
-                <span className="ml-auto text-white/40 text-[10px]">$9.99</span>
-              </div>
-            </div>
           </div>
         )}
 
-        {/* ── OmniHuman HD status ────────────────────────────────────────── */}
-        {didPhase !== "ready" && (
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
-            <p className="text-white/70 text-sm tracking-wide text-center">
-              {step || "Creating your character..."}
-            </p>
-            <p className="text-purple-400/60 text-xs font-semibold">🎬 HD Version — coming in ~4 min</p>
-            {phase === "polling" && (
-              <p className="text-white/30 text-xs">
-                {elapsed > 0 ? `${elapsed}s elapsed` : "Starting..."} · checking every 5s
-              </p>
+        {/* ── Paywall card ───────────────────────────────────────────────── */}
+        {(stage === "paywall" || stage === "preview") && (
+          <div className="w-full max-w-sm rounded-2xl border border-purple-500/40 bg-black/90 backdrop-blur p-5 flex flex-col gap-3 shadow-2xl shadow-purple-500/20">
+            {stage === "paywall" ? (
+              <>
+                <p className="text-white font-bold text-base text-center">🔥 This is just a preview</p>
+                <p className="text-white/50 text-xs text-center">
+                  Your real cinematic version is ready
+                </p>
+                {/* Benefits list */}
+                <div className="flex flex-col gap-1 px-1">
+                  {["🎬 Full HD · no watermark", "⬇️ Download to your device", "🎙️ Your voice · your face"].map((b) => (
+                    <p key={b} className="text-white/60 text-xs flex items-center gap-1.5">{b}</p>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={!photoUrl || !firstLine || paywallLoading}
+                  onClick={async () => {
+                    if (!photoUrl || !firstLine || paywallLoading) return;
+                    // 📊 埋点
+                    console.log("[analytics] paywall_click", { stage: "paywall" });
+                    setPaywallLoading(true);
+                    await handleUnlockHD();
+                    setPaywallLoading(false);
+                  }}
+                  className={[
+                    "w-full py-3 rounded-xl font-bold text-sm transition shadow-lg shadow-purple-500/30",
+                    photoUrl && firstLine && !paywallLoading
+                      ? "bg-purple-600 text-white hover:bg-purple-500 cursor-pointer"
+                      : "bg-white/10 text-white/30 cursor-not-allowed",
+                  ].join(" ")}
+                >
+                  {paywallLoading ? "⏳ Processing..." : "🎬 Unlock Full Movie ($4.99)"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={paywallLoading}
+                  className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs hover:bg-white/10 transition disabled:opacity-40"
+                >
+                  Start Over
+                </button>
+                {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+              </>
+            ) : (
+              // stage === "preview" — show teaser paywall below the video
+              <>
+                <p className="text-white font-bold text-base text-center">🔥 This is just a preview</p>
+                <p className="text-white/50 text-xs text-center">
+                  Your real cinematic version is ready
+                </p>
+                {/* Benefits list */}
+                <div className="flex flex-col gap-1 px-1">
+                  {["🎬 Full HD · no watermark", "⬇️ Download to your device", "🎙️ Your voice · your face"].map((b) => (
+                    <p key={b} className="text-white/60 text-xs flex items-center gap-1.5">{b}</p>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={!photoUrl || !firstLine || paywallLoading}
+                  onClick={async () => {
+                    if (!photoUrl || !firstLine || paywallLoading) return;
+                    // 📊 埋点
+                    console.log("[analytics] paywall_click", { stage: "preview" });
+                    setPaywallLoading(true);
+                    await handleUnlockHD();
+                    setPaywallLoading(false);
+                  }}
+                  className={[
+                    "w-full py-3 rounded-xl font-bold text-sm transition shadow-lg shadow-purple-500/30",
+                    photoUrl && firstLine && !paywallLoading
+                      ? "bg-purple-600 text-white hover:bg-purple-500 cursor-pointer"
+                      : "bg-white/10 text-white/30 cursor-not-allowed",
+                  ].join(" ")}
+                >
+                  {paywallLoading ? "⏳ Processing..." : "🎬 Unlock Full Movie ($4.99)"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={paywallLoading}
+                  className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs hover:bg-white/10 transition disabled:opacity-40"
+                >
+                  Start Over
+                </button>
+              </>
             )}
-            {phase === "submitting" && (
-              <p className="text-white/30 text-xs">Preparing audio & submitting...</p>
+          </div>
+        )}
+
+        {/* ── Processing (HD rendering) ──────────────────────────────────── */}
+        {stage === "processing" && (
+          <div className="w-full max-w-sm rounded-2xl border border-purple-500/40 bg-black/90 backdrop-blur p-5 flex flex-col items-center gap-3 shadow-2xl shadow-purple-500/20">
+            <div className="w-10 h-10 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
+            <p className="text-white font-bold text-sm text-center">Generating your HD version…</p>
+            <p className="text-white/40 text-xs text-center">This takes ~4 minutes. Don&apos;t close this tab!</p>
+            {hdPollElapsed > 0 && (
+              <p className="text-white/30 text-xs">{hdPollElapsed}s elapsed · checking every 3s</p>
             )}
             {taskId && (
               <p className="text-white/20 text-xs font-mono">task: {taskId.slice(0, 16)}…</p>
             )}
-          </div>
-        )}
-
-        {/* ── Upsell card (appears after 10s of preview) ─────────────────── */}
-        {showUpsell && (
-          <div className="w-full max-w-sm rounded-2xl border border-purple-500/40 bg-black/90 backdrop-blur p-5 flex flex-col gap-3 shadow-2xl shadow-purple-500/20">
-            <p className="text-white font-bold text-base text-center">This is just the beginning...</p>
-            <p className="text-white/50 text-xs text-center">Upgrade to get the full HD cinematic version of your character</p>
-            <button
-              type="button"
-              className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-500 transition shadow-lg shadow-purple-500/30"
-            >
-              🎬 Upgrade to HD — $4.99
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowUpsell(false)}
-              className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs hover:bg-white/10 transition"
-            >
-              Continue watching free
-            </button>
+            {error && <p className="text-red-400 text-xs text-center">{error}</p>}
           </div>
         )}
       </div>
@@ -636,7 +692,6 @@ export default function BeTheStarPage() {
           <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-purple-400">ScriptFlow</p>
           <h1 className="text-3xl font-extrabold tracking-tight">Be the Star 🌟</h1>
           <p className="mt-2 text-white/50 text-sm">Upload your photo and hear your character speak</p>
-          {/* My Videos button */}
           <button
             type="button"
             onClick={() => void handleOpenMyVideos()}
@@ -723,7 +778,6 @@ export default function BeTheStarPage() {
             placeholder="Tell your story in one sentence..."
             className="w-full resize-none rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/20 transition-all"
           />
-          {/* Preset lines */}
           <p className="text-xs text-white/30 mt-2 mb-1.5">Or pick a line:</p>
           <div className="flex flex-col gap-1.5">
             {FIRST_LINES.map((line, i) => (
