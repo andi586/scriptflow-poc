@@ -550,20 +550,28 @@ export default function BeTheStarPage() {
   if (phase === "polling" && didPhase === "ready" && didVideoUrl) {
     return (
       <div className="fixed inset-0 bg-black">
-        {/* ── Video (always rendered, paused when paywall hits) ── */}
+        {/* ── Video — always rendered, muted for autoplay compat ── */}
         <video
           ref={didVideoRef}
           src={didVideoUrl}
           playsInline
           autoPlay
-          muted={false}
-          className="absolute inset-0 w-full h-full object-cover"
+          muted
+          controls
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }}
           onTimeUpdate={(e) => {
             const vid = e.currentTarget;
             if (vid.duration > 0 && vid.currentTime / vid.duration >= PREVIEW_CUTOFF_RATIO) {
               vid.pause();
               setStage("paywall");
             }
+          }}
+          onLoadedData={(e) => {
+            console.log("[video] loaded, duration:", e.currentTarget.duration);
+            e.currentTarget.play().catch((err) => console.warn("[video] play() failed:", err));
+          }}
+          onError={(e) => {
+            console.error("[video] error:", e.currentTarget.error);
           }}
         />
 
