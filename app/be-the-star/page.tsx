@@ -343,10 +343,16 @@ export default function BeTheStarPage() {
     })
       .then((r) => r.json())
       .then((d) => {
-        // Only accept a real video — no audio/image fallbacks
-        if (d.success && d.videoUrl) {
-          console.log("[did-preview] videoUrl:", d.videoUrl);
-          setDidVideoUrl(d.videoUrl);
+        // Debug: log full response to diagnose field name issues
+        console.log("[did-preview] full response:", JSON.stringify(d));
+
+        // Accept any of the possible field names D-ID might return
+        const resolvedUrl: string | undefined =
+          d.videoUrl ?? d.url ?? d.result_url ?? undefined;
+
+        if (resolvedUrl) {
+          console.log("[did-preview] resolved videoUrl:", resolvedUrl);
+          setDidVideoUrl(resolvedUrl);
           setDidPhase("ready");
           // Start in "preview" — video plays first, paywall triggers via onTimeUpdate
           setStage("preview");
@@ -357,11 +363,11 @@ export default function BeTheStarPage() {
             const vid = didVideoRef.current;
             if (vid) {
               vid.currentTime = 0; // ensure starts from beginning
-              vid.play().catch(() => {});
+              vid.play().catch((e) => console.warn("[did-preview] autoplay blocked:", e));
             }
           }, 300);
         } else {
-          console.warn("[did-preview] preview failed:", d.error ?? "no videoUrl");
+          console.warn("[did-preview] preview failed — no videoUrl in response:", d);
           setDidPhase("idle");
           setStage("idle");
           setPhase("upload");
