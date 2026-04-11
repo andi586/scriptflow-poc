@@ -346,18 +346,18 @@ export default function BeTheStarPage() {
     })
       .then((r) => r.json())
       .then((d) => {
-        if (d.videoUrl) {
+        // Only accept a real video — no audio/image fallbacks
+        if (d.success && d.videoUrl) {
           console.log("[did-preview] videoUrl:", d.videoUrl);
           setDidVideoUrl(d.videoUrl);
           setDidPhase("ready");
-          // Move to preview stage — paywall will show after cutoff
           setStage("preview");
           setPhase("polling");
           // 📊 埋点
           console.log("[analytics] paywall_view");
           setTimeout(() => { didVideoRef.current?.play().catch(() => {}); }, 300);
         } else {
-          console.warn("[did-preview] no videoUrl returned:", d);
+          console.warn("[did-preview] preview failed:", d.error ?? "no videoUrl");
           setDidPhase("idle");
           setStage("idle");
           setPhase("upload");
