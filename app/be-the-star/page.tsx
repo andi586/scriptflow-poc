@@ -524,124 +524,47 @@ export default function BeTheStarPage() {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: POLLING — D-ID preview ready
+  // PHASE: POLLING — D-ID preview ready (MINIMAL DEBUG RENDER)
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === "polling" && didPhase === "ready" && didVideoUrl) {
     return (
-      <div style={{ background: "black", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-
-        {/* ── BARE VIDEO — bypasses all stage/style logic for debugging ── */}
-        {didVideoUrl && (
-          <video
-            ref={didVideoRef}
-            src={didVideoUrl}
-            autoPlay
-            muted
-            controls
-            playsInline
-            style={{
-              width: "300px",
-              height: "auto",
-              display: "block",
-              margin: "20px auto",
-              objectFit: "contain",
-              background: "black",
-            }}
-            onLoadedData={(e) => {
-              console.log("[video] loaded, duration:", e.currentTarget.duration);
-              e.currentTarget.play().catch((err) => console.warn("[video] play() failed:", err));
-            }}
-            onError={(e) => {
-              console.error("[video] error:", e.currentTarget.error);
-            }}
-            onTimeUpdate={(e) => {
-              const vid = e.currentTarget;
-              if (vid.duration > 0 && vid.currentTime / vid.duration >= PREVIEW_CUTOFF_RATIO) {
-                vid.pause();
-                setStage("paywall");
-              }
-            }}
-          />
-        )}
-
-        {/* ── Preview label (only while playing) ── */}
-        {stage === "preview" && (
-          <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 rounded-full bg-black/60 border border-yellow-500/40 px-3 py-1.5 backdrop-blur">
-            <span className="text-yellow-400 text-xs font-bold">⚡ Quick Preview</span>
-          </div>
-        )}
-
-        {/* ── Full-screen paywall overlay (after cutoff) ── */}
-        {stage === "paywall" && (
-          <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center px-6 gap-6">
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-4xl">🎬</p>
-              <p className="text-white font-extrabold text-2xl text-center leading-tight">
-                What happens next?
-              </p>
-              <p className="text-white/60 text-sm text-center max-w-xs">
-                Continue your story in this world
-              </p>
-            </div>
-
-            {/* Benefits */}
-            <div className="flex flex-col gap-2 w-full max-w-xs">
-              {["🎬 Full HD · no watermark", "⬇️ Download to your device", "🎙️ Your voice · your face"].map((b) => (
-                <div key={b} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
-                  <p className="text-white/80 text-sm">{b}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* CTA */}
-            <div className="w-full max-w-xs flex flex-col gap-3">
-              <button
-                type="button"
-                disabled={paywallLoading}
-                onClick={async () => {
-                  if (paywallLoading) return;
-                  console.log("[analytics] paywall_click", { stage: "paywall" });
-                  setPaywallLoading(true);
-                  await handleUnlockHD();
-                  setPaywallLoading(false);
-                }}
-                className={[
-                  "w-full py-4 rounded-2xl font-extrabold text-lg transition shadow-2xl",
-                  !paywallLoading
-                    ? "bg-purple-600 text-white hover:bg-purple-500 shadow-purple-500/40 cursor-pointer"
-                    : "bg-white/10 text-white/30 cursor-not-allowed",
-                ].join(" ")}
-              >
-                {paywallLoading ? "⏳ Processing..." : "🎬 Continue My Story ($4.99)"}
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={paywallLoading}
-                className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/40 text-xs hover:bg-white/10 transition disabled:opacity-40"
-              >
-                Start Over
-              </button>
-              {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-            </div>
-          </div>
-        )}
-
-        {/* ── Processing overlay (HD rendering) ── */}
-        {stage === "processing" && (
-          <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center px-6 gap-4">
-            <div className="w-12 h-12 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
-            <p className="text-white font-bold text-base text-center">Generating your HD version…</p>
-            <p className="text-white/40 text-xs text-center">This takes ~4 minutes. Don&apos;t close this tab!</p>
-            {hdPollElapsed > 0 && (
-              <p className="text-white/30 text-xs">{hdPollElapsed}s elapsed · checking every 3s</p>
-            )}
-            {taskId && (
-              <p className="text-white/20 text-xs font-mono">task: {taskId.slice(0, 16)}…</p>
-            )}
-            {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-          </div>
-        )}
+      <div style={{ textAlign: "center", background: "#000", minHeight: "100vh", paddingTop: "40px" }}>
+        <p style={{ color: "#aaa", fontSize: "12px", marginBottom: "8px" }}>
+          videoUrl: {didVideoUrl.slice(0, 60)}…
+        </p>
+        <video
+          ref={didVideoRef}
+          src={didVideoUrl}
+          autoPlay
+          muted
+          controls
+          playsInline
+          style={{
+            width: "320px",
+            height: "auto",
+            display: "block",
+            margin: "0 auto",
+            objectFit: "contain",
+            background: "black",
+          }}
+          onLoadedData={(e) => {
+            console.log("[video] loaded, duration:", e.currentTarget.duration);
+            e.currentTarget.play().catch((err) => console.warn("[video] play() failed:", err));
+          }}
+          onError={(e) => {
+            const err = e.currentTarget.error;
+            console.error("[video] error code:", err?.code, "message:", err?.message);
+          }}
+        />
+        <p style={{ color: "#666", fontSize: "11px", marginTop: "8px" }}>
+          stage: {stage}
+        </p>
+        <button
+          onClick={handleReset}
+          style={{ marginTop: "16px", color: "#888", fontSize: "12px", background: "none", border: "1px solid #333", padding: "6px 16px", borderRadius: "8px", cursor: "pointer" }}
+        >
+          Start Over
+        </button>
       </div>
     );
   }
