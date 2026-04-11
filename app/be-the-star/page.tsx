@@ -44,9 +44,17 @@ const STORY_TEMPLATES: StoryTemplate[] = [
   },
 ];
 
-/** Build a full cinematic prompt for D-ID — character acts in a world, not just reads a line */
+// Emotion cues per template — short acting direction only, no explanatory sentences
+const EMOTION_CUES: Record<string, string> = {
+  death: "breathing fast, whispering",
+  betrayal: "low voice, angry",
+  power: "calm, slight smile",
+};
+
+/** Build a short reactive text for D-ID (≤80 chars, emotion tag + line only) */
 function buildPrompt(tpl: StoryTemplate): string {
-  return `You are in ${tpl.scene}. ${tpl.situation}. You feel ${tpl.emotion}. You react by ${tpl.action}. You say: "${tpl.line}"`;
+  const cue = EMOTION_CUES[tpl.id] ?? "natural";
+  return `(${cue}) ${tpl.line}`;
 }
 
 const DID_POLL_INTERVAL_MS = 3000;
