@@ -544,6 +544,7 @@ export async function generateKlingPromptsAction(input: {
 }): Promise<ActionResult<{ prompts: KlingPromptItem[] }>> {
   try {
     const projectId = requireProjectId(input.projectId);
+    console.log('[NEL] generateKlingPromptsAction START projectId:', projectId)
     const supabase = createClient();
     const { data: storyMemory, error } = await supabase
       .from("story_memory")
@@ -732,6 +733,7 @@ Rules: 2-4 lines per scene, character must be: caius/luna/marcus/narrator (lower
       console.error("[F81 v2] Failed to write script_raw:", scriptRawError);
     }
 
+    console.log('[NEL] generated prompts:', JSON.stringify(prompts))
     return { success: true, data: { prompts } };
   } catch (e) {
     return { success: false, error: formatUnknownError(e) };
