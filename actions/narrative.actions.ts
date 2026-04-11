@@ -947,23 +947,27 @@ export async function submitKlingTasksAction(input: {
       const useVeo3 = false;
       const modelUsed = useVeo3 ? "veo3" : "kling";
 
-      // Kling 3.0 omni: use OmniHuman video as reference video for omni_video_generation.
-      // The prompt must include @video to reference the input video.
-      const omnihumanVideoUrl = input.omnihumanKeyframeUrl ?? "";
-      const omniPrompt = `${sanitizedPrompt} @video in the style of the reference video`;
+      // Always use the original character reference images (uploaded photos).
+      // OmniHuman produces .mp4 video URLs which Kling does NOT accept as image references.
+      // The omnihumanKeyframeUrl parameter is intentionally ignored here to prevent
+      // passing a video URL to Kling's elements[].image_url field.
+      const effectiveRefUrls = multiRefUrls;
+      if (input.omnihumanKeyframeUrl) {
+        console.log("[submitKlingTasksAction] omnihumanKeyframeUrl ignored (video URL not accepted by Kling elements) — using original character refs:", effectiveRefUrls.length);
+      }
+
+      // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
+      // `input.elements`: [{ image_url } x 1–4], plus mode/version per docs.
       const klingPayload = {
         model: "kling",
-        task_type: "omni_video_generation",
-        input: {
-          version: "3.0",
-          prompt: omniPrompt,
-          video: omnihumanVideoUrl,
-          resolution: "720p",
+        task_type: "video_generation",
+        input: buildKlingVideoGenerationInput({
+          prompt: sanitizedPrompt,
+          aspectRatio: KLING_VIDEO_ASPECT_RATIO,
           duration: 5,
-          aspect_ratio: "9:16",
-        },
+          referenceImageUrls: effectiveRefUrls,
+        }),
       };
-      console.log("[submitKlingTasksAction] Kling 3.0 omni payload:", JSON.stringify(klingPayload));
 
       let res: Response;
       if (useVeo3) {
