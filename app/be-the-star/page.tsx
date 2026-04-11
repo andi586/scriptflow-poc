@@ -3,13 +3,20 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// ─── First lines ───────────────────────────────────────────────────────────────
-const FIRST_LINES = [
-  "我从来没有想到，这一天会来临。但我已经准备好了。",
-  "他们说我不够好。但他们错了。",
-  "每个故事都有开始。这是我的故事。",
-  "我等待这一刻，等待了我整个人生。",
-  "世界即将改变。而改变它的人，就是我。",
+// ─── Story templates (3 fixed options) ────────────────────────────────────────
+const STORY_TEMPLATES = [
+  {
+    label: "🗡️ Betrayal",
+    line: "我以为你是我最信任的人。但你选择了背叛我。",
+  },
+  {
+    label: "💀 Death",
+    line: "我站在生死边缘，回望这一生，我无怨无悔。",
+  },
+  {
+    label: "👑 Power",
+    line: "世界即将改变。而改变它的人，就是我。",
+  },
 ];
 
 const DID_POLL_INTERVAL_MS = 3000;
@@ -38,7 +45,7 @@ export default function BeTheStarPage() {
   const [phase, setPhase] = useState<Phase>("upload");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [firstLine, setFirstLine] = useState(FIRST_LINES[0]);
+  const [firstLine, setFirstLine] = useState(STORY_TEMPLATES[0].line);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [step, setStep] = useState("");
@@ -490,133 +497,92 @@ export default function BeTheStarPage() {
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === "polling" && didPhase === "ready" && didVideoUrl) {
     return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6 px-6 overflow-y-auto py-8">
+      <div className="fixed inset-0 bg-black">
+        {/* ── Video (always rendered, paused when paywall hits) ── */}
+        <video
+          ref={didVideoRef}
+          src={didVideoUrl}
+          playsInline
+          autoPlay
+          muted={false}
+          className="absolute inset-0 w-full h-full object-cover"
+          onTimeUpdate={(e) => {
+            const vid = e.currentTarget;
+            if (vid.duration > 0 && vid.currentTime / vid.duration >= PREVIEW_CUTOFF_RATIO) {
+              vid.pause();
+              setStage("paywall");
+            }
+          }}
+        />
 
-        {/* ── D-ID Quick Preview (only shown in preview stage, hidden in paywall/processing) ── */}
+        {/* ── Preview label (only while playing) ── */}
         {stage === "preview" && (
-          <div className="w-full max-w-sm rounded-2xl border border-yellow-500/40 bg-yellow-500/5 overflow-hidden relative">
-            <div className="absolute top-0 left-0 right-0 z-10 px-3 py-2 flex items-start justify-between bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
-              <div>
-                <p className="text-yellow-400 text-xs font-bold">⚡ Quick Preview</p>
-                <p className="text-white/50 text-[10px]">Unlock HD for the full cinematic version</p>
-              </div>
-              <span className="text-white/20 text-[10px]">D-ID</span>
+          <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 rounded-full bg-black/60 border border-yellow-500/40 px-3 py-1.5 backdrop-blur">
+            <span className="text-yellow-400 text-xs font-bold">⚡ Quick Preview</span>
+          </div>
+        )}
+
+        {/* ── Full-screen paywall overlay (after cutoff) ── */}
+        {stage === "paywall" && (
+          <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center px-6 gap-6">
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-4xl">🔥</p>
+              <p className="text-white font-extrabold text-2xl text-center leading-tight">
+                This is just a preview
+              </p>
+              <p className="text-white/60 text-sm text-center max-w-xs">
+                Your real cinematic version is ready — HD, no watermark, yours to keep.
+              </p>
             </div>
-            <video
-              ref={didVideoRef}
-              src={didVideoUrl}
-              playsInline
-              autoPlay
-              muted={false}
-              className="w-full aspect-video object-cover"
-              onTimeUpdate={(e) => {
-                const vid = e.currentTarget;
-                if (vid.duration > 0 && vid.currentTime / vid.duration >= PREVIEW_CUTOFF_RATIO) {
-                  // Cut to paywall — pause and hide video
-                  vid.pause();
-                  setStage("paywall");
-                }
-              }}
-            />
+
+            {/* Benefits */}
+            <div className="flex flex-col gap-2 w-full max-w-xs">
+              {["🎬 Full HD · no watermark", "⬇️ Download to your device", "🎙️ Your voice · your face"].map((b) => (
+                <div key={b} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+                  <p className="text-white/80 text-sm">{b}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* CTA */}
+            <div className="w-full max-w-xs flex flex-col gap-3">
+              <button
+                type="button"
+                disabled={paywallLoading}
+                onClick={async () => {
+                  if (paywallLoading) return;
+                  console.log("[analytics] paywall_click", { stage: "paywall" });
+                  setPaywallLoading(true);
+                  await handleUnlockHD();
+                  setPaywallLoading(false);
+                }}
+                className={[
+                  "w-full py-4 rounded-2xl font-extrabold text-lg transition shadow-2xl",
+                  !paywallLoading
+                    ? "bg-purple-600 text-white hover:bg-purple-500 shadow-purple-500/40 cursor-pointer"
+                    : "bg-white/10 text-white/30 cursor-not-allowed",
+                ].join(" ")}
+              >
+                {paywallLoading ? "⏳ Processing..." : "🎬 Unlock Full Movie ($4.99)"}
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={paywallLoading}
+                className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/40 text-xs hover:bg-white/10 transition disabled:opacity-40"
+              >
+                Start Over
+              </button>
+              {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+            </div>
           </div>
         )}
 
-        {/* ── Paywall card ───────────────────────────────────────────────── */}
-        {(stage === "paywall" || stage === "preview") && (
-          <div className="w-full max-w-sm rounded-2xl border border-purple-500/40 bg-black/90 backdrop-blur p-5 flex flex-col gap-3 shadow-2xl shadow-purple-500/20">
-            {stage === "paywall" ? (
-              <>
-                <p className="text-white font-bold text-base text-center">🔥 This is just a preview</p>
-                <p className="text-white/50 text-xs text-center">
-                  Your real cinematic version is ready
-                </p>
-                {/* Benefits list */}
-                <div className="flex flex-col gap-1 px-1">
-                  {["🎬 Full HD · no watermark", "⬇️ Download to your device", "🎙️ Your voice · your face"].map((b) => (
-                    <p key={b} className="text-white/60 text-xs flex items-center gap-1.5">{b}</p>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  disabled={!photoUrl || !firstLine || paywallLoading}
-                  onClick={async () => {
-                    if (!photoUrl || !firstLine || paywallLoading) return;
-                    // 📊 埋点
-                    console.log("[analytics] paywall_click", { stage: "paywall" });
-                    setPaywallLoading(true);
-                    await handleUnlockHD();
-                    setPaywallLoading(false);
-                  }}
-                  className={[
-                    "w-full py-3 rounded-xl font-bold text-sm transition shadow-lg shadow-purple-500/30",
-                    photoUrl && firstLine && !paywallLoading
-                      ? "bg-purple-600 text-white hover:bg-purple-500 cursor-pointer"
-                      : "bg-white/10 text-white/30 cursor-not-allowed",
-                  ].join(" ")}
-                >
-                  {paywallLoading ? "⏳ Processing..." : "🎬 Unlock Full Movie ($4.99)"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  disabled={paywallLoading}
-                  className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs hover:bg-white/10 transition disabled:opacity-40"
-                >
-                  Start Over
-                </button>
-                {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-              </>
-            ) : (
-              // stage === "preview" — show teaser paywall below the video
-              <>
-                <p className="text-white font-bold text-base text-center">🔥 This is just a preview</p>
-                <p className="text-white/50 text-xs text-center">
-                  Your real cinematic version is ready
-                </p>
-                {/* Benefits list */}
-                <div className="flex flex-col gap-1 px-1">
-                  {["🎬 Full HD · no watermark", "⬇️ Download to your device", "🎙️ Your voice · your face"].map((b) => (
-                    <p key={b} className="text-white/60 text-xs flex items-center gap-1.5">{b}</p>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  disabled={!photoUrl || !firstLine || paywallLoading}
-                  onClick={async () => {
-                    if (!photoUrl || !firstLine || paywallLoading) return;
-                    // 📊 埋点
-                    console.log("[analytics] paywall_click", { stage: "preview" });
-                    setPaywallLoading(true);
-                    await handleUnlockHD();
-                    setPaywallLoading(false);
-                  }}
-                  className={[
-                    "w-full py-3 rounded-xl font-bold text-sm transition shadow-lg shadow-purple-500/30",
-                    photoUrl && firstLine && !paywallLoading
-                      ? "bg-purple-600 text-white hover:bg-purple-500 cursor-pointer"
-                      : "bg-white/10 text-white/30 cursor-not-allowed",
-                  ].join(" ")}
-                >
-                  {paywallLoading ? "⏳ Processing..." : "🎬 Unlock Full Movie ($4.99)"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  disabled={paywallLoading}
-                  className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 text-xs hover:bg-white/10 transition disabled:opacity-40"
-                >
-                  Start Over
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── Processing (HD rendering) ──────────────────────────────────── */}
+        {/* ── Processing overlay (HD rendering) ── */}
         {stage === "processing" && (
-          <div className="w-full max-w-sm rounded-2xl border border-purple-500/40 bg-black/90 backdrop-blur p-5 flex flex-col items-center gap-3 shadow-2xl shadow-purple-500/20">
-            <div className="w-10 h-10 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
-            <p className="text-white font-bold text-sm text-center">Generating your HD version…</p>
+          <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center px-6 gap-4">
+            <div className="w-12 h-12 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
+            <p className="text-white font-bold text-base text-center">Generating your HD version…</p>
             <p className="text-white/40 text-xs text-center">This takes ~4 minutes. Don&apos;t close this tab!</p>
             {hdPollElapsed > 0 && (
               <p className="text-white/30 text-xs">{hdPollElapsed}s elapsed · checking every 3s</p>
@@ -768,31 +734,26 @@ export default function BeTheStarPage() {
           </div>
         )}
 
-        {/* ── What's your story? ─────────────────────────────────────────────── */}
+        {/* ── Choose your story ─────────────────────────────────────────────── */}
         <div className="w-full mb-6">
-          <p className="text-sm font-semibold text-white mb-2">What&apos;s your story?</p>
-          <textarea
-            value={firstLine}
-            onChange={(e) => setFirstLine(e.target.value)}
-            rows={3}
-            placeholder="Tell your story in one sentence..."
-            className="w-full resize-none rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/20 transition-all"
-          />
-          <p className="text-xs text-white/30 mt-2 mb-1.5">Or pick a line:</p>
-          <div className="flex flex-col gap-1.5">
-            {FIRST_LINES.map((line, i) => (
+          <p className="text-sm font-semibold text-white mb-3">Choose your story</p>
+          <div className="flex flex-col gap-3">
+            {STORY_TEMPLATES.map((tpl) => (
               <button
-                key={i}
+                key={tpl.label}
                 type="button"
-                onClick={() => setFirstLine(line)}
+                onClick={() => setFirstLine(tpl.line)}
                 className={[
-                  "w-full text-left px-3 py-2 rounded-lg border text-xs transition",
-                  firstLine === line
-                    ? "border-purple-500 bg-purple-500/10 text-white"
-                    : "border-white/10 bg-white/5 text-white/50 hover:border-white/20 hover:text-white/70",
+                  "w-full text-left px-4 py-3 rounded-2xl border transition-all",
+                  firstLine === tpl.line
+                    ? "border-purple-500 bg-purple-500/15 shadow-lg shadow-purple-500/20"
+                    : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/8",
                 ].join(" ")}
               >
-                &ldquo;{line}&rdquo;
+                <p className={["text-sm font-bold mb-0.5", firstLine === tpl.line ? "text-purple-300" : "text-white/70"].join(" ")}>
+                  {tpl.label}
+                </p>
+                <p className="text-white/50 text-xs leading-relaxed">&ldquo;{tpl.line}&rdquo;</p>
               </button>
             ))}
           </div>
