@@ -351,11 +351,18 @@ export default function BeTheStarPage() {
           console.log("[did-preview] videoUrl:", d.videoUrl);
           setDidVideoUrl(d.videoUrl);
           setDidPhase("ready");
+          // Start in "preview" — video plays first, paywall triggers via onTimeUpdate
           setStage("preview");
           setPhase("polling");
           // 📊 埋点
           console.log("[analytics] paywall_view");
-          setTimeout(() => { didVideoRef.current?.play().catch(() => {}); }, 300);
+          setTimeout(() => {
+            const vid = didVideoRef.current;
+            if (vid) {
+              vid.currentTime = 0; // ensure starts from beginning
+              vid.play().catch(() => {});
+            }
+          }, 300);
         } else {
           console.warn("[did-preview] preview failed:", d.error ?? "no videoUrl");
           setDidPhase("idle");
