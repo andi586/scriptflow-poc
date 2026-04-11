@@ -22,7 +22,7 @@ const STORY_TEMPLATES: StoryTemplate[] = [
     situation: "医生刚离开，你被告知只剩60秒",
     emotion: "恐惧 + 不敢相信",
     action: "呼吸急促，压低声音",
-    line: "医生刚刚告诉你…你只剩60秒可以活…",
+    line: "…只剩60秒？",
   },
   {
     id: "betrayal",
@@ -31,7 +31,7 @@ const STORY_TEMPLATES: StoryTemplate[] = [
     situation: "你刚发现最信任的人在骗你",
     emotion: "压抑愤怒 + 失望",
     action: "靠近镜头，低声",
-    line: "你终于发现了…你最信任的人，一直在骗你…",
+    line: "…一直在骗我？",
   },
   {
     id: "power",
@@ -40,13 +40,21 @@ const STORY_TEMPLATES: StoryTemplate[] = [
     situation: "所有人刚意识到你才是掌控者",
     emotion: "冷静 + 自信",
     action: "轻微微笑，缓慢开口",
-    line: "他们现在才意识到…你才是那个掌控一切的人…",
+    line: "他们现在才明白。",
   },
 ];
 
-/** Build the full prompt from a template */
+// Emotion tags per template id — injected into the D-ID text prompt
+const EMOTION_TAGS: Record<string, string> = {
+  death: "shocked, whispering, breathing fast",
+  betrayal: "low voice, angry, controlled",
+  power: "calm, confident, slight smile",
+};
+
+/** Build a short reactive prompt for D-ID (< 120 chars, no explanatory sentences) */
 function buildPrompt(tpl: StoryTemplate): string {
-  return `You are the person in this scene: ${tpl.scene}. Situation: ${tpl.situation}. Emotion: ${tpl.emotion}. Action: ${tpl.action}. Speak this line naturally: ${tpl.line}`;
+  const tag = EMOTION_TAGS[tpl.id] ?? "natural";
+  return `(${tag}) ${tpl.line}`;
 }
 
 const DID_POLL_INTERVAL_MS = 3000;
