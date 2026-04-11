@@ -44,17 +44,9 @@ const STORY_TEMPLATES: StoryTemplate[] = [
   },
 ];
 
-// Emotion tags per template id — injected into the D-ID text prompt
-const EMOTION_TAGS: Record<string, string> = {
-  death: "shocked, whispering, breathing fast",
-  betrayal: "low voice, angry, controlled",
-  power: "calm, confident, slight smile",
-};
-
-/** Build a short reactive prompt for D-ID (< 120 chars, no explanatory sentences) */
+/** Build a full cinematic prompt for D-ID — character acts in a world, not just reads a line */
 function buildPrompt(tpl: StoryTemplate): string {
-  const tag = EMOTION_TAGS[tpl.id] ?? "natural";
-  return `(${tag}) ${tpl.line}`;
+  return `You are in ${tpl.scene}. ${tpl.situation}. You feel ${tpl.emotion}. You react by ${tpl.action}. You say: "${tpl.line}"`;
 }
 
 const DID_POLL_INTERVAL_MS = 3000;
