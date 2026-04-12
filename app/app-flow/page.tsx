@@ -270,6 +270,7 @@ export default function AppFlowPage() {
 
       // Step 3: Start pipeline — create project in DB (before voice clone so we have projectId)
       setStep("Starting pipeline...");
+      console.log('[app-flow] user email:', user?.email);
       let projectId: string | null = null;
       let pipelineIsPreview = true; // default to preview (paywall) unless whitelisted
       try {
@@ -281,7 +282,7 @@ export default function AppFlowPage() {
             imageUrl,
             audioUrl,
             isStarMode: true,
-            userEmail: user?.email ?? '',
+            userEmail: user?.email ?? null,
           }),
         });
         const pipeData = await pipeRes.json();

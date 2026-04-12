@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       voiceId,
       isStarMode = false,
       userId,
+      userEmail: bodyUserEmail,
     } = body as {
       script?: string
       imageUrl?: string
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
       voiceId?: string
       isStarMode?: boolean
       userId?: string
+      userEmail?: string | null
     }
 
     // Detect language from script text: Chinese characters → 'zh', otherwise 'en'
@@ -79,32 +81,31 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Whitelist check ───────────────────────────────────────────────────────
-    // Get user email from Supabase auth (best-effort, non-fatal)
-    let userEmail: string | null = null
-    try {
-      const authHeader = request.headers.get('authorization') ?? ''
-      const token = authHeader.replace('Bearer ', '').trim()
-      if (token) {
-        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        const authClient = createClient(supabaseUrl!, anonKey)
-        const { data: { user } } = await authClient.auth.getUser(token)
-        userEmail = user?.email ?? null
+    // Prefer email from request body; fall back to Supabase auth token
+    let userEmail: string | null = bodyUserEmail ?? null
+    if (!userEmail) {
+      try {
+        const authHeader = request.headers.get('authorization') ?? ''
+        const token = authHeader.replace('Bearer ', '').trim()
+        if (token) {
+          const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          const authClient = createClient(supabaseUrl!, anonKey)
+          const { data: { user } } = await authClient.auth.getUser(token)
+          userEmail = user?.email ?? null
+        }
+      } catch (authErr) {
+        console.warn('[pipeline/start] auth check failed (non-fatal):', authErr instanceof Error ? authErr.message : authErr)
       }
-    } catch (authErr) {
-      console.warn('[pipeline/start] auth check failed (non-fatal):', authErr instanceof Error ? authErr.message : authErr)
     }
 
     const whitelisted = isWhitelisted(userEmail)
     console.log('[pipeline/start] userEmail:', userEmail, 'whitelisted:', whitelisted)
 
     // ── Step 1: Create project row ────────────────────────────────────────────
-    // user_id is required by schema — use provided userId or a placeholder
-    const effectiveUserId = userId ?? '00000000-0000-0000-0000-000000000000'
-
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .insert({
-        user_id: effectiveUserId,
+        ...(userId ? { user_id: userId } : {}),
         status: 'draft',
         is_star_mode: isStarMode,
         language: detectedLanguage,
