@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 30
 
 const PIAPI_BASE = 'https://api.piapi.ai/api/v1'
-const POLL_INTERVAL_MS = 3000
-const MAX_POLL_ATTEMPTS = 40 // 40 * 3s = 120s max
 
 /**
- * OmniHuman API wrapper
+ * OmniHuman API wrapper — fire and forget
  *
  * POST /api/omni-human
  * Body: { imageUrl, audioUrl, prompt?, projectId? }
  *
  * Flow:
- * 1. Submit task to PiAPI OmniHuman
- * 2. Poll until completed or timeout
- * 3. Return video URL
- * 4. Optionally store in projects.keyframe_url
+ * 1. Optionally convert webm audio to mp3 via Railway
+ * 2. Submit task to PiAPI OmniHuman
+ * 3. Store taskId in omnihuman_jobs table with status 'pending'
+ * 4. Return immediately with { success: true, taskId }
+ *
+ * Polling is handled by GET /api/omni-human/poll?taskId=xxx
  */
 export async function POST(request: NextRequest) {
   console.log('[omni-human] ENTER', new Date().toISOString())
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── Step 1: Submit task ───────────────────────────────────────────────────
+    // ── Submit task to PiAPI ──────────────────────────────────────────────────
     const taskPayload = {
       model: 'omni-human',
       task_type: 'omni-human-1.5',
@@ -128,91 +129,33 @@ export async function POST(request: NextRequest) {
       }, { status: 502 })
     }
 
-    // ── Step 2: Poll for result ───────────────────────────────────────────────
-    let videoUrl: string | null = null
-    let attempts = 0
-
-    while (attempts < MAX_POLL_ATTEMPTS) {
-      attempts++
-      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
-
-      console.log(`[omni-human] polling attempt ${attempts}/${MAX_POLL_ATTEMPTS}, task_id: ${taskId}`)
-
-      const pollRes = await fetch(`${PIAPI_BASE}/task/${taskId}`, {
-        headers: { 'x-api-key': piApiKey },
-      })
-
-      if (!pollRes.ok) {
-        console.warn(`[omni-human] poll ${attempts} failed: ${pollRes.status}`)
-        continue
+    // ── Store taskId in omnihuman_jobs ────────────────────────────────────────
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+      const { error: insertError } = await supabase
+        .from('omnihuman_jobs')
+        .insert({
+          task_id: taskId,
+          project_id: projectId ?? null,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      if (insertError) {
+        console.warn('[omni-human] omnihuman_jobs insert error (non-fatal):', insertError.message)
+      } else {
+        console.log('[omni-human] omnihuman_jobs row created for taskId:', taskId)
       }
-
-      const pollData = await pollRes.json()
-      const status: string = pollData?.data?.status ?? pollData?.status ?? 'unknown'
-      console.log(`[omni-human] poll ${attempts} status: ${status}`)
-
-      if (status === 'completed' || status === 'success') {
-        // Try common output paths
-        videoUrl =
-          pollData?.data?.output?.video ??
-          pollData?.data?.output?.video_url ??
-          pollData?.data?.output?.url ??
-          pollData?.output?.video ??
-          pollData?.output?.video_url ??
-          null
-        console.log('[omni-human] task completed, videoUrl:', videoUrl)
-        break
-      }
-
-      if (status === 'failed' || status === 'error') {
-        const errMsg = pollData?.data?.error ?? pollData?.error ?? 'unknown error'
-        console.error('[omni-human] task failed:', errMsg)
-        return NextResponse.json({
-          success: false,
-          error: `OmniHuman task failed: ${errMsg}`,
-          videoUrl: null,
-        }, { status: 502 })
-      }
-
-      // status is 'pending' or 'processing' — keep polling
+    } catch (dbErr) {
+      console.warn('[omni-human] DB insert failed (non-fatal):', dbErr instanceof Error ? dbErr.message : dbErr)
     }
 
-    if (!videoUrl) {
-      console.error('[omni-human] timed out after', attempts, 'attempts')
-      return NextResponse.json({
-        success: false,
-        error: `OmniHuman timed out after ${attempts * POLL_INTERVAL_MS / 1000}s`,
-        videoUrl: null,
-      }, { status: 504 })
-    }
-
-    // ── Step 3: Store videoUrl in projects.keyframe_url ───────────────────────
-    if (projectId && videoUrl) {
-      console.log('[omni-human] storing keyframe_url in projects, projectId:', projectId)
-      try {
-        const { createClient } = await import('@supabase/supabase-js')
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        )
-        const { error: dbError } = await supabase
-          .from('projects')
-          .update({ keyframe_url: videoUrl })
-          .eq('id', projectId)
-
-        if (dbError) {
-          console.error('[omni-human] DB update error:', dbError.message)
-        } else {
-          console.log('[omni-human] DB update OK: projects.keyframe_url =', videoUrl)
-        }
-      } catch (dbErr) {
-        console.error('[omni-human] DB error:', dbErr instanceof Error ? dbErr.message : dbErr)
-      }
-    }
-
+    // Return immediately — polling handled by /api/omni-human/poll
     return NextResponse.json({
       success: true,
-      videoUrl,
       taskId,
     })
   } catch (error) {

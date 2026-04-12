@@ -290,7 +290,7 @@ export default function AppFlowPage() {
         console.warn("[app-flow] voice-clone error (non-fatal):", e);
       }
 
-      // Step 5: Call OmniHuman with real HTTPS URLs
+      // Step 5: Submit OmniHuman task (fire and forget), then poll from frontend
       setStep("Generating your movie...");
       let generatedUrl: string | null = null;
       if (imageUrl && audioUrl) {
@@ -307,10 +307,34 @@ export default function AppFlowPage() {
             }),
           });
           const ohData = await ohRes.json();
-          console.log("[app-flow] omni-human response:", ohData.success, ohData.videoUrl ?? ohData.error);
-          if (ohData.success && ohData.videoUrl) generatedUrl = ohData.videoUrl;
+          console.log("[app-flow] omni-human submit response:", ohData);
+
+          if (ohData.success && ohData.taskId) {
+            const taskId = ohData.taskId;
+            // Poll /api/omni-human/poll every 5 seconds, up to 24 attempts (120s)
+            const MAX_POLL = 24;
+            for (let attempt = 1; attempt <= MAX_POLL; attempt++) {
+              await new Promise(r => setTimeout(r, 5000));
+              setStep(`Generating your movie... (${attempt * 5}s)`);
+              try {
+                const pollRes = await fetch(`/api/omni-human/poll?taskId=${taskId}`);
+                const pollData = await pollRes.json();
+                console.log(`[app-flow] poll ${attempt}/${MAX_POLL}:`, pollData.status);
+                if (pollData.status === "completed" && pollData.videoUrl) {
+                  generatedUrl = pollData.videoUrl;
+                  break;
+                }
+                if (pollData.status === "failed") {
+                  console.warn("[app-flow] OmniHuman task failed:", pollData.error);
+                  break;
+                }
+              } catch (pollErr) {
+                console.warn("[app-flow] poll error (non-fatal):", pollErr);
+              }
+            }
+          }
         } catch (e) {
-          console.warn("[app-flow] omni-human error, falling back to local blob:", e);
+          console.warn("[app-flow] omni-human error:", e);
         }
       } else {
         console.warn("[app-flow] skipping omni-human: missing imageUrl or audioUrl", { imageUrl, audioUrl });
