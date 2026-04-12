@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
           console.warn('[omni-human/poll] DB update failed (non-fatal):', dbErr instanceof Error ? dbErr.message : dbErr)
         }
 
-        // ── Get imageUrl from PiAPI task input (more reliable than DB) ────
+        // ── Get imageUrl from PiAPI task input (fallback) ─────────────────
         let imageUrlForKling: string | null = storedImageUrl
         try {
           const taskRes = await fetch(`https://api.piapi.ai/api/v1/task/${taskId}`, {
@@ -124,6 +124,29 @@ export async function GET(request: NextRequest) {
           if (fromTask) imageUrlForKling = fromTask
         } catch (taskErr) {
           console.warn('[omni-human/poll] Failed to fetch task input (non-fatal):', taskErr instanceof Error ? taskErr.message : taskErr)
+        }
+
+        // ── Extract best frame from OmniHuman output video via Railway ────
+        // Use the AI-animated face frame instead of the raw selfie
+        try {
+          const railwayUrl = process.env.RAILWAY_URL ?? 'https://scriptflow-video-merge-production.up.railway.app'
+          console.log('[omni-human/poll] Extracting frame from OmniHuman video via Railway...')
+          const frameRes = await fetch(`${railwayUrl}/extract-frame`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoUrl }),
+          })
+          if (frameRes.ok) {
+            const frameData = await frameRes.json()
+            const bestFrameUrl: string | null = frameData.frameUrl ?? null
+            console.log('[omni-human/poll] bestFrameUrl from Railway:', bestFrameUrl)
+            if (bestFrameUrl) imageUrlForKling = bestFrameUrl
+          } else {
+            const frameErr = await frameRes.text()
+            console.warn('[omni-human/poll] Railway extract-frame failed:', frameRes.status, frameErr)
+          }
+        } catch (frameErr) {
+          console.warn('[omni-human/poll] Railway extract-frame error (non-fatal):', frameErr instanceof Error ? frameErr.message : frameErr)
         }
 
         // ── Get story prompt from project ─────────────────────────────────
