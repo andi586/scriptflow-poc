@@ -270,7 +270,11 @@ export default function AppFlowPage() {
 
       // Step 3: Start pipeline — create project in DB (before voice clone so we have projectId)
       setStep("Starting pipeline...");
-      console.log('[app-flow] user email:', user?.email);
+      // Always fetch fresh auth session to avoid stale user state
+      const supabaseClient = createClient();
+      const { data: authData } = await supabaseClient.auth.getUser();
+      const currentEmail = authData?.user?.email ?? null;
+      console.log('[app-flow] user state email:', user?.email, '| fresh currentEmail:', currentEmail);
       let projectId: string | null = null;
       let pipelineIsPreview = true; // default to preview (paywall) unless whitelisted
       try {
@@ -282,7 +286,7 @@ export default function AppFlowPage() {
             imageUrl,
             audioUrl,
             isStarMode: true,
-            userEmail: user?.email ?? null,
+            userEmail: currentEmail,
           }),
         });
         const pipeData = await pipeRes.json();
