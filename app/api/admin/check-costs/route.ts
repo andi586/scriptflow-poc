@@ -17,22 +17,39 @@ export async function GET() {
   try {
     const piApiKey = process.env.PIAPI_API_KEY ?? process.env.KLING_API_KEY
     if (piApiKey) {
-      const piRes = await fetch('https://api.piapi.ai/api/v1/account', {
-        headers: { 'x-api-key': piApiKey },
-      })
-      const piData = await piRes.json()
-      console.log('[check-costs] PiAPI raw:', JSON.stringify(piData))
-      // PiAPI returns balance in various shapes — try common paths
+      // Try /account/balance first, fall back to /profile
+      const endpoints = [
+        'https://api.piapi.ai/api/v1/account/balance',
+        'https://api.piapi.ai/api/v1/profile',
+        'https://api.piapi.ai/api/v1/account',
+      ]
+      let piData: unknown = null
+      let lastStatus = 0
+      for (const url of endpoints) {
+        const piRes = await fetch(url, { headers: { 'x-api-key': piApiKey } })
+        lastStatus = piRes.status
+        const rawText = await piRes.text()
+        console.log(`[check-costs] PiAPI ${url} status=${piRes.status} raw:`, rawText.slice(0, 500))
+        if (piRes.ok) {
+          try { piData = JSON.parse(rawText) } catch { piData = { _raw: rawText } }
+          break
+        }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = piData as any
       const balance: number =
-        piData?.data?.balance ??
-        piData?.balance ??
-        piData?.data?.credit ??
-        piData?.credit ??
+        d?.data?.balance ??
+        d?.balance ??
+        d?.data?.credit ??
+        d?.credit ??
+        d?.data?.remaining_credits ??
+        d?.remaining_credits ??
         -1
       results.piapi = {
         balance,
         currency: 'points',
         ok: balance < 0 ? null : balance >= 10,
+        lastStatus,
         raw: piData,
       }
     } else {
