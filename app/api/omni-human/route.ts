@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
           task_id: taskId,
           project_id: projectId ?? null,
           status: 'pending',
+          image_url: imageUrl ?? null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })

@@ -32,18 +32,28 @@ export async function GET(request: NextRequest) {
   )
 
   // ── Step 1: Check DB first ────────────────────────────────────────────────
+  let storedImageUrl: string | null = null
   try {
     const { data: jobRow } = await supabase
       .from('omnihuman_jobs')
-      .select('status, result_video_url')
+      .select('status, result_video_url, image_url, kling_task_id')
       .eq('task_id', taskId)
       .single()
+
+    storedImageUrl = jobRow?.image_url ?? null
 
     if (jobRow?.status === 'completed' && jobRow?.result_video_url) {
       console.log('[omni-human/poll] DB hit: completed, videoUrl:', jobRow.result_video_url)
       return NextResponse.json({
         status: 'completed',
         videoUrl: jobRow.result_video_url,
+      })
+    }
+
+    if (jobRow?.status === 'kling_processing' && jobRow?.kling_task_id) {
+      return NextResponse.json({
+        status: 'kling_processing',
+        klingTaskId: jobRow.kling_task_id,
       })
     }
 
@@ -85,7 +95,7 @@ export async function GET(request: NextRequest) {
 
       console.log('[omni-human/poll] completed, videoUrl:', videoUrl)
 
-      // Update DB
+      // Update DB and submit Kling task
       if (videoUrl) {
         try {
           await supabase
@@ -98,6 +108,49 @@ export async function GET(request: NextRequest) {
             .eq('task_id', taskId)
         } catch (dbErr) {
           console.warn('[omni-human/poll] DB update failed (non-fatal):', dbErr instanceof Error ? dbErr.message : dbErr)
+        }
+
+        // ── Submit Kling task using imageUrl as reference ─────────────────
+        const imageUrlForKling = storedImageUrl
+        if (imageUrlForKling) {
+          try {
+            console.log('[omni-human/poll] Submitting Kling task with imageUrl:', imageUrlForKling)
+            const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
+              body: JSON.stringify({
+                model: 'kling',
+                task_type: 'video_generation',
+                input: {
+                  prompt: 'cinematic close-up portrait, dramatic lighting, film noir, speaking naturally, emotional expression, ultra realistic',
+                  negative_prompt: 'cartoon, anime, blur, distorted',
+                  aspect_ratio: '9:16',
+                  duration: 5,
+                  version: '1.6',
+                  mode: 'pro',
+                  elements: [{ image_url: imageUrlForKling }],
+                },
+              }),
+            })
+            const klingData = await klingRes.json()
+            const klingTaskId: string | null = klingData?.data?.task_id ?? null
+            console.log('[omni-human/poll] Kling task submitted, klingTaskId:', klingTaskId)
+
+            if (klingTaskId) {
+              await supabase
+                .from('omnihuman_jobs')
+                .update({
+                  status: 'kling_processing',
+                  kling_task_id: klingTaskId,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('task_id', taskId)
+
+              return NextResponse.json({ status: 'kling_processing', klingTaskId })
+            }
+          } catch (klingErr) {
+            console.warn('[omni-human/poll] Kling submit failed (non-fatal):', klingErr instanceof Error ? klingErr.message : klingErr)
+          }
         }
       }
 
