@@ -58,33 +58,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'audioUrl is required' }, { status: 400 })
     }
 
-    // ── Convert webm to mp3 if needed ─────────────────────────────────────────
+    // ── Convert webm to mp3 via Railway if needed ─────────────────────────────
     let finalAudioUrl = audioUrl
     if (audioUrl.endsWith('.webm')) {
       try {
-        const { execSync } = await import('child_process')
-        const { writeFileSync, readFileSync, unlinkSync } = await import('fs')
-        const { tmpdir } = await import('os')
-        const { join } = await import('path')
-
-        const audioRes = await fetch(audioUrl)
-        const audioBuf = Buffer.from(await audioRes.arrayBuffer())
-        const tmpWebm = join(tmpdir(), `audio_${Date.now()}.webm`)
-        const tmpMp3 = join(tmpdir(), `audio_${Date.now()}.mp3`)
-        writeFileSync(tmpWebm, audioBuf)
-        execSync(`ffmpeg -i ${tmpWebm} -c:a libmp3lame -q:a 4 ${tmpMp3} -y`)
-        const mp3Buf = readFileSync(tmpMp3)
-        unlinkSync(tmpWebm)
-        unlinkSync(tmpMp3)
-
-        const { createClient } = await import('@supabase/supabase-js')
-        const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-        const mp3Path = `tmp/converted_${Date.now()}.mp3`
-        await sb.storage.from('recordings').upload(mp3Path, mp3Buf, { contentType: 'audio/mpeg', upsert: true })
-        finalAudioUrl = sb.storage.from('recordings').getPublicUrl(mp3Path).data.publicUrl
-        console.log('[omni-human] converted webm to mp3:', finalAudioUrl)
+        const railwayUrl = process.env.RAILWAY_URL ?? 'https://scriptflow-video-merge-production.up.railway.app'
+        const convertRes = await fetch(`${railwayUrl}/convert-audio`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audioUrl }),
+        })
+        const convertData = await convertRes.json()
+        if (convertData.mp3Url) {
+          finalAudioUrl = convertData.mp3Url
+          console.log('[omni-human] converted webm to mp3 via Railway:', finalAudioUrl)
+        } else {
+          console.warn('[omni-human] Railway convert-audio returned no mp3Url:', convertData)
+        }
       } catch (e) {
-        console.warn('[omni-human] webm conversion failed, using original:', e)
+        console.warn('[omni-human] Railway webm conversion failed, using original:', e)
       }
     }
 
