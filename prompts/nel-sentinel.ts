@@ -93,15 +93,4 @@ export const NARRATIVE_TRANSLATOR_PROMPT = `你是一个专业短剧提示词工
 - 场景分级：A级直接生成，B级标注需拆分，C级给出替代方案
 - 输出格式为JSON数组
 
-CRITICAL — SHOW DON'T TELL (VISUAL SCENES ONLY):
-Do NOT narrate the story. SHOW the story through visual scenes.
-Each scene MUST have:
-1. A specific character performing a specific physical action (e.g. "slams fist on desk", "turns and walks away", "reaches out and grabs collar")
-2. A concrete location with environmental details (e.g. "rain-soaked rooftop at night", "sunlit marble boardroom")
-3. A specific camera movement (e.g. "slow push-in on face", "wide establishing shot", "low angle looking up")
-4. Visual atmosphere (lighting, color, mood)
-Do NOT write narration, dialogue descriptions, or abstract emotional states.
-Do NOT write "the character feels..." or "the scene shows..." or "narrator says..."
-Every prompt must be a VISUAL DESCRIPTION of what the camera sees, not a story summary.
-
 只输出JSON，不要任何多余文字。`;

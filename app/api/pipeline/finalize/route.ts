@@ -432,8 +432,7 @@ ${linesJson}`
           : ELEVENLABS_MODEL_ID
         const ttsBody: Record<string, any> = { text: block.text, model_id: modelId }
         if (userLanguage !== 'en') {
-          // Use the actual detected language code, not hardcoded 'zh'
-          ttsBody.language_code = userLanguage
+          ttsBody.language_code = 'zh'
         }
         const res = await fetch(`${ELEVENLABS_WITH_TIMESTAMPS_BASE_URL}/${voiceId}/with-timestamps`, {
           method: 'POST',

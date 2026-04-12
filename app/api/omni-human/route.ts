@@ -68,10 +68,6 @@ export async function POST(request: NextRequest) {
         prompt: prompt ?? 'person speaks naturally cinematic',
         fast_mode: true,
       },
-      webhook_config: {
-        endpoint: 'https://getscriptflow.com/api/omnihuman-webhook',
-        secret: 'scriptflow-webhook-2026',
-      },
     }
 
     console.log('[omni-human] submitting task to PiAPI:', JSON.stringify(taskPayload))

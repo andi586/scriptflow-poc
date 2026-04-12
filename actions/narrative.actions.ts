@@ -544,7 +544,6 @@ export async function generateKlingPromptsAction(input: {
 }): Promise<ActionResult<{ prompts: KlingPromptItem[] }>> {
   try {
     const projectId = requireProjectId(input.projectId);
-    console.log('[NEL] generateKlingPromptsAction START projectId:', projectId)
     const supabase = createClient();
     const { data: storyMemory, error } = await supabase
       .from("story_memory")
@@ -733,7 +732,6 @@ Rules: 2-4 lines per scene, character must be: caius/luna/marcus/narrator (lower
       console.error("[F81 v2] Failed to write script_raw:", scriptRawError);
     }
 
-    console.log('[NEL] generated prompts:', JSON.stringify(prompts))
     return { success: true, data: { prompts } };
   } catch (e) {
     return { success: false, error: formatUnknownError(e) };
@@ -743,7 +741,6 @@ Rules: 2-4 lines per scene, character must be: caius/luna/marcus/narrator (lower
 function getKlingConfig() {
   const base = process.env.KLING_API_BASE ?? "";
   const key = process.env.KLING_API_KEY ?? "";
-  console.log('[kling] key prefix:', key?.slice(0, 8))
   if (!base) throw new Error("Missing KLING_API_BASE");
   if (!key) throw new Error("Missing KLING_API_KEY");
   return { base, key };
@@ -845,12 +842,6 @@ export async function submitKlingTasksAction(input: {
   prompts: KlingPromptItem[];
   /** Cinema Glow™ beauty tier for Star Mode: "natural" | "cinema" | "iconic". Defaults to "cinema". */
   cinemaGlowTier?: string;
-  /**
-   * OmniHuman keyframe URL — when provided, this image is used as `image_url` (start_image)
-   * for every Kling scene, locking face + outfit across all shots.
-   * Prepended to referenceImageUrls so it becomes the primary reference (@image_1).
-   */
-  omnihumanKeyframeUrl?: string;
 }): Promise<ActionResult<{ tasks: KlingTaskItem[] }>> {
   try {
     const projectId = requireProjectId(input.projectId);
@@ -947,15 +938,6 @@ export async function submitKlingTasksAction(input: {
       const useVeo3 = false;
       const modelUsed = useVeo3 ? "veo3" : "kling";
 
-      // Always use the original character reference images (uploaded photos).
-      // OmniHuman produces .mp4 video URLs which Kling does NOT accept as image references.
-      // The omnihumanKeyframeUrl parameter is intentionally ignored here to prevent
-      // passing a video URL to Kling's elements[].image_url field.
-      const effectiveRefUrls = multiRefUrls;
-      if (input.omnihumanKeyframeUrl) {
-        console.log("[submitKlingTasksAction] omnihumanKeyframeUrl ignored (video URL not accepted by Kling elements) — using original character refs:", effectiveRefUrls.length);
-      }
-
       // PiAPI: multi-image refs for model "kling" + video_generation use Kling Elements
       // `input.elements`: [{ image_url } x 1–4], plus mode/version per docs.
       const klingPayload = {
@@ -965,7 +947,7 @@ export async function submitKlingTasksAction(input: {
           prompt: sanitizedPrompt,
           aspectRatio: KLING_VIDEO_ASPECT_RATIO,
           duration: 5,
-          referenceImageUrls: effectiveRefUrls,
+          referenceImageUrls: multiRefUrls,
         }),
       };
 
