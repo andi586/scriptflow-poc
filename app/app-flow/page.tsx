@@ -478,6 +478,84 @@ export default function AppFlowPage() {
     setPhase("input");
   }, [videoUrl]);
 
+  // ── My Videos state ────────────────────────────────────────────────────────
+  const [showMyVideos, setShowMyVideos] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [myVideos, setMyVideos] = useState<any[]>([]);
+  const [myVideosLoading, setMyVideosLoading] = useState(false);
+
+  const openMyVideos = useCallback(async () => {
+    setShowMyVideos(true);
+    setMyVideosLoading(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('omnihuman_jobs')
+        .select('id, task_id, status, result_video_url, created_at')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setMyVideos(data ?? []);
+    } catch (e) {
+      console.warn('[my-videos] fetch error:', e);
+    } finally {
+      setMyVideosLoading(false);
+    }
+  }, []);
+
+  const deleteVideo = useCallback(async (jobId: string) => {
+    if (!confirm('Delete this video?')) return;
+    // Optimistically remove from list
+    setMyVideos(prev => prev.filter(j => j.id !== jobId));
+    try {
+      const supabase = createClient();
+      await supabase.from('omnihuman_jobs').delete().eq('id', jobId);
+    } catch (e) {
+      console.warn('[my-videos] delete error:', e);
+    }
+  }, []);
+
+  // ── My Videos button — always visible across all phases ───────────────────
+  const myVideosButton = (
+    <button
+      type="button"
+      onClick={openMyVideos}
+      style={{position:'fixed', top:'1rem', left:'1rem', zIndex:200, background:'rgba(255,255,255,0.1)', color:'white', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer'}}
+    >
+      🎬 My Videos
+    </button>
+  );
+
+  // ── My Videos modal ────────────────────────────────────────────────────────
+  const myVideosModal = showMyVideos && (
+    <div style={{position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.85)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', padding:'2rem 1rem', overflowY:'auto'}}>
+      <div style={{width:'100%', maxWidth:'480px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+          <h2 style={{color:'white', fontSize:'1.25rem', fontWeight:'bold'}}>🎬 My Videos</h2>
+          <button type="button" onClick={() => setShowMyVideos(false)} style={{color:'rgba(255,255,255,0.5)', background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer'}}>✕</button>
+        </div>
+        {myVideosLoading && <p style={{color:'rgba(255,255,255,0.5)', textAlign:'center'}}>Loading...</p>}
+        {!myVideosLoading && myVideos.length === 0 && <p style={{color:'rgba(255,255,255,0.4)', textAlign:'center'}}>No videos yet.</p>}
+        {myVideos.map(job => (
+          <div key={job.id} style={{background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'1rem', padding:'1rem', marginBottom:'0.75rem', display:'flex', alignItems:'center', gap:'0.75rem'}}>
+            {job.result_video_url ? (
+              <video src={job.result_video_url} style={{width:'80px', height:'80px', objectFit:'cover', borderRadius:'0.5rem', flexShrink:0}} muted playsInline />
+            ) : (
+              <div style={{width:'80px', height:'80px', background:'rgba(255,255,255,0.05)', borderRadius:'0.5rem', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:'0.7rem'}}>{job.status}</div>
+            )}
+            <div style={{flex:1, minWidth:0}}>
+              <p style={{color:'rgba(255,255,255,0.6)', fontSize:'0.7rem', marginBottom:'0.25rem'}}>{new Date(job.created_at).toLocaleDateString()}</p>
+              <p style={{color: job.status === 'completed' ? '#a3e635' : job.status === 'failed' ? '#f87171' : '#fbbf24', fontSize:'0.75rem', fontWeight:'bold'}}>{job.status}</p>
+              {job.result_video_url && (
+                <a href={job.result_video_url} download style={{color:'#a78bfa', fontSize:'0.75rem', textDecoration:'none'}}>⬇️ Download</a>
+              )}
+            </div>
+            <button type="button" onClick={() => deleteVideo(job.id)} style={{background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:'1.25rem', cursor:'pointer', flexShrink:0}} title="Delete">🗑️</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   // ── Auth button — always visible across all phases ─────────────────────────
   const authButton = user ? (
     <button
@@ -502,6 +580,8 @@ export default function AppFlowPage() {
   if (phase === "input") {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col">
+        {myVideosButton}
+        {myVideosModal}
         {authButton}
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(700px_circle_at_50%_20%,rgba(139,92,246,0.18),transparent_60%)]" />
 
@@ -752,6 +832,8 @@ export default function AppFlowPage() {
   if (phase === "processing") {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6">
+        {myVideosButton}
+        {myVideosModal}
         {authButton}
         <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
         <p className="text-white/70 text-sm tracking-wide">{step || "Creating your movie…"}</p>
@@ -764,6 +846,8 @@ export default function AppFlowPage() {
   // ════════════════════════════════════════════════════════════════════════════
   return (
     <div className="fixed inset-0 bg-black">
+      {myVideosButton}
+      {myVideosModal}
       {videoUrl && (
         <video
           ref={resultRef}
