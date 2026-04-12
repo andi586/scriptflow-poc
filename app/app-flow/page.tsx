@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 // import { PRICING } from "@/lib/generation-tiers"; // Hidden until Stripe is activated
 
+const WHITELIST = ['jiming.liu2@icloud.com'];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function extractFirstFrame(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -57,6 +59,19 @@ export default function AppFlowPage() {
   const [phase, setPhase]           = useState<Phase>("input");
   const [storyText, setStoryText]   = useState("");
   const [isListening, setIsListening] = useState(false);
+
+  // auth state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   // record state
   const [isRecording, setIsRecording] = useState(false);
@@ -266,6 +281,7 @@ export default function AppFlowPage() {
             imageUrl,
             audioUrl,
             isStarMode: true,
+            userEmail: user?.email ?? '',
           }),
         });
         const pipeData = await pipeRes.json();
@@ -664,8 +680,26 @@ export default function AppFlowPage() {
         />
       )}
 
-      {/* ── Paywall overlay (shown when isPreview) ── */}
-      {isPreview && videoUrl && (
+      {/* ── Login/Logout button — always visible on result phase ── */}
+      {user ? (
+        <button
+          type="button"
+          onClick={() => createClient().auth.signOut()}
+          style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(255,255,255,0.1)', color:'white', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer'}}
+        >
+          {user.email?.split('@')[0]} · Sign Out
+        </button>
+      ) : (
+        <a
+          href="/login"
+          style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(139,92,246,0.8)', color:'white', border:'none', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer', textDecoration:'none', display:'inline-block'}}
+        >
+          Sign In
+        </a>
+      )}
+
+      {/* ── Paywall overlay (shown when isPreview and NOT whitelisted) ── */}
+      {isPreview && !WHITELIST.includes(user?.email ?? '') && videoUrl && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-end pb-16 px-6"
           style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.3) 100%)" }}>
           <div className="text-center mb-6">
@@ -690,10 +724,10 @@ export default function AppFlowPage() {
         </div>
       )}
 
-      {/* Overlay shown when video ended or no video (non-preview) */}
-      {!isPreview && (videoEnded || !videoUrl) && <div className="absolute inset-0 bg-black/75" />}
+      {/* Overlay shown when video ended or no video (non-preview or whitelisted) */}
+      {(!isPreview || WHITELIST.includes(user?.email ?? '')) && (videoEnded || !videoUrl) && <div className="absolute inset-0 bg-black/75" />}
 
-      {!isPreview && (videoEnded || !videoUrl) && (
+      {(!isPreview || WHITELIST.includes(user?.email ?? '')) && (videoEnded || !videoUrl) && (
         <div className="relative z-10 flex flex-col items-center justify-center h-full px-6 gap-6">
           <p className="text-white text-2xl font-semibold text-center tracking-wide">
             Your movie is ready. 🎬
@@ -719,8 +753,8 @@ export default function AppFlowPage() {
         </div>
       )}
 
-      {/* Replay + Download overlay while video is playing (non-preview) */}
-      {!isPreview && videoUrl && !videoEnded && (
+      {/* Replay + Download overlay while video is playing (non-preview or whitelisted) */}
+      {(!isPreview || WHITELIST.includes(user?.email ?? '')) && videoUrl && !videoEnded && (
         <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-3 z-10">
           <button
             type="button"
