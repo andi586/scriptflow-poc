@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
         status: 'draft',
         is_star_mode: isStarMode,
         language: detectedLanguage,
+        title: (script as any)?.title ?? `Movie ${new Date().toISOString().slice(0, 10)}`,
       })
       .select('id')
       .single()
