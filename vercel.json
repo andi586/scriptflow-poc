@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/orchestrator",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/process-kling",
+      "schedule": "* * * * *"
     }
   ]
 }
