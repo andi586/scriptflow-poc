@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       projectId,
     })
 
-    const piApiKey = process.env.PIAPI_API_KEY
+    const piApiKey = process.env.PIAPI_API_KEY ?? process.env.KLING_API_KEY
     console.log('[PiAPI] key prefix:', piApiKey?.slice(0, 8))
     if (!piApiKey) {
       console.error('[omni-human] PIAPI_API_KEY not set — returning stub')
@@ -132,10 +132,11 @@ export async function POST(request: NextRequest) {
       if (status === 'completed' || status === 'success') {
         // Try common output paths
         videoUrl =
+          pollData?.data?.output?.video ??
           pollData?.data?.output?.video_url ??
           pollData?.data?.output?.url ??
+          pollData?.output?.video ??
           pollData?.output?.video_url ??
-          pollData?.output?.url ??
           null
         console.log('[omni-human] task completed, videoUrl:', videoUrl)
         break
