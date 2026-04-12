@@ -793,9 +793,9 @@ export default function BeTheStarPage() {
           />
           <label htmlFor="photo-input" className="block w-full cursor-pointer">
             {photoPreview ? (
-              <div className="relative w-full aspect-[3/4] max-h-72 rounded-2xl overflow-hidden border-2 border-purple-500/50">
+              <div className="relative w-full aspect-[3/4] max-h-72 rounded-2xl overflow-hidden border-2 border-purple-500/50 bg-black">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoPreview} alt="Your photo" className="w-full h-full object-cover" />
+                <img src={photoPreview} alt="Your photo" className="w-full h-full object-contain" />
                 {!photoUrl && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <div className="w-6 h-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
