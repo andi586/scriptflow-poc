@@ -642,7 +642,7 @@ export default function AppFlowPage() {
             {videoUrl && (
               <a
                 href={videoUrl}
-                download="my-movie.webm"
+                download="my-movie.mp4"
                 className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-base text-center hover:bg-purple-500 transition-all shadow-lg shadow-purple-500/30"
               >
                 ⬇️ Download My Movie
@@ -691,7 +691,7 @@ export default function AppFlowPage() {
           </button>
           <a
             href={videoUrl}
-            download="my-movie.webm"
+            download="my-movie.mp4"
             className="px-6 py-2 rounded-full bg-purple-600/80 border border-purple-500/40 text-white text-sm hover:bg-purple-600 transition-all"
           >
             ⬇️ Download
