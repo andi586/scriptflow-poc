@@ -227,6 +227,18 @@ export default function BeTheStarPage() {
           setVoiceRecordingUrl(pub.publicUrl);
           setRecordingStatus("done");
           console.log("[be-the-star] voice recording uploaded:", pub.publicUrl);
+
+          // Auto-trigger voice cloning after upload
+          const cloneRes = await fetch('/api/voice-clone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audioUrl: pub.publicUrl })
+          });
+          const cloneData = await cloneRes.json();
+          if (cloneData.voiceId) {
+            setClonedVoiceId(cloneData.voiceId);
+            console.log('[be-the-star] voice cloned:', cloneData.voiceId);
+          }
         } catch (e) {
           console.error("[be-the-star] voice upload failed:", e);
           setRecordingError(e instanceof Error ? e.message : "Upload failed");
