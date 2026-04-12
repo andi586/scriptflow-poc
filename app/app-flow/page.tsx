@@ -406,12 +406,31 @@ export default function AppFlowPage() {
     setPhase("input");
   }, [videoUrl]);
 
+  // ── Auth button — always visible across all phases ─────────────────────────
+  const authButton = user ? (
+    <button
+      type="button"
+      onClick={() => createClient().auth.signOut()}
+      style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(255,255,255,0.1)', color:'white', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer'}}
+    >
+      {user.email?.split('@')[0]} · Sign Out
+    </button>
+  ) : (
+    <a
+      href="/login"
+      style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(139,92,246,0.8)', color:'white', border:'none', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer', textDecoration:'none', display:'inline-block'}}
+    >
+      Sign In
+    </a>
+  );
+
   // ════════════════════════════════════════════════════════════════════════════
   // PHASE: INPUT
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === "input") {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col">
+        {authButton}
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(700px_circle_at_50%_20%,rgba(139,92,246,0.18),transparent_60%)]" />
 
         <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-lg mx-auto w-full">
@@ -498,6 +517,7 @@ export default function AppFlowPage() {
   if (phase === "camera_prompt") {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center px-6 gap-8">
+        {authButton}
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(600px_circle_at_50%_40%,rgba(139,92,246,0.15),transparent_60%)]" />
 
         <div className="text-center">
@@ -543,6 +563,7 @@ export default function AppFlowPage() {
   if (phase === "record") {
     return (
       <div className="fixed inset-0 bg-black overflow-hidden">
+        {authButton}
         <video
           ref={previewRef}
           autoPlay muted playsInline
@@ -659,6 +680,7 @@ export default function AppFlowPage() {
   if (phase === "processing") {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6">
+        {authButton}
         <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
         <p className="text-white/70 text-sm tracking-wide">{step || "Creating your movie…"}</p>
       </div>
@@ -680,23 +702,7 @@ export default function AppFlowPage() {
         />
       )}
 
-      {/* ── Login/Logout button — always visible on result phase ── */}
-      {user ? (
-        <button
-          type="button"
-          onClick={() => createClient().auth.signOut()}
-          style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(255,255,255,0.1)', color:'white', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer'}}
-        >
-          {user.email?.split('@')[0]} · Sign Out
-        </button>
-      ) : (
-        <a
-          href="/login"
-          style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(139,92,246,0.8)', color:'white', border:'none', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer', textDecoration:'none', display:'inline-block'}}
-        >
-          Sign In
-        </a>
-      )}
+      {authButton}
 
       {/* ── Paywall overlay (shown when isPreview and NOT whitelisted) ── */}
       {isPreview && !WHITELIST.includes(user?.email ?? '') && videoUrl && (
