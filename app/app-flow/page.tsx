@@ -270,25 +270,31 @@ export default function AppFlowPage() {
     setStep("Uploading your recording...");
     try {
       // Step 1: Upload audio blob → Supabase Storage → HTTPS URL
+      // audioUrl is set here and must NOT be cleared by any later step (e.g. voice-clone failure)
       const audioMime = blob.type || "video/webm";
       const audioExt  = audioMime.includes("mp4") ? "mp4" : "webm";
       const audioBlob = new Blob([blob], { type: audioMime });
-      const audioUrl  = await uploadBlob(audioBlob, `audio_${Date.now()}.${audioExt}`);
-      console.log("[app-flow] audioUrl:", audioUrl);
+      const uploadedAudioUrl = await uploadBlob(audioBlob, `audio_${Date.now()}.${audioExt}`);
+      console.log("[app-flow] audioUrl:", uploadedAudioUrl);
 
       // Step 2: Extract first frame → upload image → HTTPS URL
+      // imageUrl is set here and must NOT be cleared by any later step
       setStep("Analyzing your video...");
-      let imageUrl: string | null = null;
+      let uploadedImageUrl: string | null = null;
       try {
         const frameDataUrl = await extractFirstFrame(blob);
         console.log("[app-flow] extractFirstFrame OK, length:", frameDataUrl.length);
         const res     = await fetch(frameDataUrl);
         const imgBlob = await res.blob();
-        imageUrl = await uploadBlob(imgBlob, `frame_${Date.now()}.jpg`);
-        console.log("[app-flow] imageUrl:", imageUrl);
+        uploadedImageUrl = await uploadBlob(imgBlob, `frame_${Date.now()}.jpg`);
+        console.log("[app-flow] imageUrl:", uploadedImageUrl);
       } catch (e) {
         console.warn("[app-flow] frame extraction/upload failed:", e);
       }
+
+      // Freeze references — these will not be mutated by voice-clone or pipeline steps
+      const audioUrl = uploadedAudioUrl;
+      const imageUrl = uploadedImageUrl;
 
       // Step 3: Start pipeline — create project in DB (before voice clone so we have projectId)
       setStep("Starting pipeline...");
@@ -338,6 +344,7 @@ export default function AppFlowPage() {
 
       // Step 5: Submit OmniHuman task (fire and forget), then poll from frontend
       setStep("Generating your movie...");
+      console.log('[app-flow] before omni-human: imageUrl:', imageUrl, 'audioUrl:', audioUrl);
       let generatedUrl: string | null = null;
       if (imageUrl && audioUrl) {
         try {
