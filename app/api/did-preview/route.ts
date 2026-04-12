@@ -40,16 +40,10 @@ export async function POST(req: NextRequest) {
         script: {
           type: 'text',
           input: text,
-          provider: voiceId
-            ? {
-                type: 'elevenlabs',
-                voice_id: voiceId,
-                model_id: 'eleven_multilingual_v2',
-              }
-            : {
-                type: 'microsoft',
-                voice_id: 'zh-CN-YunxiNeural',
-              },
+          provider: {
+            type: 'microsoft',
+            voice_id: 'zh-CN-YunxiNeural',
+          },
         },
       }),
     })
