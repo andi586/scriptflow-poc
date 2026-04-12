@@ -109,6 +109,17 @@ export default function AppFlowPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const secondsRef    = useRef(0);
+  const bgPollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // background polling state
+  const [bgPolling, setBgPolling] = useState(false);
+
+  // Clear background poll on unmount
+  useEffect(() => {
+    return () => {
+      if (bgPollRef.current) clearInterval(bgPollRef.current);
+    };
+  }, []);
 
   // ── subtitle sync ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -347,30 +358,30 @@ export default function AppFlowPage() {
           if (ohData.success && ohData.taskId) {
             const taskId = ohData.taskId;
 
-            // Register push notification for when movie is ready
-            try {
-              if ('Notification' in window && 'serviceWorker' in navigator) {
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                  const reg = await navigator.serviceWorker.register('/sw.js');
-                  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-                  if (vapidKey) {
-                    const subscription = await reg.pushManager.subscribe({
-                      userVisibleOnly: true,
-                      applicationServerKey: vapidKey,
-                    });
-                    await fetch('/api/push/subscribe', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ subscription, jobId: taskId }),
-                    });
-                    console.log('[app-flow] Push subscription registered for taskId:', taskId);
-                  }
+            // Start silent background polling every 30s (survives page navigation within SPA)
+            if (bgPollRef.current) clearInterval(bgPollRef.current);
+            setBgPolling(true);
+            bgPollRef.current = setInterval(async () => {
+              try {
+                const supabase = createClient();
+                const { data: jobRow } = await supabase
+                  .from('omnihuman_jobs')
+                  .select('status, result_video_url')
+                  .eq('task_id', taskId)
+                  .eq('status', 'completed')
+                  .not('result_video_url', 'is', null)
+                  .maybeSingle();
+                if (jobRow?.result_video_url) {
+                  clearInterval(bgPollRef.current!);
+                  setBgPolling(false);
+                  setVideoUrl(jobRow.result_video_url);
+                  setIsPreview(!WHITELIST.includes(user?.email ?? ''));
+                  setVideoEnded(false);
+                  setPhase('result');
+                  try { await document.documentElement.requestFullscreen(); } catch {}
                 }
-              }
-            } catch (pushErr) {
-              console.warn('[app-flow] Push registration failed (non-fatal):', pushErr);
-            }
+              } catch {}
+            }, 30000);
 
             // Phase 1: Poll OmniHuman every 5 seconds, up to 60 attempts (5 min)
             const MAX_POLL = 60;
@@ -556,6 +567,40 @@ export default function AppFlowPage() {
     </div>
   );
 
+  // ── Background polling indicator ───────────────────────────────────────────
+  const bgPollingIndicator = bgPolling && (
+    <button
+      type="button"
+      onClick={async () => {
+        // Manual check on tap
+        try {
+          const supabase = createClient();
+          const { data: jobs } = await supabase
+            .from('omnihuman_jobs')
+            .select('status, result_video_url')
+            .eq('status', 'completed')
+            .not('result_video_url', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          const job = jobs?.[0];
+          if (job?.result_video_url) {
+            if (bgPollRef.current) clearInterval(bgPollRef.current);
+            setBgPolling(false);
+            setVideoUrl(job.result_video_url);
+            setIsPreview(!WHITELIST.includes(user?.email ?? ''));
+            setVideoEnded(false);
+            setPhase('result');
+            try { await document.documentElement.requestFullscreen(); } catch {}
+          }
+        } catch {}
+      }}
+      style={{position:'fixed', bottom:'1.5rem', right:'1.5rem', zIndex:250, background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:'2rem', padding:'0.5rem 1rem', display:'flex', alignItems:'center', gap:'0.5rem', cursor:'pointer'}}
+    >
+      <span style={{width:'8px', height:'8px', borderRadius:'50%', background:'#a855f7', display:'inline-block', animation:'pulse 1.5s infinite'}} />
+      <span style={{color:'rgba(255,255,255,0.7)', fontSize:'0.75rem'}}>🎬 generating...</span>
+    </button>
+  );
+
   // ── Auth button — always visible across all phases ─────────────────────────
   const authButton = user ? (
     <button
@@ -582,6 +627,7 @@ export default function AppFlowPage() {
       <div className="min-h-screen bg-black text-white flex flex-col">
         {myVideosButton}
         {myVideosModal}
+        {bgPollingIndicator}
         {authButton}
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(700px_circle_at_50%_20%,rgba(139,92,246,0.18),transparent_60%)]" />
 
