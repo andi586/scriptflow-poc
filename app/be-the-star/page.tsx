@@ -343,7 +343,7 @@ export default function BeTheStarPage() {
     fetch("/api/did-preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl: photoUrl, text: fullPrompt, voiceId: clonedVoiceId ?? undefined }),
+      body: JSON.stringify({ imageUrl: photoUrl, text: fullPrompt, voiceRecordingUrl: voiceRecordingUrl ?? undefined }),
     })
       .then((r) => r.json())
       .then((d) => {

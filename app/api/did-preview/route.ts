@@ -9,7 +9,7 @@ const POLL_INTERVAL_MS = 3000
 const MAX_POLL_ATTEMPTS = 10 // 10 × 3s = 30s max
 
 export async function POST(req: NextRequest) {
-  const { imageUrl, text, voiceId } = await req.json()
+  const { imageUrl, text, voiceId, voiceRecordingUrl } = await req.json()
 
   const apiKey = process.env.DID_API_KEY
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -27,6 +27,63 @@ export async function POST(req: NextRequest) {
   try {
     const auth = Buffer.from(`${apiKey}:`).toString('base64')
 
+    // ── Step 0: Generate ElevenLabs audio if voiceRecordingUrl is provided ───
+    let audioUrl: string | null = null
+
+    if (voiceRecordingUrl) {
+      try {
+        const elevenKey = process.env.ELEVENLABS_API_KEY
+        if (elevenKey) {
+          // Clone voice
+          const audioRes = await fetch(voiceRecordingUrl)
+          const audioBuffer = await audioRes.arrayBuffer()
+          const contentType = audioRes.headers.get('content-type') || 'audio/webm'
+          const ext = contentType.includes('mp4') ? 'mp4' : 'webm'
+          const form = new FormData()
+          form.append('name', `clone-${Date.now()}`)
+          form.append('files', new Blob([audioBuffer], { type: contentType }), `recording.${ext}`)
+          form.append('remove_background_noise', 'true')
+          const cloneRes = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+            method: 'POST',
+            headers: { 'xi-api-key': elevenKey },
+            body: form,
+          })
+          if (cloneRes.ok) {
+            const cloneData = await cloneRes.json()
+            const clonedVoiceId = cloneData.voice_id
+            if (clonedVoiceId) {
+              // Generate TTS audio
+              const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${clonedVoiceId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'xi-api-key': elevenKey },
+                body: JSON.stringify({
+                  text: text,
+                  model_id: 'eleven_multilingual_v2',
+                  output_format: 'mp3_44100_128',
+                  voice_settings: { stability: 0.45, similarity_boost: 0.8 },
+                }),
+              })
+              if (ttsRes.ok) {
+                const ttsBuffer = await ttsRes.arrayBuffer()
+                const { createClient: createSB } = await import('@supabase/supabase-js')
+                const sb = createSB(supabaseUrl!, serviceRoleKey!)
+                const audioPath = `be-the-star/preview_voice_${Date.now()}.mp3`
+                await sb.storage.from('recordings').upload(
+                  audioPath,
+                  Buffer.from(ttsBuffer),
+                  { contentType: 'audio/mpeg', upsert: true }
+                )
+                audioUrl = sb.storage.from('recordings').getPublicUrl(audioPath).data.publicUrl
+                console.log('[did-preview] cloned audio URL:', audioUrl)
+              }
+            }
+          }
+        }
+      } catch (voiceErr) {
+        console.warn('[did-preview] voice clone/TTS failed, falling back to microsoft:', voiceErr)
+      }
+    }
+
     // ── Step 1: Create D-ID talk ─────────────────────────────────────────────
     console.log('[did-preview] DID input image:', imageUrl)
     const createRes = await fetch('https://api.d-id.com/talks', {
@@ -37,14 +94,9 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         source_url: imageUrl,
-        script: {
-          type: 'text',
-          input: text,
-          provider: {
-            type: 'microsoft',
-            voice_id: 'zh-CN-YunxiNeural',
-          },
-        },
+        script: audioUrl
+          ? { type: 'audio', audio_url: audioUrl }
+          : { type: 'text', input: text, provider: { type: 'microsoft', voice_id: 'zh-CN-YunxiNeural' } },
       }),
     })
 
