@@ -93,7 +93,9 @@ export async function GET(request: NextRequest) {
         pollData?.output?.video_url ??
         null
 
-      console.log('[omni-human/poll] completed, videoUrl:', videoUrl)
+      console.log('[omni-human/poll] OmniHuman COMPLETED, videoUrl:', videoUrl)
+      console.log('[omni-human/poll] imageUrl from DB:', storedImageUrl)
+      console.log('[omni-human/poll] About to submit Kling task...')
 
       // Update DB and submit Kling task
       if (videoUrl) {
@@ -132,25 +134,33 @@ export async function GET(request: NextRequest) {
                 },
               }),
             })
-            const klingData = await klingRes.json()
-            const klingTaskId: string | null = klingData?.data?.task_id ?? null
-            console.log('[omni-human/poll] Kling task submitted, klingTaskId:', klingTaskId)
+            console.log('[omni-human/poll] Kling submit response status:', klingRes.status)
+            if (!klingRes.ok) {
+              const klingError = await klingRes.text()
+              console.error('[omni-human/poll] Kling submit FAILED:', klingError)
+            } else {
+              const klingData = await klingRes.json()
+              const klingTaskId: string | null = klingData?.data?.task_id ?? null
+              console.log('[omni-human/poll] Kling taskId:', klingTaskId)
 
-            if (klingTaskId) {
-              await supabase
-                .from('omnihuman_jobs')
-                .update({
-                  status: 'kling_processing',
-                  kling_task_id: klingTaskId,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('task_id', taskId)
+              if (klingTaskId) {
+                await supabase
+                  .from('omnihuman_jobs')
+                  .update({
+                    status: 'kling_processing',
+                    kling_task_id: klingTaskId,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('task_id', taskId)
 
-              return NextResponse.json({ status: 'kling_processing', klingTaskId })
+                return NextResponse.json({ status: 'kling_processing', klingTaskId })
+              }
             }
           } catch (klingErr) {
             console.warn('[omni-human/poll] Kling submit failed (non-fatal):', klingErr instanceof Error ? klingErr.message : klingErr)
           }
+        } else {
+          console.warn('[omni-human/poll] imageUrlForKling is null — Kling will NOT be submitted')
         }
       }
 

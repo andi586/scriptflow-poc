@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
       )
+      console.log('[omni-human] storing image_url in DB:', imageUrl)
       const { error: insertError } = await supabase
         .from('omnihuman_jobs')
         .insert({
