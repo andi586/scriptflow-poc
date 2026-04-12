@@ -102,10 +102,12 @@ export async function POST(request: NextRequest) {
     console.log('[pipeline/start] userEmail:', userEmail, 'whitelisted:', whitelisted)
 
     // ── Step 1: Create project row ────────────────────────────────────────────
+    // user_id has NOT NULL constraint — use provided userId or generate an anonymous UUID
+    const effectiveUserId = userId ?? crypto.randomUUID()
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .insert({
-        ...(userId ? { user_id: userId } : {}),
+        user_id: effectiveUserId,
         status: 'draft',
         is_star_mode: isStarMode,
         language: detectedLanguage,
