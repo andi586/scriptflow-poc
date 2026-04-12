@@ -331,8 +331,9 @@ export default function AppFlowPage() {
 
           if (ohData.success && ohData.taskId) {
             const taskId = ohData.taskId;
-            // Poll /api/omni-human/poll every 5 seconds, up to 60 attempts (5 min)
+            // Phase 1: Poll OmniHuman every 5 seconds, up to 60 attempts (5 min)
             const MAX_POLL = 60;
+            let klingTaskId: string | null = null;
             for (let attempt = 1; attempt <= MAX_POLL; attempt++) {
               await new Promise(r => setTimeout(r, 5000));
               setStep(`Generating your movie... (${Math.floor(attempt * 5 / 60)}m ${(attempt * 5) % 60}s)`);
@@ -344,12 +345,41 @@ export default function AppFlowPage() {
                   generatedUrl = pollData.videoUrl;
                   break;
                 }
+                if (pollData.status === "kling_processing" && pollData.klingTaskId) {
+                  console.log("[app-flow] OmniHuman done, switching to Kling poll:", pollData.klingTaskId);
+                  klingTaskId = pollData.klingTaskId;
+                  break;
+                }
                 if (pollData.status === "failed") {
                   console.warn("[app-flow] OmniHuman task failed:", pollData.error);
                   break;
                 }
               } catch (pollErr) {
                 console.warn("[app-flow] poll error (non-fatal):", pollErr);
+              }
+            }
+
+            // Phase 2: Poll Kling if we got a klingTaskId
+            if (klingTaskId && !generatedUrl) {
+              const MAX_KLING_POLL = 60;
+              for (let attempt = 1; attempt <= MAX_KLING_POLL; attempt++) {
+                await new Promise(r => setTimeout(r, 5000));
+                setStep(`Generating your cinematic scene... (${Math.floor(attempt * 5 / 60)}m ${(attempt * 5) % 60}s)`);
+                try {
+                  const klingRes = await fetch(`/api/kling-poll?taskId=${klingTaskId}`);
+                  const klingData = await klingRes.json();
+                  console.log(`[app-flow] kling poll ${attempt}/${MAX_KLING_POLL}:`, klingData.status);
+                  if (klingData.status === "completed" && klingData.videoUrl) {
+                    generatedUrl = klingData.videoUrl;
+                    break;
+                  }
+                  if (klingData.status === "failed") {
+                    console.warn("[app-flow] Kling task failed:", klingData.error);
+                    break;
+                  }
+                } catch (klingPollErr) {
+                  console.warn("[app-flow] kling poll error (non-fatal):", klingPollErr);
+                }
               }
             }
           }
