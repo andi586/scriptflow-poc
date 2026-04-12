@@ -1,8 +1,10 @@
 self.addEventListener('push', (event) => {
   const data = event.data.json()
+  const title = data.title || '🎬 Your Movie is Ready!'
+  const body = data.body || 'Tap to watch your movie now'
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
+    self.registration.showNotification(title, {
+      body: body,
       icon: '/icon.png',
       badge: '/icon.png',
       data: { url: data.url }

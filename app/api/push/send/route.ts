@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = JSON.stringify({
-      title: '🎬 你的电影好了！',
-      body: '点击看你的专属电影',
+      title: '🎬 Your Movie is Ready!',
+      body: 'Tap to watch your movie now',
       url: `/app-flow?autoplay=${encodeURIComponent(videoUrl)}`,
     })
 
