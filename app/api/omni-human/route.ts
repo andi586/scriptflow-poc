@@ -6,7 +6,7 @@ export const maxDuration = 120
 
 const PIAPI_BASE = 'https://api.piapi.ai/api/v1'
 const POLL_INTERVAL_MS = 3000
-const MAX_POLL_ATTEMPTS = 20 // 20 * 3s = 60s max
+const MAX_POLL_ATTEMPTS = 40 // 40 * 3s = 120s max
 
 /**
  * OmniHuman API wrapper
