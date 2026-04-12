@@ -317,7 +317,13 @@ export default function AppFlowPage() {
       }
 
       setStep("Almost done...");
-      setVideoUrl(generatedUrl ?? URL.createObjectURL(blob));
+      if (generatedUrl) {
+        setVideoUrl(generatedUrl);
+      } else {
+        setError("Video generation failed. Please try again.");
+        setPhase("record");
+        return;
+      }
       setVideoEnded(false);
       setPhase("result");
     } catch (e) {
