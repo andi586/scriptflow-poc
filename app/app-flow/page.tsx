@@ -73,6 +73,17 @@ export default function AppFlowPage() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // ── Autoplay from push notification ───────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const autoplayUrl = params.get('autoplay');
+    if (autoplayUrl) {
+      setVideoUrl(decodeURIComponent(autoplayUrl));
+      setPhase('result');
+      setIsPreview(false);
+    }
+  }, []);
+
   // record state
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds]         = useState(0);
@@ -335,6 +346,32 @@ export default function AppFlowPage() {
 
           if (ohData.success && ohData.taskId) {
             const taskId = ohData.taskId;
+
+            // Register push notification for when movie is ready
+            try {
+              if ('Notification' in window && 'serviceWorker' in navigator) {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                  const reg = await navigator.serviceWorker.register('/sw.js');
+                  const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                  if (vapidKey) {
+                    const subscription = await reg.pushManager.subscribe({
+                      userVisibleOnly: true,
+                      applicationServerKey: vapidKey,
+                    });
+                    await fetch('/api/push/subscribe', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ subscription, jobId: taskId }),
+                    });
+                    console.log('[app-flow] Push subscription registered for taskId:', taskId);
+                  }
+                }
+              }
+            } catch (pushErr) {
+              console.warn('[app-flow] Push registration failed (non-fatal):', pushErr);
+            }
+
             // Phase 1: Poll OmniHuman every 5 seconds, up to 60 attempts (5 min)
             const MAX_POLL = 60;
             let klingTaskId: string | null = null;

@@ -80,6 +80,21 @@ export async function GET() {
             .eq('id', job.id)
           console.log(`[cron/process-kling] job ${job.id} completed, videoUrl:`, videoUrl)
           completed++
+
+          // Send push notification (non-fatal)
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL
+              ? `https://${process.env.VERCEL_URL}`
+              : 'http://localhost:3000'
+            await fetch(`${baseUrl}/api/push/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jobId: job.task_id, videoUrl }),
+            })
+            console.log(`[cron/process-kling] Push notification sent for job ${job.id}`)
+          } catch (pushErr) {
+            console.warn(`[cron/process-kling] Push notification failed (non-fatal):`, pushErr instanceof Error ? pushErr.message : pushErr)
+          }
         } else {
           console.warn(`[cron/process-kling] job ${job.id} completed but no videoUrl in response`)
           pending++
