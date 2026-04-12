@@ -554,7 +554,7 @@ export default function AppFlowPage() {
               <div style={{width:'80px', height:'80px', background:'rgba(255,255,255,0.05)', borderRadius:'0.5rem', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:'0.7rem'}}>{job.status}</div>
             )}
             <div style={{flex:1, minWidth:0}}>
-              <p style={{color:'rgba(255,255,255,0.6)', fontSize:'0.7rem', marginBottom:'0.25rem'}}>{new Date(job.created_at).toLocaleDateString()}</p>
+              <p style={{color:'rgba(255,255,255,0.6)', fontSize:'0.7rem', marginBottom:'0.25rem'}}>{new Date(job.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
               <p style={{color: job.status === 'completed' ? '#a3e635' : job.status === 'failed' ? '#f87171' : '#fbbf24', fontSize:'0.75rem', fontWeight:'bold'}}>{job.status}</p>
               {job.result_video_url && (
                 <a href={job.result_video_url} download style={{color:'#a78bfa', fontSize:'0.75rem', textDecoration:'none'}}>⬇️ Download</a>
