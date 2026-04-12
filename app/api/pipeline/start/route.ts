@@ -102,17 +102,20 @@ export async function POST(request: NextRequest) {
     console.log('[pipeline/start] userEmail:', userEmail, 'whitelisted:', whitelisted)
 
     // ── Step 1: Create project row ────────────────────────────────────────────
-    // user_id has NOT NULL constraint — use provided userId or generate an anonymous UUID
-    const effectiveUserId = userId ?? crypto.randomUUID()
+    // Only include user_id if we have a valid one — omitting it avoids FK constraint errors
+    const insertData: Record<string, unknown> = {
+      status: 'draft',
+      is_star_mode: isStarMode,
+      language: detectedLanguage,
+      title: (script as any)?.title ?? `Movie ${new Date().toISOString().slice(0, 10)}`,
+    }
+    if (userId) {
+      insertData.user_id = userId
+    }
+    console.log('[pipeline/start] inserting project, has user_id:', !!userId)
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .insert({
-        user_id: effectiveUserId,
-        status: 'draft',
-        is_star_mode: isStarMode,
-        language: detectedLanguage,
-        title: (script as any)?.title ?? `Movie ${new Date().toISOString().slice(0, 10)}`,
-      })
+      .insert(insertData)
       .select('id')
       .single()
 
