@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       input: {
         image_url: imageUrl,
         audio_url: finalAudioUrl,
-        prompt: prompt ?? 'person speaks naturally cinematic',
+        prompt: prompt ?? 'person speaks naturally, cinematic lighting, soft beauty light, smooth skin, professional film look, warm color grade',
         fast_mode: true,
       },
     }
