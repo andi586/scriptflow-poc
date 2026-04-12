@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+/** Check if an email is in the WHITELIST_EMAILS env var (comma-separated) */
+function isWhitelisted(email: string | null | undefined): boolean {
+  if (!email) return false
+  const whitelist = (process.env.WHITELIST_EMAILS ?? '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean)
+  return whitelist.includes(email.toLowerCase())
+}
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -68,6 +78,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'script is required' }, { status: 400 })
     }
 
+    // ── Whitelist check ───────────────────────────────────────────────────────
+    // Get user email from Supabase auth (best-effort, non-fatal)
+    let userEmail: string | null = null
+    try {
+      const authHeader = request.headers.get('authorization') ?? ''
+      const token = authHeader.replace('Bearer ', '').trim()
+      if (token) {
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        const authClient = createClient(supabaseUrl!, anonKey)
+        const { data: { user } } = await authClient.auth.getUser(token)
+        userEmail = user?.email ?? null
+      }
+    } catch (authErr) {
+      console.warn('[pipeline/start] auth check failed (non-fatal):', authErr instanceof Error ? authErr.message : authErr)
+    }
+
+    const whitelisted = isWhitelisted(userEmail)
+    console.log('[pipeline/start] userEmail:', userEmail, 'whitelisted:', whitelisted)
+
     // ── Step 1: Create project row ────────────────────────────────────────────
     // user_id is required by schema — use provided userId or a placeholder
     const effectiveUserId = userId ?? '00000000-0000-0000-0000-000000000000'
@@ -129,6 +158,8 @@ export async function POST(request: NextRequest) {
       success: true,
       projectId,
       status: 'active',
+      isPreview: !whitelisted,
+      whitelisted,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'

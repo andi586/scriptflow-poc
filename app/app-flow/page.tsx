@@ -70,6 +70,7 @@ export default function AppFlowPage() {
   const [videoEnded, setVideoEnded] = useState(false);
   const [step, setStep]           = useState("");
   const [error, setError]         = useState<string | null>(null);
+  const [isPreview, setIsPreview] = useState(false);
 
   // refs
   const previewRef    = useRef<HTMLVideoElement | null>(null);
@@ -255,6 +256,7 @@ export default function AppFlowPage() {
       // Step 3: Start pipeline — create project in DB (before voice clone so we have projectId)
       setStep("Starting pipeline...");
       let projectId: string | null = null;
+      let pipelineIsPreview = true; // default to preview (paywall) unless whitelisted
       try {
         const pipeRes  = await fetch("/api/pipeline/start", {
           method: "POST",
@@ -268,7 +270,8 @@ export default function AppFlowPage() {
         });
         const pipeData = await pipeRes.json();
         projectId = pipeData.projectId ?? null;
-        console.log("[pipeline] starting for project:", projectId);
+        pipelineIsPreview = pipeData.isPreview !== false; // false only if explicitly whitelisted
+        console.log("[pipeline] starting for project:", projectId, "isPreview:", pipelineIsPreview);
         if (!pipeData.success) {
           console.warn("[app-flow] pipeline/start non-success:", pipeData.error);
         }
@@ -343,6 +346,7 @@ export default function AppFlowPage() {
       setStep("Almost done...");
       if (generatedUrl) {
         setVideoUrl(generatedUrl);
+        setIsPreview(pipelineIsPreview);
       } else {
         setError("Video generation failed. Please try again.");
         setPhase("record");
@@ -375,6 +379,7 @@ export default function AppFlowPage() {
     if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
     setVideoUrl(null);
     setVideoEnded(false);
+    setIsPreview(false);
     setSeconds(0);
     setSubtitle("");
     setError(null);
@@ -659,16 +664,41 @@ export default function AppFlowPage() {
         />
       )}
 
-      {/* Overlay shown when video ended or no video */}
-      {(videoEnded || !videoUrl) && <div className="absolute inset-0 bg-black/75" />}
+      {/* ── Paywall overlay (shown when isPreview) ── */}
+      {isPreview && videoUrl && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-end pb-16 px-6"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.3) 100%)" }}>
+          <div className="text-center mb-6">
+            <p className="text-white text-2xl font-bold mb-2">🎬 Your Movie is Ready</p>
+            <p className="text-white/60 text-sm max-w-xs">Unlock the full cinematic version</p>
+          </div>
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            <a
+              href="#"
+              className="w-full py-4 rounded-2xl bg-amber-500 text-black font-bold text-base text-center hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/30"
+            >
+              🔓 Unlock Full Version — $9.99
+            </a>
+            <button
+              type="button"
+              className="w-full py-3 text-white/40 text-sm hover:text-white/60 transition-colors"
+              onClick={makeAnother}
+            >
+              Make Another (Preview)
+            </button>
+          </div>
+        </div>
+      )}
 
-      {(videoEnded || !videoUrl) && (
+      {/* Overlay shown when video ended or no video (non-preview) */}
+      {!isPreview && (videoEnded || !videoUrl) && <div className="absolute inset-0 bg-black/75" />}
+
+      {!isPreview && (videoEnded || !videoUrl) && (
         <div className="relative z-10 flex flex-col items-center justify-center h-full px-6 gap-6">
           <p className="text-white text-2xl font-semibold text-center tracking-wide">
             Your movie is ready. 🎬
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs">
-            {/* ── Download button (always visible) ── */}
             {videoUrl && (
               <a
                 href={videoUrl}
@@ -678,24 +708,6 @@ export default function AppFlowPage() {
                 ⬇️ Download My Movie
               </a>
             )}
-
-            {/* ── Paywall buttons — HIDDEN until Stripe is activated ──
-            <button
-              type="button"
-              className="w-full py-4 rounded-2xl bg-amber-500 text-black font-bold text-base hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/30"
-              onClick={() => alert(`Checkout: $${PRICING.fullMovie}`)}
-            >
-              🎬 Unlock Full Movie — ${PRICING.fullMovie}
-            </button>
-            <button
-              type="button"
-              className="w-full py-4 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-base hover:bg-white/15 transition-all"
-              onClick={() => alert(`Subscribe: $${PRICING.unlimited}/mo`)}
-            >
-              ∞ Unlimited — ${PRICING.unlimited}/mo
-            </button>
-            ── END Paywall ── */}
-
             <button
               type="button"
               className="w-full py-3 text-white/50 text-sm hover:text-white/70 transition-colors"
@@ -707,8 +719,8 @@ export default function AppFlowPage() {
         </div>
       )}
 
-      {/* Replay + Download overlay while video is playing */}
-      {videoUrl && !videoEnded && (
+      {/* Replay + Download overlay while video is playing (non-preview) */}
+      {!isPreview && videoUrl && !videoEnded && (
         <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-3 z-10">
           <button
             type="button"
