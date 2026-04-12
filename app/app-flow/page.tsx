@@ -311,11 +311,11 @@ export default function AppFlowPage() {
 
           if (ohData.success && ohData.taskId) {
             const taskId = ohData.taskId;
-            // Poll /api/omni-human/poll every 5 seconds, up to 24 attempts (120s)
-            const MAX_POLL = 24;
+            // Poll /api/omni-human/poll every 5 seconds, up to 60 attempts (5 min)
+            const MAX_POLL = 60;
             for (let attempt = 1; attempt <= MAX_POLL; attempt++) {
               await new Promise(r => setTimeout(r, 5000));
-              setStep(`Generating your movie... (${attempt * 5}s)`);
+              setStep(`Generating your movie... (${Math.floor(attempt * 5 / 60)}m ${(attempt * 5) % 60}s)`);
               try {
                 const pollRes = await fetch(`/api/omni-human/poll?taskId=${taskId}`);
                 const pollData = await pollRes.json();
