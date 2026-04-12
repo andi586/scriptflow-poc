@@ -112,8 +112,21 @@ export async function GET(request: NextRequest) {
           console.warn('[omni-human/poll] DB update failed (non-fatal):', dbErr instanceof Error ? dbErr.message : dbErr)
         }
 
+        // ── Get imageUrl from PiAPI task input (more reliable than DB) ────
+        let imageUrlForKling: string | null = storedImageUrl
+        try {
+          const taskRes = await fetch(`https://api.piapi.ai/api/v1/task/${taskId}`, {
+            headers: { 'x-api-key': piApiKey },
+          })
+          const taskData = await taskRes.json()
+          const fromTask: string | null = taskData?.data?.input?.image_url ?? null
+          console.log('[omni-human/poll] imageUrl from PiAPI task:', fromTask)
+          if (fromTask) imageUrlForKling = fromTask
+        } catch (taskErr) {
+          console.warn('[omni-human/poll] Failed to fetch task input (non-fatal):', taskErr instanceof Error ? taskErr.message : taskErr)
+        }
+
         // ── Submit Kling task using imageUrl as reference ─────────────────
-        const imageUrlForKling = storedImageUrl
         if (imageUrlForKling) {
           try {
             console.log('[omni-human/poll] Submitting Kling task with imageUrl:', imageUrlForKling)
