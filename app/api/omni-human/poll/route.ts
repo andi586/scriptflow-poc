@@ -126,10 +126,38 @@ export async function GET(request: NextRequest) {
           console.warn('[omni-human/poll] Failed to fetch task input (non-fatal):', taskErr instanceof Error ? taskErr.message : taskErr)
         }
 
+        // ── Get story prompt from project ─────────────────────────────────
+        let storyPrompt = 'cinematic dramatic scene'
+        try {
+          const { data: jobRow2 } = await supabase
+            .from('omnihuman_jobs')
+            .select('project_id')
+            .eq('task_id', taskId)
+            .single()
+          if (jobRow2?.project_id) {
+            const { data: project } = await supabase
+              .from('projects')
+              .select('script_raw')
+              .eq('id', jobRow2.project_id)
+              .single()
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const raw = project?.script_raw as any
+            const fromProject: string | null =
+              raw?.userInput ?? raw?.story ?? raw?.script ?? null
+            if (fromProject) {
+              storyPrompt = fromProject.slice(0, 200) // cap length
+              console.log('[omni-human/poll] storyPrompt from project:', storyPrompt)
+            }
+          }
+        } catch (storyErr) {
+          console.warn('[omni-human/poll] Failed to fetch story prompt (non-fatal):', storyErr instanceof Error ? storyErr.message : storyErr)
+        }
+
         // ── Submit Kling task using imageUrl as reference ─────────────────
         if (imageUrlForKling) {
           try {
             console.log('[omni-human/poll] Submitting Kling task with imageUrl:', imageUrlForKling)
+            const klingPrompt = `${storyPrompt}, cinematic lighting, dramatic scene, film quality, ultra realistic, ${imageUrlForKling ? '@image_1 as main character' : ''}`
             const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
@@ -137,7 +165,7 @@ export async function GET(request: NextRequest) {
                 model: 'kling',
                 task_type: 'video_generation',
                 input: {
-                  prompt: 'cinematic close-up portrait, dramatic lighting, film noir, speaking naturally, emotional expression, ultra realistic',
+                  prompt: klingPrompt,
                   negative_prompt: 'cartoon, anime, blur, distorted',
                   aspect_ratio: '9:16',
                   duration: 5,
