@@ -488,6 +488,8 @@ export default function BeTheStarPage() {
   }, [loadMyVideos]);
 
   const handleDeleteVideo = useCallback(async (v: typeof myVideos[0]) => {
+    // Optimistically remove from list immediately for instant UI feedback
+    setMyVideos((prev) => prev.filter((item) => item.url !== v.url));
     try {
       const supabase = createClient();
       if (v.type === "preview" && v.storagePath) {
@@ -495,9 +497,10 @@ export default function BeTheStarPage() {
       } else if (v.type === "hd" && v.jobId) {
         await supabase.from("omnihuman_jobs").delete().eq("id", v.jobId);
       }
-      await loadMyVideos();
     } catch (e) {
       console.error("[my-videos] delete error:", e);
+      // Re-fetch to restore correct state on error
+      await loadMyVideos();
     }
   }, [loadMyVideos, myVideos]);
 
@@ -564,12 +567,12 @@ export default function BeTheStarPage() {
   if (phase === "polling" && didPhase === "ready" && didVideoUrl) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col">
-        {/* ── Cinematic video — fullscreen, no crop, no controls ────────── */}
+        {/* ── Cinematic video — fullscreen, no crop, with controls + audio ── */}
         <video
           ref={didVideoRef}
           src={didVideoUrl}
           autoPlay
-          muted
+          controls
           playsInline
           style={{
             width: "100vw",
