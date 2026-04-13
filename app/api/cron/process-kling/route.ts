@@ -176,22 +176,50 @@ export async function GET() {
       console.log(`[cron/process-kling] job ${job.id} klingTaskId=${job.kling_task_id} status=${status}`)
 
       if (status === 'completed' || status === 'success') {
-        const videoUrl: string | null =
+        const klingVideoUrl: string | null =
           data?.data?.output?.video_url ??
           data?.data?.output?.video ??
           data?.data?.output?.url ??
           null
 
-        if (videoUrl) {
+        if (klingVideoUrl) {
+          // ── Merge dialogue audio into Kling video via Railway ───────────
+          let finalVideoUrl = klingVideoUrl
+          const audioUrl: string | null = job.audio_url ?? null
+          if (audioUrl) {
+            try {
+              const railwayUrl = process.env.RAILWAY_URL ?? 'https://scriptflow-video-merge-production.up.railway.app'
+              console.log(`[cron/process-kling] Merging audio for job ${job.id}...`)
+              const mergeRes = await fetch(`${railwayUrl}/merge-audio`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoUrl: klingVideoUrl, audioUrl }),
+              })
+              if (mergeRes.ok) {
+                const mergeData = await mergeRes.json()
+                finalVideoUrl = mergeData.outputUrl ?? klingVideoUrl
+                console.log(`[cron/process-kling] Audio merged for job ${job.id}, finalVideoUrl:`, finalVideoUrl)
+              } else {
+                const mergeErr = await mergeRes.text()
+                console.warn(`[cron/process-kling] merge-audio failed for job ${job.id}:`, mergeRes.status, mergeErr)
+              }
+            } catch (mergeErr) {
+              console.warn(`[cron/process-kling] merge-audio error for job ${job.id} (non-fatal):`, mergeErr instanceof Error ? mergeErr.message : mergeErr)
+            }
+          } else {
+            console.log(`[cron/process-kling] No audio_url for job ${job.id} — skipping audio merge`)
+          }
+
           await supabaseAdmin
             .from('omnihuman_jobs')
             .update({
               status: 'completed',
-              result_video_url: videoUrl,
+              result_video_url: finalVideoUrl,
               updated_at: new Date().toISOString(),
             })
             .eq('id', job.id)
-          console.log(`[cron/process-kling] job ${job.id} completed, videoUrl:`, videoUrl)
+          console.log(`[cron/process-kling] job ${job.id} completed, finalVideoUrl:`, finalVideoUrl)
+          const videoUrl = finalVideoUrl
           completed++
 
           // Send push notification (non-fatal)
