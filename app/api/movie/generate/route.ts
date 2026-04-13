@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
       body: JSON.stringify({
         model: 'omni-human',
-        task_type: 'video_generation',
+        task_type: 'omni-human-1.5',
         input: {
           image_url: frameUrl,
           audio_url: audioUrl,
