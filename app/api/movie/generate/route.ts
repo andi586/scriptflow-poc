@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
     // ── Step 4: Store in omnihuman_jobs ───────────────────────────────────
     console.log('[movie/generate] storing audio_url in DB:', audioUrl)
     try {
-      await supabase.from('omnihuman_jobs').insert({
+      const { error: insertErr } = await supabase.from('omnihuman_jobs').insert({
         task_id: taskId,
         status: 'processing',
         image_url: frameUrl,
@@ -141,8 +141,13 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
+      if (insertErr) {
+        console.error('[movie/generate] DB insert FAILED:', insertErr.message, JSON.stringify(insertErr))
+      } else {
+        console.log('[movie/generate] DB insert SUCCESS, audio_url:', audioUrl)
+      }
     } catch (dbErr) {
-      console.warn('[movie/generate] DB insert failed (non-fatal):', dbErr instanceof Error ? dbErr.message : dbErr)
+      console.error('[movie/generate] DB insert FAILED:', dbErr instanceof Error ? dbErr.message : JSON.stringify(dbErr))
     }
 
     return NextResponse.json({ success: true, taskId, audioUrl, frameUrl })
