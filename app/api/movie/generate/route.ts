@@ -171,7 +171,6 @@ export async function POST(request: NextRequest) {
         image_url: frameUrl,
         audio_url: audioUrl,
         scene_task_id: sceneTaskId ?? null,
-        session_id: sessionId ?? null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

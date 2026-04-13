@@ -28,6 +28,68 @@ export async function GET() {
 
   const supabaseAdmin = createClient(supabaseUrl, serviceKey)
 
+  const railwayUrl = process.env.RAILWAY_URL ?? 'https://scriptflow-video-merge-production.up.railway.app'
+
+  // ── Step 0: Poll scene_task_id for jobs that have one ────────────────────
+  const { data: sceneJobs } = await supabaseAdmin
+    .from('omnihuman_jobs')
+    .select('*')
+    .not('scene_task_id', 'is', null)
+    .is('scene_video_url', null)
+    .not('status', 'eq', 'failed')
+
+  console.log(`[cron/process-kling] Found ${sceneJobs?.length ?? 0} jobs with pending scene_task_id`)
+
+  for (const job of sceneJobs ?? []) {
+    try {
+      const sceneRes = await fetch(`https://api.piapi.ai/api/v1/task/${job.scene_task_id}`, {
+        headers: { 'x-api-key': piApiKey },
+      })
+      if (!sceneRes.ok) { console.warn(`[cron/process-kling] Scene poll failed for job ${job.id}: ${sceneRes.status}`); continue }
+      const sceneData = await sceneRes.json()
+      const sceneStatus: string = sceneData?.data?.status ?? sceneData?.status ?? 'unknown'
+      const sceneVideoUrl: string | null =
+        sceneData?.data?.output?.video_url ??
+        sceneData?.data?.output?.video ??
+        sceneData?.data?.output?.url ??
+        null
+      console.log(`[cron/process-kling] scene job ${job.id} status=${sceneStatus} url=${sceneVideoUrl}`)
+
+      if ((sceneStatus === 'completed' || sceneStatus === 'success') && sceneVideoUrl) {
+        await supabaseAdmin.from('omnihuman_jobs').update({ scene_video_url: sceneVideoUrl, updated_at: new Date().toISOString() }).eq('id', job.id)
+        console.log(`[cron/process-kling] scene_video_url stored for job ${job.id}`)
+
+        // If face video is also ready, concat them now
+        const { data: freshJob } = await supabaseAdmin.from('omnihuman_jobs').select('result_video_url').eq('id', job.id).single()
+        if (freshJob?.result_video_url) {
+          try {
+            console.log(`[cron/process-kling] Both videos ready for job ${job.id} — concatenating...`)
+            const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sceneVideoUrl, faceVideoUrl: freshJob.result_video_url }),
+            })
+            if (concatRes.ok) {
+              const concatData = await concatRes.json()
+              const finalUrl = concatData.outputUrl ?? freshJob.result_video_url
+              await supabaseAdmin.from('omnihuman_jobs').update({ result_video_url: finalUrl, status: 'completed', updated_at: new Date().toISOString() }).eq('id', job.id)
+              console.log(`[cron/process-kling] Concat done for job ${job.id}: ${finalUrl}`)
+            } else {
+              console.warn(`[cron/process-kling] concat-videos failed for job ${job.id}: ${concatRes.status}`)
+            }
+          } catch (concatErr) {
+            console.warn(`[cron/process-kling] concat error for job ${job.id}:`, concatErr instanceof Error ? concatErr.message : concatErr)
+          }
+        }
+      } else if (sceneStatus === 'failed' || sceneStatus === 'error') {
+        console.warn(`[cron/process-kling] scene task failed for job ${job.id}`)
+        await supabaseAdmin.from('omnihuman_jobs').update({ scene_task_id: null, updated_at: new Date().toISOString() }).eq('id', job.id)
+      }
+    } catch (err) {
+      console.warn(`[cron/process-kling] scene poll error for job ${job.id}:`, err instanceof Error ? err.message : err)
+    }
+  }
+
   // ── Step 1: Check OmniHuman pending/processing jobs ───────────────────────
   // Poll PiAPI for jobs that haven't reached Kling yet
   const { data: pendingJobs } = await supabaseAdmin
