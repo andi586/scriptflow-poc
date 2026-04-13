@@ -206,6 +206,8 @@ export default function AppFlowPage() {
 
   // ── Generate movie ─────────────────────────────────────────────────────────
   const generateMovie = useCallback(async () => {
+    console.log('[app-flow] Generate clicked')
+    console.log('[app-flow] twinId:', twinId, 'story:', story)
     if (!twinId || !story.trim()) return
     setPhase('movie_processing')
     setStep('Generating your dialogue...')
@@ -213,6 +215,7 @@ export default function AppFlowPage() {
 
     try {
       const sessionId = getOrCreateSessionId()
+      console.log('[app-flow] calling /api/movie/generate with twinId:', twinId)
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
