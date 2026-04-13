@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
             console.log('[movie/generate] TTS audioUrl:', audioUrl)
           } else {
             console.warn('[movie/generate] TTS upload failed:', uploadErr?.message)
+            console.error('[movie/generate] TTS upload error details:', JSON.stringify(uploadErr))
+            console.log('[movie/generate] TTS upload bucket: recordings, path:', audioPath)
           }
         } else {
           const errText = await ttsRes.text()
