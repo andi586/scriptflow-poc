@@ -181,28 +181,17 @@ export async function GET(request: NextRequest) {
           try {
             console.log('[omni-human/poll] Submitting Kling task with imageUrl:', imageUrlForKling)
             console.log('[omni-human/poll] storyPrompt for Kling:', storyPrompt)
-            const klingPrompt = `${storyPrompt}. Cinematic scene: change the background and costume to match this story. Ancient battlefield, warrior armor, dramatic lighting. Keep the person's movements and expressions.`
             const klingPayload = {
               model: 'kling',
               task_type: 'omni_video_generation',
               input: {
-                model_name: 'kling-v3-omni',
-                prompt: klingPrompt,
-                negative_prompt: 'bedroom, home interior, white wall, casual clothing, plain background',
-                video_list: [
-                  {
-                    video_url: videoUrl,
-                    refer_type: 'base',
-                    keep_original_sound: 'no',
-                  },
-                ],
-                image_list: [
-                  {
-                    image_url: imageUrlForKling,
-                  },
-                ],
-                mode: 'pro',
-                sound: 'off',
+                prompt: `@image_1 as the main character. ${storyPrompt}. Cinematic scene, dramatic lighting, film quality, keep the person's face exactly as @image_1`,
+                version: '3.0',
+                resolution: '720p',
+                duration: 5,
+                aspect_ratio: '9:16',
+                enable_audio: true,
+                images: [imageUrlForKling],
               },
             }
             console.log('[omni-human/poll] Kling payload:', JSON.stringify(klingPayload))
