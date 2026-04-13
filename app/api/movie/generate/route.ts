@@ -67,7 +67,13 @@ export async function POST(request: NextRequest) {
         })
 
         if (ttsRes.ok) {
+          console.log('[movie/generate] ElevenLabs response headers:', Object.fromEntries(ttsRes.headers.entries()))
           const audioBuffer = Buffer.from(await ttsRes.arrayBuffer())
+          console.log('[movie/generate] TTS audio buffer size:', audioBuffer.length, 'bytes')
+          if (audioBuffer.length < 100) {
+            console.error('[movie/generate] TTS audio buffer too small, likely invalid')
+            throw new Error('TTS audio buffer invalid')
+          }
           const audioPath = `tmp/tts_${Date.now()}.mp3`
           const { data: uploadData, error: uploadErr } = await supabase.storage
             .from('recordings')
