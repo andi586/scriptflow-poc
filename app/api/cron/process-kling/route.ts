@@ -272,6 +272,30 @@ export async function GET() {
             console.log(`[cron/process-kling] No audio_url for job ${job.id} — skipping audio merge`)
           }
 
+          // ── Check if scene_video_url also exists; if so, concat ────────────
+          const { data: jobData } = await supabaseAdmin
+            .from('omnihuman_jobs')
+            .select('scene_video_url')
+            .eq('id', job.id)
+            .single()
+
+          if (jobData?.scene_video_url) {
+            console.log('[cron/process-kling] Both videos ready, concatenating...')
+            const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sceneVideoUrl: jobData.scene_video_url,
+                faceVideoUrl: finalVideoUrl
+              })
+            })
+            const concatData = await concatRes.json()
+            if (concatData.outputUrl) {
+              finalVideoUrl = concatData.outputUrl
+              console.log('[cron/process-kling] Concat complete:', finalVideoUrl)
+            }
+          }
+
           await supabaseAdmin
             .from('omnihuman_jobs')
             .update({
