@@ -180,12 +180,13 @@ export async function GET(request: NextRequest) {
         if (imageUrlForKling) {
           try {
             console.log('[omni-human/poll] Submitting Kling task with imageUrl:', imageUrlForKling)
-            console.log('[omni-human/poll] storyPrompt for Kling:', storyPrompt)
+            console.log('[omni-human/poll] storyPrompt:', storyPrompt?.slice(0, 100))
+            const klingPrompt = `${storyPrompt}. Scene: dramatic cinematic environment matching the story. Change the background completely. Film quality lighting. @image_1 is the main character speaking.`
             const klingPayload = {
               model: 'kling',
               task_type: 'omni_video_generation',
               input: {
-                prompt: `@image_1 as the main character. ${storyPrompt}. Cinematic scene, dramatic lighting, film quality, keep the person's face exactly as @image_1`,
+                prompt: klingPrompt,
                 version: '3.0',
                 resolution: '720p',
                 duration: 5,
