@@ -77,14 +77,18 @@ export async function POST(request: NextRequest) {
           const audioPath = `tmp/tts_${Date.now()}.mp3`
           const { data: uploadData, error: uploadErr } = await supabase.storage
             .from('recordings')
-            .upload(audioPath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+            .upload(audioPath, audioBuffer, { 
+              contentType: 'audio/mpeg', 
+              upsert: false,
+              cacheControl: '3600'
+            })
 
           if (!uploadErr && uploadData) {
             audioUrl = supabase.storage.from('recordings').getPublicUrl(uploadData.path).data.publicUrl
             console.log('[movie/generate] TTS audioUrl:', audioUrl)
           } else {
             console.warn('[movie/generate] TTS upload failed:', uploadErr?.message)
-            console.error('[movie/generate] TTS upload error details:', JSON.stringify(uploadErr))
+            console.error('[movie/generate] TTS upload full error:', JSON.stringify(uploadErr, null, 2))
             console.log('[movie/generate] TTS upload bucket: recordings, path:', audioPath)
           }
         } else {
