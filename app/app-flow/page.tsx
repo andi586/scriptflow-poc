@@ -1,994 +1,539 @@
-"use client";
+'use client'
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-// import { PRICING } from "@/lib/generation-tiers"; // Hidden until Stripe is activated
-
-const WHITELIST = ['jiming.liu2@icloud.com'];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function extractFirstFrame(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(blob);
-    const video = document.createElement("video");
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "metadata";
-    video.src = url;
-    video.onloadeddata = () => { video.currentTime = 0.1; };
-    video.onseeked = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth || 480;
-        canvas.height = video.videoHeight || 854;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { URL.revokeObjectURL(url); reject(new Error("no ctx")); return; }
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      } catch (e) { URL.revokeObjectURL(url); reject(e); }
-    };
-    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("video error")); };
-    video.load();
-  });
-}
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MIN_SECONDS = 10;
-const MAX_SECONDS = 60;
+const TWIN_ID_KEY = 'sf_twin_id'
+const TWIN_FRAME_KEY = 'sf_twin_frame'
+const SESSION_ID_KEY = 'sf_session_id'
+const MAX_RECORD_SECONDS = 60
+const MIN_RECORD_SECONDS = 5
 
-const CHAOS_SPARKS = [
-  { emoji: "🌊", text: "A surfer discovers a message in a bottle that changes everything" },
-  { emoji: "🤖", text: "An AI falls in love with its creator's morning coffee ritual" },
-  { emoji: "🌙", text: "Two strangers meet on the last train and share their biggest secret" },
-];
-
-const SUBTITLES = [
-  { start: 0,  end: 10, text: "Show your face..." },
-  { start: 10, end: 20, text: "Now show your world..." },
-  { start: 20, end: 35, text: "Keep going..." },
-  { start: 35, end: 50, text: "Almost there..." },
-  { start: 50, end: 60, text: "Wrapping up..." },
-];
+function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') return 'ssr'
+  let id = localStorage.getItem(SESSION_ID_KEY)
+  if (!id) {
+    id = crypto.randomUUID()
+    localStorage.setItem(SESSION_ID_KEY, id)
+  }
+  return id
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Phase = "input" | "camera_prompt" | "record" | "processing" | "result";
+type Phase =
+  | 'loading'          // checking localStorage for existing twin
+  | 'twin_intro'       // no twin yet — explain what digital twin is
+  | 'twin_record'      // recording video for twin
+  | 'twin_processing'  // uploading + creating twin
+  | 'story_input'      // twin exists — enter story
+  | 'movie_processing' // generating movie
+  | 'result'           // show final video
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppFlowPage() {
-  const [phase, setPhase]           = useState<Phase>("input");
-  const [storyText, setStoryText]   = useState("");
-  const [isListening, setIsListening] = useState(false);
+  const [phase, setPhase] = useState<Phase>('loading')
+  const [twinId, setTwinId] = useState<string | null>(null)
+  const [twinFrameUrl, setTwinFrameUrl] = useState<string | null>(null)
+  const [story, setStory] = useState('')
+  const [step, setStep] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
 
-  // auth state
+  // recording state
+  const [isRecording, setIsRecording] = useState(false)
+  const [seconds, setSeconds] = useState(0)
+  const secondsRef = useRef(0)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const previewRef = useRef<HTMLVideoElement | null>(null)
+  const resultRef = useRef<HTMLVideoElement | null>(null)
+
+  // polling
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // auth
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [user, setUser] = useState<any>(null);
-
+  const [user, setUser] = useState<any>(null)
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => listener.subscription.unsubscribe();
-  }, []);
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
 
-  // ── Autoplay from push notification ───────────────────────────────────────
+  // ── On mount: check for existing twin ─────────────────────────────────────
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const autoplayUrl = params.get('autoplay');
-    if (autoplayUrl) {
-      setVideoUrl(decodeURIComponent(autoplayUrl));
-      setPhase('result');
-      setIsPreview(false);
+    const storedTwinId = localStorage.getItem(TWIN_ID_KEY)
+    const storedFrame = localStorage.getItem(TWIN_FRAME_KEY)
+    if (storedTwinId && storedFrame) {
+      setTwinId(storedTwinId)
+      setTwinFrameUrl(storedFrame)
+      setPhase('story_input')
+    } else {
+      setPhase('twin_intro')
     }
-  }, []);
+  }, [])
 
-  // record state
-  const [isRecording, setIsRecording] = useState(false);
-  const [seconds, setSeconds]         = useState(0);
-  const [subtitle, setSubtitle]       = useState("");
-  const [tooShort, setTooShort]       = useState(false);
-  const [doneSeconds, setDoneSeconds] = useState<number | null>(null);
-
-  // result state
-  const [videoUrl, setVideoUrl]   = useState<string | null>(null);
-  const [videoEnded, setVideoEnded] = useState(false);
-  const [step, setStep]           = useState("");
-  const [error, setError]         = useState<string | null>(null);
-  const [isPreview, setIsPreview] = useState(false);
-
-  // refs
-  const previewRef    = useRef<HTMLVideoElement | null>(null);
-  const resultRef     = useRef<HTMLVideoElement | null>(null);
-  const recorderRef   = useRef<MediaRecorder | null>(null);
-  const chunksRef     = useRef<Blob[]>([]);
-  const streamRef     = useRef<MediaStream | null>(null);
-  const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
-  const autoStopRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
-  const secondsRef    = useRef(0);
-  const bgPollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // background polling state
-  const [bgPolling, setBgPolling] = useState(false);
-
-  // Clear background poll on unmount
+  // ── Open camera when entering twin_record ─────────────────────────────────
   useEffect(() => {
-    return () => {
-      if (bgPollRef.current) clearInterval(bgPollRef.current);
-    };
-  }, []);
-
-  // ── subtitle sync ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isRecording) { setSubtitle(""); return; }
-    setSubtitle(SUBTITLES.find(s => seconds >= s.start && seconds < s.end)?.text ?? "");
-  }, [isRecording, seconds]);
-
-  // ── open camera only when entering record phase ────────────────────────────
-  useEffect(() => {
-    if (phase !== "record") return;
-    let alive = true;
+    if (phase !== 'twin_record') return
+    let alive = true
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "user" }, audio: true })
-      .then((stream) => {
-        if (!alive) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (previewRef.current) previewRef.current.srcObject = stream;
+      .getUserMedia({ video: { facingMode: 'user' }, audio: true })
+      .then(stream => {
+        if (!alive) { stream.getTracks().forEach(t => t.stop()); return }
+        streamRef.current = stream
+        if (previewRef.current) previewRef.current.srcObject = stream
       })
       .catch(() => {
-        if (alive) setError("Camera access denied. Please allow camera and reload.");
-      });
+        if (alive) setError('Camera access denied. Please allow camera and reload.')
+      })
     return () => {
-      alive = false;
-      streamRef.current?.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    };
-  }, [phase]);
+      alive = false
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+  }, [phase])
 
-  // ── auto-play result video ─────────────────────────────────────────────────
+  // ── Auto-play result video ─────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== "result" || !videoUrl) return;
+    if (phase !== 'result' || !videoUrl) return
     const t = setTimeout(() => {
-      resultRef.current?.play().catch(() => setVideoEnded(true));
-    }, 100);
-    return () => clearTimeout(t);
-  }, [phase, videoUrl]);
+      resultRef.current?.play().catch(() => {})
+    }, 100)
+    return () => clearTimeout(t)
+  }, [phase, videoUrl])
 
-  // ── voice recognition ──────────────────────────────────────────────────────
-  const startListening = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) { setError("Speech recognition not supported in this browser."); return; }
-    const rec = new SR();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-US";
-    recognitionRef.current = rec;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (e: any) => {
-      let t = "";
-      for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-      setStoryText(t);
-    };
-    rec.onerror = () => setIsListening(false);
-    rec.onend   = () => setIsListening(false);
-    rec.start();
-    setIsListening(true);
-  }, []);
+  // ── Cleanup poll on unmount ────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    }
+  }, [])
 
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    setIsListening(false);
-  }, []);
-
-  // ── start recording ────────────────────────────────────────────────────────
-  const startRecording = useCallback(async () => {
-    if (!streamRef.current) { setError("Camera not ready."); return; }
-    setError(null);
-    setTooShort(false);
-    setDoneSeconds(null);
-    chunksRef.current = [];
-    setSeconds(0);
-    secondsRef.current = 0;
-
-    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-      ? "video/webm;codecs=vp9,opus"
-      : MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "video/mp4";
-
-    const recorder = new MediaRecorder(streamRef.current, { mimeType: mime });
-    recorderRef.current = recorder;
-
-    recorder.ondataavailable = (e) => { if (e.data?.size > 0) chunksRef.current.push(e.data); };
-    recorder.onstop = () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      const finalSec = secondsRef.current;
-      setIsRecording(false);
-
-      if (finalSec < MIN_SECONDS) {
-        setTooShort(true);
-        return;
-      }
-
-      const blob = new Blob(chunksRef.current, { type: mime });
-      setDoneSeconds(finalSec);
-      setTimeout(() => void processRecording(blob), 1500);
-    };
-
-    recorder.start(100);
-    setIsRecording(true);
-
-    timerRef.current = setInterval(() => {
-      secondsRef.current += 1;
-      setSeconds(s => s + 1);
-    }, 1000);
-
-    autoStopRef.current = setTimeout(() => {
-      if (recorderRef.current?.state === "recording") recorderRef.current.stop();
-    }, MAX_SECONDS * 1000);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── stop recording ─────────────────────────────────────────────────────────
-  const stopRecording = useCallback(() => {
-    if (autoStopRef.current) clearTimeout(autoStopRef.current);
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
-  }, []);
-
-  // ── helper: upload blob directly to Supabase Storage (bypasses /api/upload to avoid 413) ──
+  // ── Upload blob to Supabase Storage ───────────────────────────────────────
   const uploadBlob = useCallback(async (blob: Blob, filename: string): Promise<string | null> => {
     try {
-      const supabase = createClient();
-      const filePath = `tmp/${Date.now()}_${filename}`;
+      const supabase = createClient()
+      const filePath = `tmp/${Date.now()}_${filename}`
       const { data, error } = await supabase.storage
-        .from("recordings")
-        .upload(filePath, blob, {
-          contentType: blob.type || "video/webm",
-          upsert: true,
-        });
-      if (error) {
-        console.warn("[app-flow] supabase upload failed:", error.message);
-        return null;
-      }
-      const audioUrl = supabase.storage
-        .from("recordings")
-        .getPublicUrl(data.path).data.publicUrl;
-      console.log("[app-flow] uploaded", filename, "→", audioUrl);
-      return audioUrl;
+        .from('recordings')
+        .upload(filePath, blob, { contentType: blob.type || 'video/webm', upsert: true })
+      if (error) { console.warn('[app-flow] upload failed:', error.message); return null }
+      return supabase.storage.from('recordings').getPublicUrl(data.path).data.publicUrl
     } catch (e) {
-      console.warn("[app-flow] upload error:", e);
-      return null;
+      console.warn('[app-flow] upload error:', e)
+      return null
     }
-  }, []);
+  }, [])
 
-  // ── process recording ──────────────────────────────────────────────────────
-  const processRecording = useCallback(async (blob: Blob) => {
-    setPhase("processing");
-    setStep("Uploading your recording...");
+  // ── Start recording ────────────────────────────────────────────────────────
+  const startRecording = useCallback(async () => {
+    if (!streamRef.current) { setError('Camera not ready.'); return }
+    setError(null)
+    chunksRef.current = []
+    setSeconds(0)
+    secondsRef.current = 0
+
+    const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+      ? 'video/webm;codecs=vp9,opus'
+      : MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4'
+
+    const recorder = new MediaRecorder(streamRef.current, { mimeType: mime })
+    recorderRef.current = recorder
+    recorder.ondataavailable = e => { if (e.data?.size > 0) chunksRef.current.push(e.data) }
+    recorder.onstop = () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      setIsRecording(false)
+      const blob = new Blob(chunksRef.current, { type: mime })
+      void processTwinVideo(blob)
+    }
+    recorder.start(100)
+    setIsRecording(true)
+
+    timerRef.current = setInterval(() => {
+      secondsRef.current += 1
+      setSeconds(s => s + 1)
+    }, 1000)
+
+    autoStopRef.current = setTimeout(() => {
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
+    }, MAX_RECORD_SECONDS * 1000)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stopRecording = useCallback(() => {
+    if (autoStopRef.current) clearTimeout(autoStopRef.current)
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
+  }, [])
+
+  // ── Process twin video ─────────────────────────────────────────────────────
+  const processTwinVideo = useCallback(async (blob: Blob) => {
+    setPhase('twin_processing')
+    setStep('Uploading your video...')
     try {
-      // Step 1: Upload audio blob → Supabase Storage → HTTPS URL
-      // audioUrl is set here and must NOT be cleared by any later step (e.g. voice-clone failure)
-      const audioMime = blob.type || "video/webm";
-      const audioExt  = audioMime.includes("mp4") ? "mp4" : "webm";
-      const audioBlob = new Blob([blob], { type: audioMime });
-      const uploadedAudioUrl = await uploadBlob(audioBlob, `audio_${Date.now()}.${audioExt}`);
-      console.log("[app-flow] audioUrl:", uploadedAudioUrl);
+      const mime = blob.type || 'video/webm'
+      const ext = mime.includes('mp4') ? 'mp4' : 'webm'
+      const videoUrl = await uploadBlob(blob, `twin_${Date.now()}.${ext}`)
+      if (!videoUrl) throw new Error('Upload failed')
 
-      // Step 2: Extract first frame → upload image → HTTPS URL
-      // imageUrl is set here and must NOT be cleared by any later step
-      setStep("Analyzing your video...");
-      let uploadedImageUrl: string | null = null;
-      try {
-        const frameDataUrl = await extractFirstFrame(blob);
-        console.log("[app-flow] extractFirstFrame OK, length:", frameDataUrl.length);
-        const res     = await fetch(frameDataUrl);
-        const imgBlob = await res.blob();
-        uploadedImageUrl = await uploadBlob(imgBlob, `frame_${Date.now()}.jpg`);
-        console.log("[app-flow] imageUrl:", uploadedImageUrl);
-      } catch (e) {
-        console.warn("[app-flow] frame extraction/upload failed:", e);
-      }
+      setStep('Creating your digital twin...')
+      const sessionId = getOrCreateSessionId()
+      const res = await fetch('/api/digital-twin/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl, sessionId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.twinId) throw new Error(data.error ?? 'Twin creation failed')
 
-      // Freeze references — these will not be mutated by voice-clone or pipeline steps
-      const audioUrl = uploadedAudioUrl;
-      const imageUrl = uploadedImageUrl;
+      localStorage.setItem(TWIN_ID_KEY, data.twinId)
+      localStorage.setItem(TWIN_FRAME_KEY, data.frameUrl)
+      setTwinId(data.twinId)
+      setTwinFrameUrl(data.frameUrl)
+      setPhase('story_input')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Twin creation failed')
+      setPhase('twin_record')
+    }
+  }, [uploadBlob])
 
-      // Step 3: Start pipeline — create project in DB (before voice clone so we have projectId)
-      setStep("Starting pipeline...");
-      // Always fetch fresh auth session to avoid stale user state
-      const supabaseClient = createClient();
-      const { data: authData } = await supabaseClient.auth.getUser();
-      const currentEmail = authData?.user?.email ?? null;
-      console.log('[app-flow] user state email:', user?.email, '| fresh currentEmail:', currentEmail);
-      let projectId: string | null = null;
-      let pipelineIsPreview = true; // default to preview (paywall) unless whitelisted
-      try {
-        const pipeRes  = await fetch("/api/pipeline/start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            script: storyText || "User recorded video",
-            imageUrl,
-            audioUrl,
-            isStarMode: true,
-            userEmail: currentEmail,
-          }),
-        });
-        const pipeData = await pipeRes.json();
-        projectId = pipeData.projectId ?? null;
-        pipelineIsPreview = pipeData.isPreview !== false; // false only if explicitly whitelisted
-        console.log("[pipeline] starting for project:", projectId, "isPreview:", pipelineIsPreview);
-        if (!pipeData.success) {
-          console.warn("[app-flow] pipeline/start non-success:", pipeData.error);
-        }
-      } catch (e) {
-        console.warn("[app-flow] pipeline/start error (non-fatal):", e);
-      }
+  // ── Generate movie ─────────────────────────────────────────────────────────
+  const generateMovie = useCallback(async () => {
+    if (!twinId || !story.trim()) return
+    setPhase('movie_processing')
+    setStep('Generating your dialogue...')
+    setError(null)
 
-      // Step 4: Voice clone — send audio + projectId as FormData (no manual Content-Type)
-      let voiceId: string | null = null;
-      try {
-        const vcForm = new FormData();
-        vcForm.append("audio", blob, "recording.webm");
-        if (projectId) vcForm.append("projectId", projectId);
-        const vcRes  = await fetch("/api/voice-clone", { method: "POST", body: vcForm });
-        const vcData = await vcRes.json();
-        voiceId = vcData.voice_id ?? null;
-        console.log("[app-flow] voice_id:", voiceId ?? "none");
-      } catch (e) {
-        console.warn("[app-flow] voice-clone error (non-fatal):", e);
-      }
+    try {
+      const sessionId = getOrCreateSessionId()
+      const res = await fetch('/api/movie/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ twinId, story: story.trim(), sessionId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.taskId) throw new Error(data.error ?? 'Movie generation failed')
 
-      // Step 5: Submit OmniHuman task (fire and forget), then poll from frontend
-      setStep("Generating your movie...");
-      console.log('[app-flow] before omni-human: imageUrl:', imageUrl, 'audioUrl:', audioUrl);
-      let generatedUrl: string | null = null;
-      if (imageUrl && audioUrl) {
+      const taskId: string = data.taskId
+      console.log('[app-flow] movie taskId:', taskId)
+      setStep('Animating your digital twin...')
+
+      // ── Poll OmniHuman → Kling ─────────────────────────────────────────
+      let attempt = 0
+      const MAX_POLL = 120 // 10 min at 5s intervals
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+
+      pollIntervalRef.current = setInterval(async () => {
+        attempt++
+        const elapsed = attempt * 5
+        const mins = Math.floor(elapsed / 60)
+        const secs = elapsed % 60
+        setStep(`Generating your movie... (${mins}m ${secs}s)`)
+
         try {
-          console.log("[app-flow] calling omni-human, projectId:", projectId);
-          const ohRes  = await fetch("/api/omni-human", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imageUrl,
-              audioUrl,
-              prompt: storyText || "person speaks naturally cinematic",
-              projectId,
-            }),
-          });
-          const ohData = await ohRes.json();
-          console.log("[app-flow] omni-human submit response:", ohData);
+          const pollRes = await fetch(`/api/omni-human/poll?taskId=${taskId}`)
+          const pollData = await pollRes.json()
+          console.log(`[app-flow] poll ${attempt}:`, pollData.status)
 
-          if (ohData.success && ohData.taskId) {
-            const taskId = ohData.taskId;
-
-            // Start silent background polling every 30s (survives page navigation within SPA)
-            if (bgPollRef.current) clearInterval(bgPollRef.current);
-            setBgPolling(true);
-            bgPollRef.current = setInterval(async () => {
+          if (pollData.status === 'kling_processing' && pollData.klingTaskId) {
+            setStep('Creating cinematic scene...')
+            // Switch to polling Kling
+            clearInterval(pollIntervalRef.current!)
+            let klingAttempt = 0
+            pollIntervalRef.current = setInterval(async () => {
+              klingAttempt++
+              const ke = klingAttempt * 5
+              setStep(`Creating cinematic scene... (${Math.floor(ke / 60)}m ${ke % 60}s)`)
               try {
-                const supabase = createClient();
-                const { data: jobRow } = await supabase
-                  .from('omnihuman_jobs')
-                  .select('status, result_video_url')
-                  .eq('task_id', taskId)
-                  .eq('status', 'completed')
-                  .not('result_video_url', 'is', null)
-                  .maybeSingle();
-                if (jobRow?.result_video_url) {
-                  clearInterval(bgPollRef.current!);
-                  setBgPolling(false);
-                  setVideoUrl(jobRow.result_video_url);
-                  setIsPreview(!WHITELIST.includes(user?.email ?? ''));
-                  setVideoEnded(false);
-                  setPhase('result');
-                  try { await document.documentElement.requestFullscreen(); } catch {}
+                const kr = await fetch(`/api/kling-poll?taskId=${pollData.klingTaskId}`)
+                const kd = await kr.json()
+                console.log(`[app-flow] kling poll ${klingAttempt}:`, kd.status)
+                if (kd.status === 'completed' && kd.videoUrl) {
+                  clearInterval(pollIntervalRef.current!)
+                  setVideoUrl(kd.videoUrl)
+                  setPhase('result')
+                } else if (kd.status === 'failed') {
+                  clearInterval(pollIntervalRef.current!)
+                  setError('Kling scene generation failed')
+                  setPhase('story_input')
                 }
               } catch {}
-            }, 30000);
-
-            // Phase 1: Poll OmniHuman every 5 seconds, up to 60 attempts (5 min)
-            const MAX_POLL = 60;
-            let klingTaskId: string | null = null;
-            for (let attempt = 1; attempt <= MAX_POLL; attempt++) {
-              await new Promise(r => setTimeout(r, 5000));
-              setStep(`Generating your movie... (${Math.floor(attempt * 5 / 60)}m ${(attempt * 5) % 60}s)`);
-              try {
-                const pollRes = await fetch(`/api/omni-human/poll?taskId=${taskId}`);
-                const pollData = await pollRes.json();
-                console.log(`[app-flow] poll ${attempt}/${MAX_POLL}:`, pollData.status);
-                if (pollData.status === "completed" && pollData.videoUrl) {
-                  generatedUrl = pollData.videoUrl;
-                  break;
-                }
-                if (pollData.status === "kling_processing" && pollData.klingTaskId) {
-                  console.log("[app-flow] OmniHuman done, switching to Kling poll:", pollData.klingTaskId);
-                  klingTaskId = pollData.klingTaskId;
-                  break;
-                }
-                if (pollData.status === "failed") {
-                  console.warn("[app-flow] OmniHuman task failed:", pollData.error);
-                  break;
-                }
-              } catch (pollErr) {
-                console.warn("[app-flow] poll error (non-fatal):", pollErr);
+              if (klingAttempt >= MAX_POLL) {
+                clearInterval(pollIntervalRef.current!)
+                setError('Timed out waiting for scene generation')
+                setPhase('story_input')
               }
-            }
-
-            // Phase 2: Poll Kling if we got a klingTaskId
-            if (klingTaskId && !generatedUrl) {
-              const MAX_KLING_POLL = 60;
-              for (let attempt = 1; attempt <= MAX_KLING_POLL; attempt++) {
-                await new Promise(r => setTimeout(r, 5000));
-                setStep(`Generating your cinematic scene... (${Math.floor(attempt * 5 / 60)}m ${(attempt * 5) % 60}s)`);
-                try {
-                  const klingRes = await fetch(`/api/kling-poll?taskId=${klingTaskId}`);
-                  const klingData = await klingRes.json();
-                  console.log(`[app-flow] kling poll ${attempt}/${MAX_KLING_POLL}:`, klingData.status);
-                  if (klingData.status === "completed" && klingData.videoUrl) {
-                    generatedUrl = klingData.videoUrl;
-                    break;
-                  }
-                  if (klingData.status === "failed") {
-                    console.warn("[app-flow] Kling task failed:", klingData.error);
-                    break;
-                  }
-                } catch (klingPollErr) {
-                  console.warn("[app-flow] kling poll error (non-fatal):", klingPollErr);
-                }
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("[app-flow] omni-human error:", e);
-        }
-      } else {
-        console.warn("[app-flow] skipping omni-human: missing imageUrl or audioUrl", { imageUrl, audioUrl });
-      }
-
-      setStep("Almost done...");
-      if (generatedUrl) {
-        setVideoUrl(generatedUrl);
-        setIsPreview(pipelineIsPreview);
-      } else {
-        setError("Video generation failed. Please try again.");
-        setPhase("record");
-        return;
-      }
-      setVideoEnded(false);
-      setPhase("result");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Processing failed");
-      setPhase("record");
-    }
-  }, [storyText, uploadBlob]);
-
-  // ── skip camera (AI actor) ─────────────────────────────────────────────────
-  const skipCamera = useCallback(() => {
-    setPhase("processing");
-    setStep("Generating your movie...");
-    fetch("/api/narrative/parse", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ script: storyText, tier: "preview", maxShots: 3 }),
-    })
-      .then(r => r.json())
-      .then(() => { setVideoUrl(null); setVideoEnded(true); setPhase("result"); })
-      .catch(() => { setVideoEnded(true); setPhase("result"); });
-  }, [storyText]);
-
-  // ── make another ───────────────────────────────────────────────────────────
-  const makeAnother = useCallback(() => {
-    if (videoUrl?.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
-    setVideoUrl(null);
-    setVideoEnded(false);
-    setIsPreview(false);
-    setSeconds(0);
-    setSubtitle("");
-    setError(null);
-    setStep("");
-    setDoneSeconds(null);
-    setTooShort(false);
-    setStoryText("");
-    setPhase("input");
-  }, [videoUrl]);
-
-  // ── My Videos state ────────────────────────────────────────────────────────
-  const [showMyVideos, setShowMyVideos] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [myVideos, setMyVideos] = useState<any[]>([]);
-  const [myVideosLoading, setMyVideosLoading] = useState(false);
-
-  const openMyVideos = useCallback(async () => {
-    setShowMyVideos(true);
-    setMyVideosLoading(true);
-    try {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('omnihuman_jobs')
-        .select('id, task_id, status, result_video_url, created_at')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      setMyVideos(data ?? []);
-    } catch (e) {
-      console.warn('[my-videos] fetch error:', e);
-    } finally {
-      setMyVideosLoading(false);
-    }
-  }, []);
-
-  const deleteVideo = useCallback(async (jobId: string) => {
-    if (!confirm('Delete this video?')) return;
-    // Optimistically remove from list
-    setMyVideos(prev => prev.filter(j => j.id !== jobId));
-    try {
-      const supabase = createClient();
-      await supabase.from('omnihuman_jobs').delete().eq('id', jobId);
-    } catch (e) {
-      console.warn('[my-videos] delete error:', e);
-    }
-  }, []);
-
-  // ── My Videos button — always visible across all phases ───────────────────
-  const myVideosButton = (
-    <button
-      type="button"
-      onClick={openMyVideos}
-      style={{position:'fixed', top:'1rem', left:'1rem', zIndex:200, background:'rgba(255,255,255,0.1)', color:'white', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer'}}
-    >
-      🎬 My Videos
-    </button>
-  );
-
-  // ── My Videos modal ────────────────────────────────────────────────────────
-  const myVideosModal = showMyVideos && (
-    <div style={{position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.85)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', padding:'2rem 1rem', overflowY:'auto'}}>
-      <div style={{width:'100%', maxWidth:'480px'}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-          <h2 style={{color:'white', fontSize:'1.25rem', fontWeight:'bold'}}>🎬 My Videos</h2>
-          <button type="button" onClick={() => setShowMyVideos(false)} style={{color:'rgba(255,255,255,0.5)', background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer'}}>✕</button>
-        </div>
-        {myVideosLoading && <p style={{color:'rgba(255,255,255,0.5)', textAlign:'center'}}>Loading...</p>}
-        {!myVideosLoading && myVideos.length === 0 && <p style={{color:'rgba(255,255,255,0.4)', textAlign:'center'}}>No videos yet.</p>}
-        {myVideos.map(job => (
-          <div key={job.id} style={{background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'1rem', padding:'1rem', marginBottom:'0.75rem', display:'flex', alignItems:'center', gap:'0.75rem'}}>
-            {job.result_video_url ? (
-              <video src={job.result_video_url} style={{width:'80px', height:'80px', objectFit:'cover', borderRadius:'0.5rem', flexShrink:0}} muted playsInline />
-            ) : (
-              <div style={{width:'80px', height:'80px', background:'rgba(255,255,255,0.05)', borderRadius:'0.5rem', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:'0.7rem'}}>{job.status}</div>
-            )}
-            <div style={{flex:1, minWidth:0}}>
-              <p style={{color:'rgba(255,255,255,0.6)', fontSize:'0.7rem', marginBottom:'0.25rem'}}>{new Date(job.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-              <p style={{color: job.status === 'completed' ? '#a3e635' : job.status === 'failed' ? '#f87171' : '#fbbf24', fontSize:'0.75rem', fontWeight:'bold'}}>{job.status}</p>
-              {job.result_video_url && (
-                <a href={job.result_video_url} download style={{color:'#a78bfa', fontSize:'0.75rem', textDecoration:'none'}}>⬇️ Download</a>
-              )}
-            </div>
-            <button type="button" onClick={() => deleteVideo(job.id)} style={{background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:'1.25rem', cursor:'pointer', flexShrink:0}} title="Delete">🗑️</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  // ── Background polling indicator ───────────────────────────────────────────
-  const bgPollingIndicator = bgPolling && (
-    <button
-      type="button"
-      onClick={async () => {
-        // Manual check on tap
-        try {
-          const supabase = createClient();
-          const { data: jobs } = await supabase
-            .from('omnihuman_jobs')
-            .select('status, result_video_url')
-            .eq('status', 'completed')
-            .not('result_video_url', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          const job = jobs?.[0];
-          if (job?.result_video_url) {
-            if (bgPollRef.current) clearInterval(bgPollRef.current);
-            setBgPolling(false);
-            setVideoUrl(job.result_video_url);
-            setIsPreview(!WHITELIST.includes(user?.email ?? ''));
-            setVideoEnded(false);
-            setPhase('result');
-            try { await document.documentElement.requestFullscreen(); } catch {}
+            }, 5000)
+          } else if (pollData.status === 'completed' && pollData.videoUrl) {
+            clearInterval(pollIntervalRef.current!)
+            setVideoUrl(pollData.videoUrl)
+            setPhase('result')
+          } else if (pollData.status === 'failed') {
+            clearInterval(pollIntervalRef.current!)
+            setError('Video generation failed')
+            setPhase('story_input')
           }
         } catch {}
-      }}
-      style={{position:'fixed', bottom:'1.5rem', right:'1.5rem', zIndex:250, background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:'2rem', padding:'0.5rem 1rem', display:'flex', alignItems:'center', gap:'0.5rem', cursor:'pointer'}}
-    >
-      <span style={{width:'8px', height:'8px', borderRadius:'50%', background:'#a855f7', display:'inline-block', animation:'pulse 1.5s infinite'}} />
-      <span style={{color:'rgba(255,255,255,0.7)', fontSize:'0.75rem'}}>🎬 generating...</span>
-    </button>
-  );
 
-  // ── Auth button — always visible across all phases ─────────────────────────
+        if (attempt >= MAX_POLL) {
+          clearInterval(pollIntervalRef.current!)
+          setError('Timed out waiting for video generation')
+          setPhase('story_input')
+        }
+      }, 5000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Movie generation failed')
+      setPhase('story_input')
+    }
+  }, [twinId, story])
+
+  // ── Reset twin ─────────────────────────────────────────────────────────────
+  const resetTwin = useCallback(() => {
+    localStorage.removeItem(TWIN_ID_KEY)
+    localStorage.removeItem(TWIN_FRAME_KEY)
+    setTwinId(null)
+    setTwinFrameUrl(null)
+    setPhase('twin_intro')
+  }, [])
+
+  // ── Auth button ────────────────────────────────────────────────────────────
   const authButton = user ? (
     <button
       type="button"
       onClick={() => createClient().auth.signOut()}
-      style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(255,255,255,0.1)', color:'white', border:'1px solid rgba(255,255,255,0.2)', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer'}}
+      style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 200, background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.75rem', cursor: 'pointer' }}
     >
       {user.email?.split('@')[0]} · Sign Out
     </button>
   ) : (
-    <a
-      href="/login"
-      style={{position:'fixed', top:'1rem', right:'1rem', zIndex:200, background:'rgba(139,92,246,0.8)', color:'white', border:'none', borderRadius:'0.5rem', padding:'0.5rem 1rem', fontSize:'0.75rem', cursor:'pointer', textDecoration:'none', display:'inline-block'}}
-    >
+    <a href="/login" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 200, background: 'rgba(139,92,246,0.8)', color: 'white', borderRadius: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.75rem', textDecoration: 'none', display: 'inline-block' }}>
       Sign In
     </a>
-  );
+  )
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: INPUT
+  // PHASE: LOADING
   // ════════════════════════════════════════════════════════════════════════════
-  if (phase === "input") {
+  if (phase === 'loading') {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col">
-        {myVideosButton}
-        {myVideosModal}
-        {bgPollingIndicator}
-        {authButton}
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(700px_circle_at_50%_20%,rgba(139,92,246,0.18),transparent_60%)]" />
-
-        <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-lg mx-auto w-full">
-          {/* Header */}
-          <div className="mb-8 text-center">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-purple-400">ScriptFlow</p>
-            <h1 className="text-3xl font-extrabold tracking-tight">Your Story. Your Movie. 🎬</h1>
-          </div>
-
-          {/* Story textarea + mic */}
-          <div className="w-full mb-6">
-            <div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur overflow-hidden">
-              <textarea
-                value={storyText}
-                onChange={e => setStoryText(e.target.value)}
-                rows={5}
-                placeholder="Tell your story..."
-                className="w-full resize-none bg-transparent px-5 pt-5 pb-14 text-base text-white outline-none placeholder:text-white/30"
-              />
-              {/* Mic button — bottom-right */}
-              <button
-                type="button"
-                onClick={isListening ? stopListening : startListening}
-                title={isListening ? "Stop" : "Speak your story"}
-                className={[
-                  "absolute bottom-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all",
-                  isListening
-                    ? "bg-red-500 shadow-lg shadow-red-500/40 animate-pulse"
-                    : "bg-white/10 hover:bg-white/20",
-                ].join(" ")}
-              >
-                🎤
-              </button>
-              {isListening && (
-                <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs text-red-400">Listening…</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {error && <p className="mb-4 text-sm text-red-400 text-center">{error}</p>}
-
-          {/* CTA */}
-          <button
-            type="button"
-            onClick={() => {
-              console.log("[app-flow] Create My Movie clicked, storyText:", JSON.stringify(storyText));
-              setError(null);
-              setPhase("camera_prompt");
-            }}
-            className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-base hover:bg-purple-500 active:bg-purple-700 transition-all shadow-lg shadow-purple-500/30 mb-8 cursor-pointer select-none"
-            style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
-          >
-            ✨ Create My Movie
-          </button>
-
-          {/* Chaos Sparks */}
-          <div className="w-full">
-            <p className="mb-3 text-center text-xs uppercase tracking-widest text-white/30">⚡ Chaos Sparks</p>
-            <div className="flex flex-col gap-2">
-              {CHAOS_SPARKS.map((spark, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setStoryText(spark.text)}
-                  className="w-full text-left px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-purple-500/40 transition-all group"
-                >
-                  <span className="mr-2">{spark.emoji}</span>
-                  <span className="text-sm text-white/70 group-hover:text-white/90 transition-colors">{spark.text}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </main>
+      <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'white', animation: 'spin 0.8s linear infinite' }} />
       </div>
-    );
+    )
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: CAMERA PROMPT
+  // PHASE: TWIN INTRO
   // ════════════════════════════════════════════════════════════════════════════
-  if (phase === "camera_prompt") {
+  if (phase === 'twin_intro') {
     return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center px-6 gap-8">
+      <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
         {authButton}
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(600px_circle_at_50%_40%,rgba(139,92,246,0.15),transparent_60%)]" />
-
-        <div className="text-center">
-          <div className="text-5xl mb-4">🎬</div>
-          <h2 className="text-2xl font-bold text-white mb-2">Want to star in your movie?</h2>
-          <p className="text-white/50 text-sm max-w-xs">
-            Record a short video of yourself and we&apos;ll put you in the film
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 w-full max-w-xs">
-          <button
-            type="button"
-            onClick={() => { setError(null); setTooShort(false); setDoneSeconds(null); setPhase("record"); }}
-            className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-base hover:bg-purple-500 transition-all shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2"
-          >
-            📷 Add Yourself
-          </button>
-
-          <button
-            type="button"
-            onClick={skipCamera}
-            className="w-full py-4 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-base hover:bg-white/15 transition-all"
-          >
-            Skip — Use AI Actor
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setPhase("input")}
-            className="w-full py-2 text-white/40 text-sm hover:text-white/60 transition-colors"
-          >
-            ← Back
-          </button>
-        </div>
+        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🎭</div>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>Create Your Digital Twin</h1>
+        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', maxWidth: '320px', marginBottom: '2.5rem', lineHeight: 1.6 }}>
+          Record a short video of yourself. We&apos;ll create a digital version of you that can star in any movie you imagine.
+        </p>
+        <button
+          type="button"
+          onClick={() => { setError(null); setPhase('twin_record') }}
+          style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: '1rem', padding: '1rem 2.5rem', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem' }}
+        >
+          📷 Record My Twin
+        </button>
+        {error && <p style={{ color: '#f87171', fontSize: '0.875rem', marginTop: '1rem' }}>{error}</p>}
       </div>
-    );
+    )
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: RECORD
+  // PHASE: TWIN RECORD
   // ════════════════════════════════════════════════════════════════════════════
-  if (phase === "record") {
+  if (phase === 'twin_record') {
     return (
-      <div className="fixed inset-0 bg-black overflow-hidden">
+      <div style={{ position: 'fixed', inset: 0, background: '#000', overflow: 'hidden' }}>
         {authButton}
         <video
           ref={previewRef}
           autoPlay muted playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: "scaleX(-1)" }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
         />
-        <div className="absolute inset-0 bg-black/30" />
-
-        <div className="relative z-10 flex flex-col items-center justify-between h-full w-full px-6 py-16">
-          {/* Top */}
-          <div className="text-center">
-            {!isRecording && !tooShort && !doneSeconds && (
-              <p className="text-white text-2xl font-light tracking-widest opacity-90 drop-shadow">
-                Tell your story.
-              </p>
-            )}
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', height: '100%', padding: '4rem 2rem' }}>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ color: 'white', fontSize: '1.25rem', fontWeight: 300, opacity: 0.9 }}>
+              {isRecording ? 'Look at the camera and speak naturally...' : 'Get ready to record your digital twin'}
+            </p>
           </div>
 
-          {/* Middle */}
-          <div className="flex-1 flex items-center justify-center">
-            {/* Too short warning */}
-            {tooShort && (
-              <div className="bg-black/70 rounded-2xl px-6 py-5 text-center max-w-xs">
-                <p className="text-yellow-400 text-base font-semibold leading-snug">
-                  Too short! Please record<br />at least {MIN_SECONDS} seconds. 🎬
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setTooShort(false)}
-                  className="mt-3 text-white/60 text-sm hover:text-white/80"
-                >
-                  Try again
-                </button>
-              </div>
-            )}
-
-            {/* Success */}
-            {doneSeconds !== null && !tooShort && (
-              <div className="bg-black/60 rounded-2xl px-6 py-4 text-center">
-                <p className="text-white text-lg font-semibold">
-                  Great! {doneSeconds} seconds recorded ✅
-                </p>
-              </div>
-            )}
-
-            {/* Subtitle during recording */}
-            {isRecording && subtitle && !tooShort && !doneSeconds && (
-              <p className="text-white text-xl font-medium text-center px-8 drop-shadow-lg animate-pulse">
-                {subtitle}
-              </p>
-            )}
-          </div>
-
-          {/* Bottom */}
-          <div className="flex flex-col items-center gap-4">
-            {/* Timer */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
             {isRecording && (
-              <div className="flex items-center gap-3">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-white text-sm font-mono tabular-nums">
-                  {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
-                  {" / "}
-                  {String(Math.floor(MAX_SECONDS / 60)).padStart(2, "0")}:{String(MAX_SECONDS % 60).padStart(2, "0")}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'pulse 1s infinite' }} />
+                <span style={{ color: 'white', fontFamily: 'monospace', fontSize: '1rem' }}>
+                  {String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')} / {String(Math.floor(MAX_RECORD_SECONDS / 60)).padStart(2, '0')}:{String(MAX_RECORD_SECONDS % 60).padStart(2, '0')}
                 </span>
-                {seconds < MIN_SECONDS && (
-                  <span className="text-yellow-400 text-xs">min {MIN_SECONDS}s</span>
-                )}
               </div>
             )}
 
-            {/* Record / Stop button — hidden while showing success */}
-            {!doneSeconds && (
-              <button
-                type="button"
-                onClick={isRecording ? stopRecording : () => void startRecording()}
-                className={[
-                  "flex items-center gap-3 px-8 py-4 rounded-full text-base font-semibold transition-all",
-                  isRecording
-                    ? "bg-red-600 text-white hover:bg-red-500 shadow-lg shadow-red-500/40"
-                    : "bg-white text-black hover:bg-white/90 shadow-lg shadow-white/20",
-                ].join(" ")}
-              >
-                {isRecording
-                  ? <><span className="w-3 h-3 rounded-sm bg-white" /> Stop</>
-                  : <><span className="w-3 h-3 rounded-full bg-red-500" /> Record</>
-                }
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={isRecording ? stopRecording : () => void startRecording()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                padding: '1rem 2.5rem', borderRadius: '9999px', border: 'none',
+                background: isRecording ? '#dc2626' : 'white',
+                color: isRecording ? 'white' : 'black',
+                fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
+              }}
+            >
+              {isRecording
+                ? <><span style={{ width: '12px', height: '12px', background: 'white', borderRadius: '2px', display: 'inline-block' }} /> Stop</>
+                : <><span style={{ width: '12px', height: '12px', background: '#ef4444', borderRadius: '50%', display: 'inline-block' }} /> Record</>
+              }
+            </button>
 
-            {/* Camera error */}
-            {error && !tooShort && (
-              <p className="text-red-400 text-sm text-center max-w-xs">{error}</p>
-            )}
-
-            {/* Back link */}
-            {!isRecording && !doneSeconds && !tooShort && (
-              <button
-                type="button"
-                onClick={() => setPhase("camera_prompt")}
-                className="text-white/40 text-sm hover:text-white/60 transition-colors"
-              >
+            {!isRecording && (
+              <button type="button" onClick={() => setPhase('twin_intro')} style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', fontSize: '0.875rem', cursor: 'pointer' }}>
                 ← Back
               </button>
             )}
+
+            {error && <p style={{ color: '#f87171', fontSize: '0.875rem', textAlign: 'center' }}>{error}</p>}
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: PROCESSING
+  // PHASE: TWIN PROCESSING
   // ════════════════════════════════════════════════════════════════════════════
-  if (phase === "processing") {
+  if (phase === 'twin_processing') {
     return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-6">
-        {myVideosButton}
-        {myVideosModal}
-        {authButton}
-        <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-        <p className="text-white/70 text-sm tracking-wide">{step || "Creating your movie…"}</p>
+      <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
+        <div style={{ width: '3rem', height: '3rem', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#a855f7', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem' }}>{step || 'Creating your digital twin...'}</p>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>This takes about 30 seconds</p>
       </div>
-    );
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PHASE: STORY INPUT
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === 'story_input') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        {authButton}
+        <div style={{ width: '100%', maxWidth: '420px' }}>
+          {/* Twin thumbnail */}
+          {twinFrameUrl && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
+              <img
+                src={twinFrameUrl}
+                alt="Your digital twin"
+                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #7c3aed' }}
+              />
+              <div>
+                <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>Your Digital Twin ✅</p>
+                <button type="button" onClick={resetTwin} style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', fontSize: '0.7rem', cursor: 'pointer', padding: 0 }}>
+                  Re-record twin
+                </button>
+              </div>
+            </div>
+          )}
+
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>🎬 Create Your Movie</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Tell your story in up to 200 characters</p>
+
+          <textarea
+            value={story}
+            onChange={e => setStory(e.target.value.slice(0, 200))}
+            rows={4}
+            placeholder="A detective discovers a hidden message in an old painting..."
+            style={{
+              width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '0.75rem', padding: '1rem', color: 'white', fontSize: '0.95rem',
+              resize: 'none', outline: 'none', boxSizing: 'border-box', marginBottom: '0.5rem',
+            }}
+          />
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', textAlign: 'right', marginBottom: '1.5rem' }}>
+            {story.length}/200
+          </p>
+
+          {error && <p style={{ color: '#f87171', fontSize: '0.875rem', marginBottom: '1rem' }}>{error}</p>}
+
+          <button
+            type="button"
+            onClick={() => void generateMovie()}
+            disabled={!story.trim()}
+            style={{
+              width: '100%', padding: '1rem', borderRadius: '1rem', border: 'none',
+              background: story.trim() ? '#7c3aed' : 'rgba(255,255,255,0.1)',
+              color: 'white', fontSize: '1rem', fontWeight: 'bold',
+              cursor: story.trim() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            ✨ Generate My Movie
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PHASE: MOVIE PROCESSING
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === 'movie_processing') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
+        <div style={{ width: '3rem', height: '3rem', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#a855f7', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem', textAlign: 'center', maxWidth: '280px' }}>{step || 'Generating your movie...'}</p>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>This takes 3–5 minutes</p>
+      </div>
+    )
   }
 
   // ════════════════════════════════════════════════════════════════════════════
   // PHASE: RESULT
   // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div className="fixed inset-0 bg-black">
-      {myVideosButton}
-      {myVideosModal}
+    <div style={{ position: 'fixed', inset: 0, background: '#000' }}>
+      {authButton}
       {videoUrl && (
         <video
           ref={resultRef}
           src={videoUrl}
           playsInline autoPlay controls
-          className="absolute inset-0 w-full h-full object-cover"
-          onEnded={() => setVideoEnded(true)}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
       )}
-
-      {authButton}
-
-      {/* ── Paywall overlay (shown when isPreview and NOT whitelisted) ── */}
-      {isPreview && !WHITELIST.includes(user?.email ?? '') && videoUrl && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-end pb-16 px-6"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92) 40%, rgba(0,0,0,0.3) 100%)" }}>
-          <div className="text-center mb-6">
-            <p className="text-white text-2xl font-bold mb-2">🎬 Your Movie is Ready</p>
-            <p className="text-white/60 text-sm max-w-xs">Unlock the full cinematic version</p>
-          </div>
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            <a
-              href="#"
-              className="w-full py-4 rounded-2xl bg-amber-500 text-black font-bold text-base text-center hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/30"
-            >
-              🔓 Unlock Full Version — $9.99
-            </a>
-            <button
-              type="button"
-              className="w-full py-3 text-white/40 text-sm hover:text-white/60 transition-colors"
-              onClick={makeAnother}
-            >
-              Make Another (Preview)
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Overlay shown when video ended or no video (non-preview or whitelisted) */}
-      {(!isPreview || WHITELIST.includes(user?.email ?? '')) && (videoEnded || !videoUrl) && <div className="absolute inset-0 bg-black/75" />}
-
-      {(!isPreview || WHITELIST.includes(user?.email ?? '')) && (videoEnded || !videoUrl) && (
-        <div className="relative z-10 flex flex-col items-center justify-center h-full px-6 gap-6">
-          <p className="text-white text-2xl font-semibold text-center tracking-wide">
-            Your movie is ready. 🎬
-          </p>
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            {videoUrl && (
-              <a
-                href={videoUrl}
-                download="my-movie.mp4"
-                className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold text-base text-center hover:bg-purple-500 transition-all shadow-lg shadow-purple-500/30"
-              >
-                ⬇️ Download My Movie
-              </a>
-            )}
-            <button
-              type="button"
-              className="w-full py-3 text-white/50 text-sm hover:text-white/70 transition-colors"
-              onClick={makeAnother}
-            >
-              Make Another
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Replay + Download overlay while video is playing (non-preview or whitelisted) */}
-      {(!isPreview || WHITELIST.includes(user?.email ?? '')) && videoUrl && !videoEnded && (
-        <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-3 z-10">
-          <button
-            type="button"
-            className="px-6 py-2 rounded-full bg-black/40 border border-white/20 text-white/70 text-sm hover:bg-black/60 transition-all"
-            onClick={() => {
-              if (resultRef.current) { resultRef.current.currentTime = 0; resultRef.current.play().catch(() => {}); }
-            }}
-          >
-            ↺ Replay
-          </button>
+      <div style={{ position: 'absolute', bottom: '2rem', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '0.75rem', zIndex: 10 }}>
+        {videoUrl && (
           <a
             href={videoUrl}
             download="my-movie.mp4"
-            className="px-6 py-2 rounded-full bg-purple-600/80 border border-purple-500/40 text-white text-sm hover:bg-purple-600 transition-all"
+            style={{ padding: '0.6rem 1.25rem', borderRadius: '9999px', background: 'rgba(124,58,237,0.8)', color: 'white', fontSize: '0.875rem', textDecoration: 'none' }}
           >
             ⬇️ Download
           </a>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={() => { setVideoUrl(null); setStory(''); setError(null); setPhase('story_input') }}
+          style={{ padding: '0.6rem 1.25rem', borderRadius: '9999px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: '0.875rem', cursor: 'pointer' }}
+        >
+          🎬 Make Another
+        </button>
+      </div>
     </div>
-  );
+  )
 }
