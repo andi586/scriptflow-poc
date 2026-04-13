@@ -321,6 +321,16 @@ export default function AppFlowPage() {
     </a>
   )
 
+  // ── My Videos button ───────────────────────────────────────────────────────
+  const myVideosButton = (
+    <a
+      href="/my-videos"
+      style={{ position: 'fixed', top: '1rem', left: '1rem', zIndex: 200, background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.75rem', textDecoration: 'none', display: 'inline-block' }}
+    >
+      🎬 My Videos
+    </a>
+  )
+
   // ════════════════════════════════════════════════════════════════════════════
   // PHASE: LOADING
   // ════════════════════════════════════════════════════════════════════════════
@@ -339,6 +349,7 @@ export default function AppFlowPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
         {authButton}
+        {myVideosButton}
         <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🎭</div>
         <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>Create Your Digital Twin</h1>
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', maxWidth: '320px', marginBottom: '2.5rem', lineHeight: 1.6 }}>
@@ -436,6 +447,7 @@ export default function AppFlowPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         {authButton}
+        {myVideosButton}
         <div style={{ width: '100%', maxWidth: '420px' }}>
           {/* Twin thumbnail */}
           {twinFrameUrl && (
