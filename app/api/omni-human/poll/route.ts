@@ -180,25 +180,34 @@ export async function GET(request: NextRequest) {
         if (imageUrlForKling) {
           try {
             console.log('[omni-human/poll] Submitting Kling task with imageUrl:', imageUrlForKling)
-            const klingPrompt = `${storyPrompt}, cinematic movie scene, dramatic environment, professional film set, @video_1 character actions and movements`
+            const klingPayload = {
+              model: 'kling',
+              task_type: 'omni_video_generation',
+              input: {
+                model_name: 'kling-v3-omni',
+                prompt: `${storyPrompt}, change background to cinematic movie scene, ancient battlefield at night, dramatic lighting, keep the person's face and movements exactly, wuxia warrior costume`,
+                negative_prompt: 'bedroom, home interior, white wall, casual clothing, plain background',
+                video_list: [
+                  {
+                    video_url: videoUrl,
+                    refer_type: 'base',
+                    keep_original_sound: 'no',
+                  },
+                ],
+                image_list: [
+                  {
+                    image_url: imageUrlForKling,
+                  },
+                ],
+                mode: 'pro',
+                sound: 'off',
+              },
+            }
+            console.log('[omni-human/poll] Kling payload:', JSON.stringify(klingPayload))
             const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
-              body: JSON.stringify({
-                model: 'kling',
-                task_type: 'video_generation',
-                input: {
-                  prompt: klingPrompt,
-                  negative_prompt: 'bedroom, home interior, selfie background, casual setting, plain wall, static, standing still',
-                  aspect_ratio: '9:16',
-                  duration: 5,
-                  version: '1.6',
-                  mode: 'pro',
-                  elements: [{ image_url: imageUrlForKling }],
-                  video_reference_url: videoUrl,
-                  creativity: 0.5,
-                },
-              }),
+              body: JSON.stringify(klingPayload),
             })
             console.log('[omni-human/poll] Kling submit response status:', klingRes.status)
             if (!klingRes.ok) {
