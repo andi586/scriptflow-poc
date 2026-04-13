@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
         if (imageUrlForKling) {
           try {
             console.log('[omni-human/poll] Submitting Kling task with imageUrl:', imageUrlForKling)
-            const klingPrompt = `${storyPrompt}, cinematic movie scene, dramatic environment, professional film set, @image_1 as the main character in the scene`
+            const klingPrompt = `${storyPrompt}, cinematic movie scene, dramatic environment, professional film set, @video_1 character actions and movements`
             const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
@@ -189,12 +189,14 @@ export async function GET(request: NextRequest) {
                 task_type: 'video_generation',
                 input: {
                   prompt: klingPrompt,
-                  negative_prompt: 'bedroom, home interior, selfie background, casual setting, plain wall',
+                  negative_prompt: 'bedroom, home interior, selfie background, casual setting, plain wall, static, standing still',
                   aspect_ratio: '9:16',
                   duration: 5,
                   version: '1.6',
                   mode: 'pro',
                   elements: [{ image_url: imageUrlForKling }],
+                  video_reference_url: videoUrl,
+                  creativity: 0.5,
                 },
               }),
             })
