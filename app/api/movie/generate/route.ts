@@ -100,6 +100,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
     }
 
+    // ── Step 3a: Parallel Kling scene generation (text-to-video) ─────────
+    let sceneTaskId: string | null = null
+    try {
+      console.log('[movie/generate] Submitting parallel Kling scene generation...')
+      const scenePayload = {
+        model: 'kling',
+        task_type: 'video_generation',
+        input: {
+          prompt: story,
+          version: '3.0',
+          mode: 'pro',
+          duration: 5,
+          aspect_ratio: '9:16',
+          enable_audio: true,
+        },
+      }
+      const sceneRes = await fetch('https://api.piapi.ai/api/v1/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
+        body: JSON.stringify(scenePayload),
+      })
+      if (sceneRes.ok) {
+        const sceneData = await sceneRes.json()
+        sceneTaskId = sceneData?.data?.task_id ?? null
+        console.log('[movie/generate] Kling scene taskId:', sceneTaskId)
+      } else {
+        const sceneErr = await sceneRes.text()
+        console.warn('[movie/generate] Kling scene submit failed:', sceneRes.status, sceneErr)
+      }
+    } catch (sceneErr) {
+      console.warn('[movie/generate] Kling scene submit error (non-fatal):', sceneErr instanceof Error ? sceneErr.message : sceneErr)
+    }
+
     console.log('[movie/generate] Submitting OmniHuman task...')
     const omniRes = await fetch('https://api.piapi.ai/api/v1/task', {
       method: 'POST',
@@ -137,6 +170,7 @@ export async function POST(request: NextRequest) {
         status: 'processing',
         image_url: frameUrl,
         audio_url: audioUrl,
+        scene_task_id: sceneTaskId ?? null,
         session_id: sessionId ?? null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
