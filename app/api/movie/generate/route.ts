@@ -130,6 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Step 4: Store in omnihuman_jobs ───────────────────────────────────
+    console.log('[movie/generate] storing audio_url in DB:', audioUrl)
     try {
       await supabase.from('omnihuman_jobs').insert({
         task_id: taskId,
