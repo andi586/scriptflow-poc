@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
 
     let shots: unknown
     try {
-      shots = JSON.parse(rawText)
+      const cleanedText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      shots = JSON.parse(cleanedText)
     } catch {
       console.error('[generate-script] Failed to parse JSON:', rawText)
       return NextResponse.json({ error: 'Failed to parse shots JSON from Anthropic' }, { status: 500 })
