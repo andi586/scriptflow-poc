@@ -391,184 +391,147 @@ export async function GET() {
     return NextResponse.json({ processed: jobs?.length ?? 0, completed, failed, pending, concatSweep: concatCount, stopped: 'budget_exceeded' })
   }
 
-  // ── Process 1 pending movie_shot per cron tick ────────────────────────────
+  // ── Process ALL pending movie_shots in parallel (non-blocking per shot) ───
   const { data: pendingShots } = await supabaseAdmin
     .from('movie_shots')
     .select('*')
     .in('status', ['pending', 'processing', 'omni_done', 'kling_done'])
-    .limit(1) // Only process 1 shot per cron tick to avoid timeout
+    .limit(20) // Process all pending shots per tick
 
   console.log(`[cron/process-kling] Found ${pendingShots?.length ?? 0} pending movie_shots`)
 
-  for (const shot of pendingShots ?? []) {
+  // Run all shot operations in parallel — each must complete in < 2s
+  await Promise.allSettled((pendingShots ?? []).map(async (shot) => {
     try {
-      // ── Poll OmniHuman status via omnihuman_jobs table ────────────────
-      if (shot.omni_task_id && !shot.omni_video_url) {
-        try {
-          const { data: omniJob } = await supabaseAdmin
-            .from('omnihuman_jobs')
-            .select('status, result_video_url')
-            .eq('task_id', shot.omni_task_id)
-            .single()
+      // Track local state changes for this shot
+      let omniVideoUrl: string | null = shot.omni_video_url ?? null
+      let klingSceneUrl: string | null = shot.kling_scene_url ?? null
+      let shotStatus: string = shot.status
 
-          if (omniJob?.result_video_url) {
-            await supabaseAdmin.from('movie_shots').update({
-              omni_video_url: omniJob.result_video_url,
-              status: 'omni_done',
-            }).eq('id', shot.id)
-            shot.omni_video_url = omniJob.result_video_url
-            shot.status = 'omni_done'
-            console.log(`[cron/process-kling] movie_shot ${shot.id} omni_done: ${omniJob.result_video_url}`)
-          } else {
-            console.log(`[cron/process-kling] movie_shot ${shot.id} omni job status=${omniJob?.status ?? 'not found'}, waiting...`)
-          }
-        } catch (omniErr) {
-          console.warn(`[cron/process-kling] omni job lookup error for shot ${shot.id}:`, omniErr instanceof Error ? omniErr.message : omniErr)
+      // ── Check OmniHuman via omnihuman_jobs (DB lookup, fast) ─────────
+      if (shot.omni_task_id && !omniVideoUrl) {
+        const { data: omniJob } = await supabaseAdmin
+          .from('omnihuman_jobs')
+          .select('status, result_video_url')
+          .eq('task_id', shot.omni_task_id)
+          .single()
+        if (omniJob?.result_video_url) {
+          omniVideoUrl = omniJob.result_video_url
+          shotStatus = 'omni_done'
+          await supabaseAdmin.from('movie_shots').update({ omni_video_url: omniVideoUrl, status: 'omni_done' }).eq('id', shot.id)
+          console.log(`[cron/movie_shots] shot ${shot.id} omni_done: ${omniVideoUrl}`)
         }
       }
 
-      // ── Poll Kling scene status via PiAPI ─────────────────────────────
-      if (shot.kling_task_id && !shot.kling_scene_url) {
-        try {
-          const klingRes = await fetch(`https://api.piapi.ai/api/v1/task/${shot.kling_task_id}`, {
-            headers: { 'x-api-key': piApiKey },
-          })
-          if (klingRes.ok) {
-            const klingData = await klingRes.json()
-            const klingStatus: string = klingData?.data?.status ?? klingData?.status ?? 'unknown'
-            if (klingStatus === 'completed' || klingStatus === 'success') {
-              const sceneUrl: string | null =
-                klingData?.data?.output?.video?.resource_without_watermark ??
-                klingData?.data?.output?.video_url ??
-                klingData?.data?.output?.video ??
-                klingData?.data?.output?.url ??
-                null
-              if (sceneUrl) {
-                await supabaseAdmin.from('movie_shots').update({
-                  kling_scene_url: sceneUrl,
-                  status: 'kling_done',
-                }).eq('id', shot.id)
-                shot.kling_scene_url = sceneUrl
-                shot.status = 'kling_done'
-                console.log(`[cron/process-kling] movie_shot ${shot.id} kling_done: ${sceneUrl}`)
+      // ── Check Kling scene via PiAPI (single poll, fast) ───────────────
+      if (shot.kling_task_id && !klingSceneUrl) {
+        const klingRes = await fetch(`https://api.piapi.ai/api/v1/task/${shot.kling_task_id}`, {
+          headers: { 'x-api-key': piApiKey },
+        })
+        if (klingRes.ok) {
+          const klingData = await klingRes.json()
+          const klingStatus: string = klingData?.data?.status ?? klingData?.status ?? 'unknown'
+          if (klingStatus === 'completed' || klingStatus === 'success') {
+            const sceneUrl: string | null =
+              klingData?.data?.output?.video?.resource_without_watermark ??
+              klingData?.data?.output?.video_url ??
+              klingData?.data?.output?.video ??
+              klingData?.data?.output?.url ??
+              null
+            if (sceneUrl) {
+              klingSceneUrl = sceneUrl
+              shotStatus = 'kling_done'
+              await supabaseAdmin.from('movie_shots').update({ kling_scene_url: klingSceneUrl, status: 'kling_done' }).eq('id', shot.id)
+              console.log(`[cron/movie_shots] shot ${shot.id} kling_done: ${klingSceneUrl}`)
+            }
+          }
+        }
+      }
+
+      // ── Poll existing Shotstack render (single check, fast) ───────────
+      if (shot.shotstack_render_id && !shot.final_shot_url && shotstackKey) {
+        const pollRes = await fetch(`https://api.shotstack.io/stage/render/${shot.shotstack_render_id}`, {
+          headers: { 'x-api-key': shotstackKey },
+        })
+        if (pollRes.ok) {
+          const pollData = await pollRes.json()
+          const renderStatus: string = pollData?.response?.status ?? 'unknown'
+          console.log(`[cron/movie_shots] shot ${shot.id} Shotstack render ${shot.shotstack_render_id} status=${renderStatus}`)
+          if (renderStatus === 'done') {
+            const finalShotUrl: string | null = pollData?.response?.url ?? null
+            if (finalShotUrl) {
+              await supabaseAdmin.from('movie_shots').update({ final_shot_url: finalShotUrl, status: 'shot_complete' }).eq('id', shot.id)
+              shotStatus = 'shot_complete'
+              console.log(`[cron/movie_shots] shot ${shot.id} shot_complete: ${finalShotUrl}`)
+            }
+          } else if (renderStatus === 'failed') {
+            await supabaseAdmin.from('movie_shots').update({ shotstack_render_id: null }).eq('id', shot.id)
+            console.warn(`[cron/movie_shots] shot ${shot.id} Shotstack render failed, cleared render_id`)
+          }
+        }
+        return // Don't submit new render while one is in flight
+      }
+
+      // ── Both ready + no render in flight → submit Shotstack (fire & forget) ─
+      if (omniVideoUrl && klingSceneUrl && !shot.final_shot_url && !shot.shotstack_render_id) {
+        if (shotstackKey) {
+          // Fire and forget — don't await the render result
+          fetch('https://api.shotstack.io/stage/render', {
+            method: 'POST',
+            headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              timeline: {
+                tracks: [{ clips: [
+                  { asset: { type: 'video', src: omniVideoUrl }, start: 0, length: 10, transition: { out: 'fade' } },
+                  { asset: { type: 'video', src: klingSceneUrl }, start: 10, length: 10, transition: { in: 'fade' } },
+                ]}],
+              },
+              output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
+            }),
+          }).then(async (res) => {
+            if (res.ok) {
+              const data = await res.json()
+              const renderId: string | null = data?.response?.id ?? null
+              if (renderId) {
+                await supabaseAdmin.from('movie_shots').update({ shotstack_render_id: renderId, status: 'processing' }).eq('id', shot.id)
+                console.log(`[cron/movie_shots] shot ${shot.id} Shotstack render submitted: ${renderId}`)
               }
             }
-          }
-        } catch (klingErr) {
-          console.warn(`[cron/process-kling] kling poll error for shot ${shot.id}:`, klingErr instanceof Error ? klingErr.message : klingErr)
-        }
-      }
-
-      // ── Poll pending Shotstack render (from previous tick) ────────────
-      if (shot.shotstack_render_id && !shot.final_shot_url) {
-        try {
-          if (shotstackKey) {
-            const pollRes = await fetch(`https://api.shotstack.io/stage/render/${shot.shotstack_render_id}`, {
-              headers: { 'x-api-key': shotstackKey },
-            })
-            if (pollRes.ok) {
-              const pollData = await pollRes.json()
-              const renderStatus: string = pollData?.response?.status ?? 'unknown'
-              console.log(`[cron/process-kling] Shotstack render ${shot.shotstack_render_id} status=${renderStatus} for shot ${shot.id}`)
-              if (renderStatus === 'done') {
-                const finalShotUrl: string | null = pollData?.response?.url ?? null
-                if (finalShotUrl) {
-                  await supabaseAdmin.from('movie_shots').update({
-                    final_shot_url: finalShotUrl,
-                    status: 'shot_complete',
-                  }).eq('id', shot.id)
-                  shot.final_shot_url = finalShotUrl
-                  shot.status = 'shot_complete'
-                  console.log(`[cron/process-kling] movie_shot ${shot.id} shot_complete via Shotstack poll: ${finalShotUrl}`)
-                }
-              } else if (renderStatus === 'failed') {
-                console.warn(`[cron/process-kling] Shotstack render failed for shot ${shot.id}, clearing render_id`)
-                await supabaseAdmin.from('movie_shots').update({ shotstack_render_id: null }).eq('id', shot.id)
-                shot.shotstack_render_id = null
+          }).catch((e) => console.warn(`[cron/movie_shots] shot ${shot.id} Shotstack submit error:`, e instanceof Error ? e.message : e))
+        } else {
+          // Fallback: Railway concat (fire and forget)
+          fetch(`${railwayUrl}/concat-videos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sceneVideoUrl: klingSceneUrl, faceVideoUrl: omniVideoUrl }),
+          }).then(async (res) => {
+            if (res.ok) {
+              const data = await res.json()
+              if (data.outputUrl) {
+                await supabaseAdmin.from('movie_shots').update({ final_shot_url: data.outputUrl, status: 'shot_complete' }).eq('id', shot.id)
+                console.log(`[cron/movie_shots] shot ${shot.id} shot_complete via Railway: ${data.outputUrl}`)
               }
             }
-          }
-        } catch (pollErr) {
-          console.warn(`[cron/process-kling] Shotstack poll error for shot ${shot.id}:`, pollErr instanceof Error ? pollErr.message : pollErr)
+          }).catch((e) => console.warn(`[cron/movie_shots] shot ${shot.id} Railway concat error:`, e instanceof Error ? e.message : e))
         }
       }
 
-      // ── When both done and no render in flight, submit Shotstack ──────
-      if (shot.omni_video_url && shot.kling_scene_url && !shot.final_shot_url && !shot.shotstack_render_id) {
-        try {
-          console.log(`[cron/process-kling] Both videos ready for shot ${shot.id}, submitting Shotstack...`)
-
-          if (shotstackKey) {
-            const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
-              method: 'POST',
-              headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                timeline: {
-                  tracks: [{
-                    clips: [
-                      { asset: { type: 'video', src: shot.omni_video_url }, start: 0, length: 10, transition: { out: 'fade' } },
-                      { asset: { type: 'video', src: shot.kling_scene_url }, start: 10, length: 10, transition: { in: 'fade' } },
-                    ],
-                  }],
-                },
-                output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
-              }),
-            })
-            const shotstackData = await shotstackRes.json()
-            const renderId: string | null = shotstackData?.response?.id ?? null
-            console.log(`[cron/process-kling] Shotstack renderId for shot ${shot.id}:`, renderId)
-            if (renderId) {
-              // Store renderId — poll result in next cron tick
-              await supabaseAdmin.from('movie_shots').update({
-                shotstack_render_id: renderId,
-                status: 'processing',
-              }).eq('id', shot.id)
-              shot.shotstack_render_id = renderId
-            }
-          } else {
-            // Fallback: Railway concat (synchronous, no polling needed)
-            const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sceneVideoUrl: shot.kling_scene_url, faceVideoUrl: shot.omni_video_url }),
-            })
-            if (concatRes.ok) {
-              const concatData = await concatRes.json()
-              const finalShotUrl: string | null = concatData.outputUrl ?? null
-              if (finalShotUrl) {
-                await supabaseAdmin.from('movie_shots').update({
-                  final_shot_url: finalShotUrl,
-                  status: 'shot_complete',
-                }).eq('id', shot.id)
-                shot.final_shot_url = finalShotUrl
-                shot.status = 'shot_complete'
-                console.log(`[cron/process-kling] movie_shot ${shot.id} shot_complete via Railway: ${finalShotUrl}`)
-              }
-            }
-          }
-        } catch (mergeErr) {
-          console.warn(`[cron/process-kling] merge error for shot ${shot.id}:`, mergeErr instanceof Error ? mergeErr.message : mergeErr)
-        }
-      }
+      void shotStatus // suppress unused warning
     } catch (shotErr) {
-      console.warn(`[cron/process-kling] error processing shot ${shot.id}:`, shotErr instanceof Error ? shotErr.message : shotErr)
+      console.warn(`[cron/movie_shots] error for shot ${shot.id}:`, shotErr instanceof Error ? shotErr.message : shotErr)
     }
-  }
+  }))
 
-  // ── When ALL shots of a movie are complete, concatenate into final video ──
-  // Only check movies that had a shot just completed this tick
-  const completedShotMovieIds = new Set<string>()
-  for (const shot of pendingShots ?? []) {
-    if (shot.status === 'shot_complete') {
-      completedShotMovieIds.add(shot.movie_id)
-    }
-  }
+  // ── Check if any movie_id now has ALL shots complete ─────────────────────
+  // Group pending shots by movie_id and check completion
+  const movieIds = [...new Set((pendingShots ?? []).map((s) => s.movie_id).filter(Boolean))]
 
-  for (const movieId of completedShotMovieIds) {
+  for (const movieId of movieIds) {
+    if (Date.now() - cronStart > CRON_BUDGET_MS) break
     try {
       const { data: allShots } = await supabaseAdmin
         .from('movie_shots')
-        .select('*')
+        .select('id, status, final_shot_url, shot_index')
         .eq('movie_id', movieId)
         .order('shot_index', { ascending: true })
 
@@ -576,13 +539,26 @@ export async function GET() {
 
       const completeShots = allShots.filter((s: { status: string }) => s.status === 'shot_complete')
       if (completeShots.length < allShots.length) {
-        console.log(`[cron/process-kling] movie ${movieId}: ${completeShots.length}/${allShots.length} shots complete, waiting...`)
+        console.log(`[cron/movie_shots] movie ${movieId}: ${completeShots.length}/${allShots.length} shots complete`)
         continue
       }
 
-      // All shots complete — submit Shotstack concat (fire-and-forget, store renderId)
-      const shotUrls: string[] = completeShots.map((s: { final_shot_url: string }) => s.final_shot_url).filter(Boolean)
-      console.log(`[cron/process-kling] All ${shotUrls.length} shots ready for movie ${movieId}, submitting final concat...`)
+      // All shots complete — check if final movie already submitted
+      const { data: existingJob } = await supabaseAdmin
+        .from('omnihuman_jobs')
+        .select('id, status, shotstack_render_id, result_video_url')
+        .eq('task_id', movieId)
+        .single()
+
+      if (existingJob?.result_video_url || existingJob?.shotstack_render_id) {
+        console.log(`[cron/movie_shots] movie ${movieId} final concat already in progress or done`)
+        continue
+      }
+
+      const shotUrls: string[] = completeShots
+        .map((s: { final_shot_url: string }) => s.final_shot_url)
+        .filter(Boolean)
+      console.log(`[cron/movie_shots] All ${shotUrls.length} shots ready for movie ${movieId}, submitting final concat...`)
 
       if (shotstackKey && shotUrls.length > 0) {
         const clips = shotUrls.map((url, i) => ({
@@ -592,85 +568,93 @@ export async function GET() {
           ...(i > 0 ? { transition: { in: 'fade' } } : {}),
           ...(i < shotUrls.length - 1 ? { transition: { out: 'fade' } } : {}),
         }))
-        const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
+        // Fire and forget
+        fetch('https://api.shotstack.io/stage/render', {
           method: 'POST',
           headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             timeline: { tracks: [{ clips }] },
             output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
           }),
-        })
-        const shotstackData = await shotstackRes.json()
-        const renderId: string | null = shotstackData?.response?.id ?? null
-        if (renderId) {
-          // Store renderId in omnihuman_jobs for polling in next tick
+        }).then(async (res) => {
+          if (res.ok) {
+            const data = await res.json()
+            const renderId: string | null = data?.response?.id ?? null
+            if (renderId) {
+              await supabaseAdmin
+                .from('omnihuman_jobs')
+                .update({ shotstack_render_id: renderId, status: 'rendering', updated_at: new Date().toISOString() })
+                .eq('task_id', movieId)
+              console.log(`[cron/movie_shots] Final Shotstack render submitted for movie ${movieId}: ${renderId}`)
+            }
+          }
+        }).catch((e) => console.warn(`[cron/movie_shots] final concat submit error for movie ${movieId}:`, e instanceof Error ? e.message : e))
+      } else if (shotUrls.length > 0) {
+        // Railway fallback (sequential, fire and forget)
+        ;(async () => {
+          let currentUrl = shotUrls[0]
+          for (let i = 1; i < shotUrls.length; i++) {
+            const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sceneVideoUrl: shotUrls[i], faceVideoUrl: currentUrl }),
+            })
+            if (concatRes.ok) {
+              const concatData = await concatRes.json()
+              currentUrl = concatData.outputUrl ?? currentUrl
+            }
+          }
           await supabaseAdmin
             .from('omnihuman_jobs')
-            .update({ shotstack_render_id: renderId, status: 'rendering', updated_at: new Date().toISOString() })
+            .update({ result_video_url: currentUrl, status: 'completed', updated_at: new Date().toISOString() })
             .eq('task_id', movieId)
-          console.log(`[cron/process-kling] Final Shotstack render submitted for movie ${movieId}: ${renderId}`)
-        }
-      } else if (shotUrls.length > 0) {
-        // Fallback: Railway concat (sequential, synchronous)
-        let currentUrl = shotUrls[0]
-        for (let i = 1; i < shotUrls.length; i++) {
-          const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sceneVideoUrl: shotUrls[i], faceVideoUrl: currentUrl }),
-          })
-          if (concatRes.ok) {
-            const concatData = await concatRes.json()
-            currentUrl = concatData.outputUrl ?? currentUrl
-          }
-        }
-        await supabaseAdmin
-          .from('omnihuman_jobs')
-          .update({ result_video_url: currentUrl, status: 'completed', updated_at: new Date().toISOString() })
-          .eq('task_id', movieId)
-        console.log(`[cron/process-kling] Final movie (Railway) for ${movieId}: ${currentUrl}`)
+          console.log(`[cron/movie_shots] Final movie (Railway) for ${movieId}: ${currentUrl}`)
+        })().catch((e) => console.warn(`[cron/movie_shots] Railway final concat error for movie ${movieId}:`, e instanceof Error ? e.message : e))
       }
     } catch (movieErr) {
-      console.warn(`[cron/process-kling] final concat error for movie ${movieId}:`, movieErr instanceof Error ? movieErr.message : movieErr)
+      console.warn(`[cron/movie_shots] final concat error for movie ${movieId}:`, movieErr instanceof Error ? movieErr.message : movieErr)
     }
   }
 
   // ── Poll pending final-movie Shotstack renders ────────────────────────────
-  const { data: renderingJobs } = await supabaseAdmin
-    .from('omnihuman_jobs')
-    .select('id, task_id, shotstack_render_id')
-    .eq('status', 'rendering')
-    .not('shotstack_render_id', 'is', null)
-    .limit(5)
+  if (Date.now() - cronStart <= CRON_BUDGET_MS) {
+    const { data: renderingJobs } = await supabaseAdmin
+      .from('omnihuman_jobs')
+      .select('id, task_id, shotstack_render_id')
+      .eq('status', 'rendering')
+      .not('shotstack_render_id', 'is', null)
+      .limit(5)
 
-  for (const job of renderingJobs ?? []) {
-    try {
-      if (!shotstackKey) continue
-      const pollRes = await fetch(`https://api.shotstack.io/stage/render/${job.shotstack_render_id}`, {
-        headers: { 'x-api-key': shotstackKey },
-      })
-      if (!pollRes.ok) continue
-      const pollData = await pollRes.json()
-      const renderStatus: string = pollData?.response?.status ?? 'unknown'
-      console.log(`[cron/process-kling] Final render ${job.shotstack_render_id} status=${renderStatus} for movie ${job.task_id}`)
-      if (renderStatus === 'done') {
-        const finalMovieUrl: string | null = pollData?.response?.url ?? null
-        if (finalMovieUrl) {
+    for (const job of renderingJobs ?? []) {
+      if (Date.now() - cronStart > CRON_BUDGET_MS) break
+      try {
+        if (!shotstackKey) continue
+        const pollRes = await fetch(`https://api.shotstack.io/stage/render/${job.shotstack_render_id}`, {
+          headers: { 'x-api-key': shotstackKey },
+        })
+        if (!pollRes.ok) continue
+        const pollData = await pollRes.json()
+        const renderStatus: string = pollData?.response?.status ?? 'unknown'
+        console.log(`[cron/process-kling] Final render ${job.shotstack_render_id} status=${renderStatus} for movie ${job.task_id}`)
+        if (renderStatus === 'done') {
+          const finalMovieUrl: string | null = pollData?.response?.url ?? null
+          if (finalMovieUrl) {
+            await supabaseAdmin
+              .from('omnihuman_jobs')
+              .update({ result_video_url: finalMovieUrl, status: 'completed', shotstack_render_id: null, updated_at: new Date().toISOString() })
+              .eq('id', job.id)
+            console.log(`[cron/process-kling] Final movie complete for ${job.task_id}: ${finalMovieUrl}`)
+          }
+        } else if (renderStatus === 'failed') {
           await supabaseAdmin
             .from('omnihuman_jobs')
-            .update({ result_video_url: finalMovieUrl, status: 'completed', shotstack_render_id: null, updated_at: new Date().toISOString() })
+            .update({ status: 'failed', shotstack_render_id: null, updated_at: new Date().toISOString() })
             .eq('id', job.id)
-          console.log(`[cron/process-kling] Final movie complete for ${job.task_id}: ${finalMovieUrl}`)
+          console.warn(`[cron/process-kling] Final render failed for movie ${job.task_id}`)
         }
-      } else if (renderStatus === 'failed') {
-        await supabaseAdmin
-          .from('omnihuman_jobs')
-          .update({ status: 'failed', shotstack_render_id: null, updated_at: new Date().toISOString() })
-          .eq('id', job.id)
-        console.warn(`[cron/process-kling] Final render failed for movie ${job.task_id}`)
+      } catch (pollErr) {
+        console.warn(`[cron/process-kling] final render poll error for job ${job.id}:`, pollErr instanceof Error ? pollErr.message : pollErr)
       }
-    } catch (pollErr) {
-      console.warn(`[cron/process-kling] final render poll error for job ${job.id}:`, pollErr instanceof Error ? pollErr.message : pollErr)
     }
   }
 
