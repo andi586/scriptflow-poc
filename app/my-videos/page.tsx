@@ -33,18 +33,29 @@ export default function MyVideosPage() {
   }, [])
 
   const handleDelete = async (id: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this video?')
+    if (!confirmed) return
+
     setDeletingId(id)
-    const supabase = createClient()
-    const { error: err } = await supabase
-      .from('omnihuman_jobs')
-      .delete()
-      .eq('id', id)
-    if (err) {
-      setError(err.message)
-    } else {
-      setVideos(prev => prev.filter(v => v.id !== id))
+    setError(null)
+
+    try {
+      const res = await fetch('/api/my-videos/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Delete failed')
+      } else {
+        setVideos(prev => prev.filter(v => v.id !== id))
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setDeletingId(null)
     }
-    setDeletingId(null)
   }
 
   const formatDate = (iso: string) => {
