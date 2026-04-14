@@ -241,9 +241,12 @@ export default function AppFlowPage() {
   }, [uploadBlob])
 
   // ── Generate movie (template mode) ────────────────────────────────────────
+  const [processingMessage, setProcessingMessage] = useState<string | null>(null)
+
   const generateFromTemplate = useCallback(async () => {
     if (!twinId || !selectedTemplate) return
     setPhase('movie_processing')
+    setProcessingMessage(null)
     setError(null)
 
     try {
@@ -255,9 +258,13 @@ export default function AppFlowPage() {
         body: JSON.stringify({ template: selectedTemplate.title, personalNote: personalNote.trim() || undefined }),
       })
       const scriptData = await scriptRes.json()
-      if (!scriptRes.ok || !scriptData.script) throw new Error(scriptData.error ?? 'Script generation failed')
+      if (!scriptRes.ok) throw new Error(scriptData.error ?? 'Script generation failed')
 
-      const script: string = scriptData.script
+      // Support both shots array (new) and legacy script string
+      const shots = scriptData.shots ?? null
+      const script: string = scriptData.script ?? (shots ? shots.map((s: { text: string }) => s.text).join(' ') : '')
+
+      if (!script && !shots) throw new Error('Script generation failed')
 
       // Step 2: Submit to movie/generate
       console.log('[app-flow] calling movie/generate...')
@@ -265,9 +272,16 @@ export default function AppFlowPage() {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ twinId, story: script, sessionId, template: selectedTemplate.title }),
+        body: JSON.stringify({ twinId, story: script, sessionId, template: selectedTemplate.title, shots }),
       })
       const data = await res.json()
+
+      if (shots && data.movieId) {
+        // Multi-shot path: show processing message, no polling needed yet
+        setProcessingMessage(`🎬 Generating your ${data.totalShots}-shot movie...`)
+        return
+      }
+
       if (!res.ok || !data.taskId) throw new Error(data.error ?? 'Movie generation failed')
 
       const taskId: string = data.taskId
@@ -698,6 +712,11 @@ export default function AppFlowPage() {
             <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i <= processingStep ? '#a855f7' : 'rgba(255,255,255,0.15)', transition: 'background 0.4s' }} />
           ))}
         </div>
+        {processingMessage && (
+          <p style={{ color: '#a855f7', fontSize: '0.9rem', textAlign: 'center', maxWidth: '280px', fontWeight: 600 }}>
+            {processingMessage}
+          </p>
+        )}
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>This takes 3–5 minutes</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
