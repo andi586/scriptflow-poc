@@ -8,7 +8,6 @@ const TWIN_ID_KEY = 'sf_twin_id'
 const TWIN_FRAME_KEY = 'sf_twin_frame'
 const SESSION_ID_KEY = 'sf_session_id'
 const MAX_RECORD_SECONDS = 60
-const MIN_RECORD_SECONDS = 5
 
 function getOrCreateSessionId(): string {
   if (typeof window === 'undefined') return 'ssr'
@@ -20,23 +19,50 @@ function getOrCreateSessionId(): string {
   return id
 }
 
+// ─── Emotion Templates ────────────────────────────────────────────────────────
+const TEMPLATES = [
+  { id: 'dear_mom',        emoji: '💌', title: 'Dear Mom',                  preview: 'Mom, I never told you this...',         featured: true },
+  { id: 'let_them_go',     emoji: '💔', title: 'Let Them Go',               preview: 'I kept holding on... but I\'m done.',   featured: false },
+  { id: 'younger_self',    emoji: '🌙', title: 'Letter to My Younger Self', preview: 'Hey... it\'s going to be okay.',         featured: false },
+  { id: 'deserve_better',  emoji: '👑', title: 'I Deserve Better',          preview: 'I used to beg for the bare minimum.',   featured: false },
+  { id: 'never_said',      emoji: '🕰', title: 'Things I Never Said',       preview: 'There\'s so much I kept inside...',     featured: false },
+  { id: 'love_myself',     emoji: '✨', title: 'I Finally Love Myself',     preview: 'I used to hate what I saw in the mirror.', featured: false },
+]
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Phase =
-  | 'loading'          // checking localStorage for existing twin
-  | 'twin_intro'       // no twin yet — explain what digital twin is
-  | 'twin_record'      // recording video for twin
-  | 'twin_processing'  // uploading + creating twin
-  | 'story_input'      // twin exists — enter story
-  | 'movie_processing' // generating movie
-  | 'result'           // show final video
+  | 'loading'
+  | 'twin_intro'
+  | 'twin_record'
+  | 'twin_processing'
+  | 'template_select'   // NEW: pick emotion template
+  | 'template_confirm'  // NEW: add personal note + create
+  | 'director_mode'     // Advanced: free-text story
+  | 'movie_processing'
+  | 'result'
+
+// ─── Processing steps ─────────────────────────────────────────────────────────
+const PROCESSING_STEPS = [
+  '🧠 Writing your words...',
+  '🎙 Giving you a voice...',
+  '🎭 Bringing you to life...',
+  '🎬 Building your scene...',
+]
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppFlowPage() {
   const [phase, setPhase] = useState<Phase>('loading')
   const [twinId, setTwinId] = useState<string | null>(null)
   const [twinFrameUrl, setTwinFrameUrl] = useState<string | null>(null)
+
+  // template mode
+  const [selectedTemplate, setSelectedTemplate] = useState<typeof TEMPLATES[0] | null>(null)
+  const [personalNote, setPersonalNote] = useState('')
+
+  // director mode (advanced)
   const [story, setStory] = useState('')
-  const [step, setStep] = useState('')
+
+  const [processingStep, setProcessingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
 
@@ -74,7 +100,7 @@ export default function AppFlowPage() {
     if (storedTwinId && storedFrame) {
       setTwinId(storedTwinId)
       setTwinFrameUrl(storedFrame)
-      setPhase('story_input')
+      setPhase('template_select')
     } else {
       setPhase('twin_intro')
     }
@@ -109,6 +135,18 @@ export default function AppFlowPage() {
     }, 100)
     return () => clearTimeout(t)
   }, [phase, videoUrl])
+
+  // ── Cycle processing steps ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'movie_processing') return
+    setProcessingStep(0)
+    let idx = 0
+    const t = setInterval(() => {
+      idx = Math.min(idx + 1, PROCESSING_STEPS.length - 1)
+      setProcessingStep(idx)
+    }, 18000) // ~18s per step
+    return () => clearInterval(t)
+  }, [phase])
 
   // ── Cleanup poll on unmount ────────────────────────────────────────────────
   useEffect(() => {
@@ -176,14 +214,12 @@ export default function AppFlowPage() {
   // ── Process twin video ─────────────────────────────────────────────────────
   const processTwinVideo = useCallback(async (blob: Blob) => {
     setPhase('twin_processing')
-    setStep('Uploading your video...')
     try {
       const mime = blob.type || 'video/webm'
       const ext = mime.includes('mp4') ? 'mp4' : 'webm'
       const videoUrl = await uploadBlob(blob, `twin_${Date.now()}.${ext}`)
       if (!videoUrl) throw new Error('Upload failed')
 
-      setStep('Creating your digital twin...')
       const sessionId = getOrCreateSessionId()
       const res = await fetch('/api/digital-twin/create', {
         method: 'POST',
@@ -197,25 +233,57 @@ export default function AppFlowPage() {
       localStorage.setItem(TWIN_FRAME_KEY, data.frameUrl)
       setTwinId(data.twinId)
       setTwinFrameUrl(data.frameUrl)
-      setPhase('story_input')
+      setPhase('template_select')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Twin creation failed')
       setPhase('twin_record')
     }
   }, [uploadBlob])
 
-  // ── Generate movie ─────────────────────────────────────────────────────────
-  const generateMovie = useCallback(async () => {
-    console.log('[app-flow] Generate clicked')
-    console.log('[app-flow] twinId:', twinId, 'story:', story)
+  // ── Generate movie (template mode) ────────────────────────────────────────
+  const generateFromTemplate = useCallback(async () => {
+    if (!twinId || !selectedTemplate) return
+    setPhase('movie_processing')
+    setError(null)
+
+    try {
+      // Step 1: Generate script via Anthropic
+      const scriptRes = await fetch('/api/generate-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: selectedTemplate.title, personalNote: personalNote.trim() || undefined }),
+      })
+      const scriptData = await scriptRes.json()
+      if (!scriptRes.ok || !scriptData.script) throw new Error(scriptData.error ?? 'Script generation failed')
+
+      const script: string = scriptData.script
+
+      // Step 2: Submit to movie/generate
+      const sessionId = getOrCreateSessionId()
+      const res = await fetch('/api/movie/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ twinId, story: script, sessionId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.taskId) throw new Error(data.error ?? 'Movie generation failed')
+
+      const taskId: string = data.taskId
+      startPolling(taskId)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Generation failed')
+      setPhase('template_confirm')
+    }
+  }, [twinId, selectedTemplate, personalNote])
+
+  // ── Generate movie (director mode) ────────────────────────────────────────
+  const generateFromDirector = useCallback(async () => {
     if (!twinId || !story.trim()) return
     setPhase('movie_processing')
-    setStep('Generating your dialogue...')
     setError(null)
 
     try {
       const sessionId = getOrCreateSessionId()
-      console.log('[app-flow] calling /api/movie/generate with twinId:', twinId)
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -223,79 +291,67 @@ export default function AppFlowPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.taskId) throw new Error(data.error ?? 'Movie generation failed')
-
-      const taskId: string = data.taskId
-      console.log('[app-flow] movie taskId:', taskId)
-      setStep('Animating your digital twin...')
-
-      // ── Poll OmniHuman → Kling ─────────────────────────────────────────
-      let attempt = 0
-      const MAX_POLL = 120 // 10 min at 5s intervals
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-
-      pollIntervalRef.current = setInterval(async () => {
-        attempt++
-        const elapsed = attempt * 5
-        const mins = Math.floor(elapsed / 60)
-        const secs = elapsed % 60
-        setStep(`Generating your movie... (${mins}m ${secs}s)`)
-
-        try {
-          const pollRes = await fetch(`/api/omni-human/poll?taskId=${taskId}`)
-          const pollData = await pollRes.json()
-          console.log(`[app-flow] poll ${attempt}:`, pollData.status)
-
-          if (pollData.status === 'kling_processing' && pollData.klingTaskId) {
-            setStep('Creating cinematic scene...')
-            // Switch to polling Kling
-            clearInterval(pollIntervalRef.current!)
-            let klingAttempt = 0
-            pollIntervalRef.current = setInterval(async () => {
-              klingAttempt++
-              const ke = klingAttempt * 5
-              setStep(`Creating cinematic scene... (${Math.floor(ke / 60)}m ${ke % 60}s)`)
-              try {
-                const kr = await fetch(`/api/kling-poll?taskId=${pollData.klingTaskId}`)
-                const kd = await kr.json()
-                console.log(`[app-flow] kling poll ${klingAttempt}:`, kd.status)
-                if (kd.status === 'completed' && kd.videoUrl) {
-                  clearInterval(pollIntervalRef.current!)
-                  setVideoUrl(kd.videoUrl)
-                  setPhase('result')
-                } else if (kd.status === 'failed') {
-                  clearInterval(pollIntervalRef.current!)
-                  setError('Kling scene generation failed')
-                  setPhase('story_input')
-                }
-              } catch {}
-              if (klingAttempt >= MAX_POLL) {
-                clearInterval(pollIntervalRef.current!)
-                setError('Timed out waiting for scene generation')
-                setPhase('story_input')
-              }
-            }, 5000)
-          } else if (pollData.status === 'completed' && pollData.videoUrl) {
-            clearInterval(pollIntervalRef.current!)
-            setVideoUrl(pollData.videoUrl)
-            setPhase('result')
-          } else if (pollData.status === 'failed') {
-            clearInterval(pollIntervalRef.current!)
-            setError('Video generation failed')
-            setPhase('story_input')
-          }
-        } catch {}
-
-        if (attempt >= MAX_POLL) {
-          clearInterval(pollIntervalRef.current!)
-          setError('Timed out waiting for video generation')
-          setPhase('story_input')
-        }
-      }, 5000)
+      startPolling(data.taskId)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Movie generation failed')
-      setPhase('story_input')
+      setPhase('director_mode')
     }
   }, [twinId, story])
+
+  // ── Shared polling logic ───────────────────────────────────────────────────
+  const startPolling = useCallback((taskId: string) => {
+    let attempt = 0
+    const MAX_POLL = 120
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+
+    pollIntervalRef.current = setInterval(async () => {
+      attempt++
+      try {
+        const pollRes = await fetch(`/api/omni-human/poll?taskId=${taskId}`)
+        const pollData = await pollRes.json()
+
+        if (pollData.status === 'kling_processing' && pollData.klingTaskId) {
+          clearInterval(pollIntervalRef.current!)
+          let klingAttempt = 0
+          pollIntervalRef.current = setInterval(async () => {
+            klingAttempt++
+            try {
+              const kr = await fetch(`/api/kling-poll?taskId=${pollData.klingTaskId}`)
+              const kd = await kr.json()
+              if (kd.status === 'completed' && kd.videoUrl) {
+                clearInterval(pollIntervalRef.current!)
+                setVideoUrl(kd.videoUrl)
+                setPhase('result')
+              } else if (kd.status === 'failed') {
+                clearInterval(pollIntervalRef.current!)
+                setError('Scene generation failed')
+                setPhase('template_select')
+              }
+            } catch {}
+            if (klingAttempt >= MAX_POLL) {
+              clearInterval(pollIntervalRef.current!)
+              setError('Timed out waiting for scene generation')
+              setPhase('template_select')
+            }
+          }, 5000)
+        } else if (pollData.status === 'completed' && pollData.videoUrl) {
+          clearInterval(pollIntervalRef.current!)
+          setVideoUrl(pollData.videoUrl)
+          setPhase('result')
+        } else if (pollData.status === 'failed') {
+          clearInterval(pollIntervalRef.current!)
+          setError('Video generation failed')
+          setPhase('template_select')
+        }
+      } catch {}
+
+      if (attempt >= MAX_POLL) {
+        clearInterval(pollIntervalRef.current!)
+        setError('Timed out waiting for video generation')
+        setPhase('template_select')
+      }
+    }, 5000)
+  }, [])
 
   // ── Reset twin ─────────────────────────────────────────────────────────────
   const resetTwin = useCallback(() => {
@@ -321,7 +377,6 @@ export default function AppFlowPage() {
     </a>
   )
 
-  // ── My Videos button ───────────────────────────────────────────────────────
   const myVideosButton = (
     <a
       href="/my-videos"
@@ -338,6 +393,7 @@ export default function AppFlowPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'white', animation: 'spin 0.8s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
@@ -363,6 +419,7 @@ export default function AppFlowPage() {
           📷 Record My Twin
         </button>
         {error && <p style={{ color: '#f87171', fontSize: '0.875rem', marginTop: '1rem' }}>{error}</p>}
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
@@ -423,6 +480,7 @@ export default function AppFlowPage() {
             {error && <p style={{ color: '#f87171', fontSize: '0.875rem', textAlign: 'center' }}>{error}</p>}
           </div>
         </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
       </div>
     )
   }
@@ -434,40 +492,157 @@ export default function AppFlowPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
         <div style={{ width: '3rem', height: '3rem', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#a855f7', animation: 'spin 0.8s linear infinite' }} />
-        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem' }}>{step || 'Creating your digital twin...'}</p>
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem' }}>Creating your digital twin...</p>
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>This takes about 30 seconds</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: STORY INPUT
+  // PHASE: TEMPLATE SELECT
   // ════════════════════════════════════════════════════════════════════════════
-  if (phase === 'story_input') {
+  if (phase === 'template_select') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#000', color: 'white', padding: '0 0 4rem' }}>
+        {authButton}
+        {myVideosButton}
+
+        {/* Header */}
+        <div style={{ padding: '4rem 1.5rem 1.5rem', textAlign: 'center' }}>
+          {twinFrameUrl && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+              <img src={twinFrameUrl} alt="twin" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #7c3aed' }} />
+              <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>Your twin is ready ✅</span>
+              <button type="button" onClick={resetTwin} style={{ color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', fontSize: '0.7rem', cursor: 'pointer' }}>re-record</button>
+            </div>
+          )}
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.4rem' }}>What do you want to say?</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.875rem' }}>Choose an emotion template</p>
+        </div>
+
+        {/* Template grid */}
+        <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0 1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          {TEMPLATES.map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => { setSelectedTemplate(t); setPersonalNote(''); setPhase('template_confirm') }}
+              style={{
+                background: t.featured ? 'linear-gradient(135deg, #7c3aed 0%, #db2777 100%)' : 'rgba(255,255,255,0.05)',
+                border: t.featured ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '1rem',
+                padding: '1rem 0.875rem',
+                textAlign: 'left',
+                cursor: 'pointer',
+                color: 'white',
+                position: 'relative',
+              }}
+            >
+              {t.featured && (
+                <span style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', fontSize: '0.6rem', background: 'rgba(255,255,255,0.25)', borderRadius: '9999px', padding: '0.15rem 0.4rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+                  FEATURED
+                </span>
+              )}
+              <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>{t.emoji}</div>
+              <div style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: '0.25rem', lineHeight: 1.2 }}>{t.title}</div>
+              <div style={{ fontSize: '0.7rem', color: t.featured ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>{t.preview}</div>
+            </button>
+          ))}
+        </div>
+
+        {error && <p style={{ color: '#f87171', fontSize: '0.875rem', textAlign: 'center', marginTop: '1rem' }}>{error}</p>}
+
+        {/* Advanced mode link */}
+        <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+          <button
+            type="button"
+            onClick={() => { setStory(''); setError(null); setPhase('director_mode') }}
+            style={{ color: 'rgba(255,255,255,0.25)', background: 'none', border: 'none', fontSize: '0.75rem', cursor: 'pointer' }}
+          >
+            Advanced Mode →
+          </button>
+        </div>
+
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PHASE: TEMPLATE CONFIRM
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === 'template_confirm') {
+    const t = selectedTemplate!
     return (
       <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         {authButton}
-        {myVideosButton}
-        <div style={{ width: '100%', maxWidth: '420px' }}>
-          {/* Twin thumbnail */}
-          {twinFrameUrl && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
-              <img
-                src={twinFrameUrl}
-                alt="Your digital twin"
-                style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #7c3aed' }}
-              />
-              <div>
-                <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>Your Digital Twin ✅</p>
-                <button type="button" onClick={resetTwin} style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', fontSize: '0.7rem', cursor: 'pointer', padding: 0 }}>
-                  Re-record twin
-                </button>
-              </div>
-            </div>
-          )}
 
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>🎬 Create Your Movie</h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Tell your story in up to 200 characters</p>
+        <div style={{ width: '100%', maxWidth: '400px' }}>
+          {/* Back */}
+          <button type="button" onClick={() => setPhase('template_select')} style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', fontSize: '0.875rem', cursor: 'pointer', marginBottom: '1.5rem', padding: 0 }}>
+            ← Back
+          </button>
+
+          {/* Selected template badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.75rem', background: 'rgba(255,255,255,0.05)', borderRadius: '0.875rem', padding: '0.875rem 1rem' }}>
+            <span style={{ fontSize: '2rem' }}>{t.emoji}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{t.title}</div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>{t.preview}</div>
+            </div>
+          </div>
+
+          {/* Personal note */}
+          <label style={{ display: 'block', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginBottom: '0.5rem' }}>
+            Add a personal touch <span style={{ color: 'rgba(255,255,255,0.25)' }}>(optional)</span>
+          </label>
+          <textarea
+            value={personalNote}
+            onChange={e => setPersonalNote(e.target.value.slice(0, 200))}
+            rows={3}
+            placeholder="e.g. She sacrificed everything for me"
+            style={{
+              width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '0.75rem', padding: '0.875rem', color: 'white', fontSize: '0.9rem',
+              resize: 'none', outline: 'none', boxSizing: 'border-box', marginBottom: '1.5rem',
+            }}
+          />
+
+          {error && <p style={{ color: '#f87171', fontSize: '0.875rem', marginBottom: '1rem' }}>{error}</p>}
+
+          <button
+            type="button"
+            onClick={() => void generateFromTemplate()}
+            style={{
+              width: '100%', padding: '1rem', borderRadius: '1rem', border: 'none',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #db2777 100%)',
+              color: 'white', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
+            }}
+          >
+            ✨ Create My Video
+          </button>
+        </div>
+
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PHASE: DIRECTOR MODE (Advanced)
+  // ════════════════════════════════════════════════════════════════════════════
+  if (phase === 'director_mode') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        {authButton}
+        <div style={{ width: '100%', maxWidth: '420px' }}>
+          <button type="button" onClick={() => setPhase('template_select')} style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', fontSize: '0.875rem', cursor: 'pointer', marginBottom: '1.5rem', padding: 0 }}>
+            ← Back
+          </button>
+
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>🎬 Director Mode</h1>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Write your own story (up to 200 characters)</p>
 
           <textarea
             value={story}
@@ -488,7 +663,7 @@ export default function AppFlowPage() {
 
           <button
             type="button"
-            onClick={() => void generateMovie()}
+            onClick={() => void generateFromDirector()}
             disabled={!story.trim()}
             style={{
               width: '100%', padding: '1rem', borderRadius: '1rem', border: 'none',
@@ -500,6 +675,7 @@ export default function AppFlowPage() {
             ✨ Generate My Movie
           </button>
         </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
@@ -511,8 +687,17 @@ export default function AppFlowPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
         <div style={{ width: '3rem', height: '3rem', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#a855f7', animation: 'spin 0.8s linear infinite' }} />
-        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem', textAlign: 'center', maxWidth: '280px' }}>{step || 'Generating your movie...'}</p>
+        <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '1rem', textAlign: 'center', maxWidth: '280px', fontWeight: 500 }}>
+          {PROCESSING_STEPS[processingStep]}
+        </p>
+        {/* Step dots */}
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {PROCESSING_STEPS.map((_, i) => (
+            <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i <= processingStep ? '#a855f7' : 'rgba(255,255,255,0.15)', transition: 'background 0.4s' }} />
+          ))}
+        </div>
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>This takes 3–5 minutes</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
@@ -543,12 +728,13 @@ export default function AppFlowPage() {
         )}
         <button
           type="button"
-          onClick={() => { setVideoUrl(null); setStory(''); setError(null); setPhase('story_input') }}
+          onClick={() => { setVideoUrl(null); setSelectedTemplate(null); setPersonalNote(''); setError(null); setPhase('template_select') }}
           style={{ padding: '0.6rem 1.25rem', borderRadius: '9999px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: '0.875rem', cursor: 'pointer' }}
         >
           🎬 Make Another
         </button>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
