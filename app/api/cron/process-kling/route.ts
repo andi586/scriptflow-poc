@@ -50,22 +50,28 @@ export async function GET() {
 
   for (const shot of pendingShots ?? []) {
     try {
-      // ── Poll OmniHuman status ──────────────────────────────────────────
+      // ── Poll OmniHuman status via omnihuman_jobs table ────────────────
       if (shot.omni_task_id && !shot.omni_video_url) {
         try {
-          const omniRes = await fetch(`${baseUrl}/api/omni-human/poll?taskId=${shot.omni_task_id}`)
-          const omniData = await omniRes.json()
-          if (omniData.status === 'completed' && omniData.videoUrl) {
+          const { data: omniJob } = await supabaseAdmin
+            .from('omnihuman_jobs')
+            .select('status, result_video_url')
+            .eq('task_id', shot.omni_task_id)
+            .single()
+
+          if (omniJob?.result_video_url) {
             await supabaseAdmin.from('movie_shots').update({
-              omni_video_url: omniData.videoUrl,
+              omni_video_url: omniJob.result_video_url,
               status: 'omni_done',
             }).eq('id', shot.id)
-            shot.omni_video_url = omniData.videoUrl
+            shot.omni_video_url = omniJob.result_video_url
             shot.status = 'omni_done'
-            console.log(`[cron/process-kling] movie_shot ${shot.id} omni_done: ${omniData.videoUrl}`)
+            console.log(`[cron/process-kling] movie_shot ${shot.id} omni_done: ${omniJob.result_video_url}`)
+          } else {
+            console.log(`[cron/process-kling] movie_shot ${shot.id} omni job status=${omniJob?.status ?? 'not found'}, waiting...`)
           }
         } catch (omniErr) {
-          console.warn(`[cron/process-kling] omni poll error for shot ${shot.id}:`, omniErr instanceof Error ? omniErr.message : omniErr)
+          console.warn(`[cron/process-kling] omni job lookup error for shot ${shot.id}:`, omniErr instanceof Error ? omniErr.message : omniErr)
         }
       }
 

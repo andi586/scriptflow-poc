@@ -185,6 +185,28 @@ export async function POST(request: NextRequest) {
         const klingTaskId = await submitKling(shot.scene, piApiKey)
         console.log('[movie/generate] Shot', shot.shot, 'kling_task_id:', klingTaskId)
 
+        // Insert into omnihuman_jobs so the cron can poll OmniHuman for this shot
+        if (omniTaskId) {
+          try {
+            const { error: omniInsertErr } = await supabase.from('omnihuman_jobs').insert({
+              task_id: omniTaskId,
+              status: 'processing',
+              image_url: frameUrl,
+              audio_url: audioUrl,
+              scene_task_id: klingTaskId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            if (omniInsertErr) {
+              console.error('[movie/generate] omnihuman_jobs insert failed for shot', shot.shot, ':', omniInsertErr.message)
+            } else {
+              console.log('[movie/generate] omnihuman_jobs insert SUCCESS for shot', shot.shot)
+            }
+          } catch (omniDbErr) {
+            console.error('[movie/generate] omnihuman_jobs insert FATAL for shot', shot.shot, ':', omniDbErr instanceof Error ? omniDbErr.message : omniDbErr)
+          }
+        }
+
         // Insert into movie_shots
         try {
           const { error: insertErr } = await supabase.from('movie_shots').insert({
