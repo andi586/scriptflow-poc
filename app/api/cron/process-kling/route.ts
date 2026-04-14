@@ -347,10 +347,54 @@ export async function GET() {
     }
   }
 
+  // ── Step 3: Catch-all concat sweep ───────────────────────────────────────
+  // Find completed jobs where both videos exist but result_video_url doesn't
+  // contain 'concat' (i.e. concat hasn't run yet for them).
+  const { data: concatPendingJobs } = await supabaseAdmin
+    .from('omnihuman_jobs')
+    .select('id, result_video_url, scene_video_url')
+    .eq('status', 'completed')
+    .not('result_video_url', 'is', null)
+    .not('scene_video_url', 'is', null)
+    .not('result_video_url', 'like', '%concat%')
+
+  console.log(`[cron/process-kling] Found ${concatPendingJobs?.length ?? 0} jobs needing catch-all concat`)
+
+  let concatCount = 0
+  for (const job of concatPendingJobs ?? []) {
+    try {
+      console.log(`[cron/process-kling] Catch-all concat for job ${job.id}...`)
+      const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sceneVideoUrl: job.scene_video_url,
+          faceVideoUrl: job.result_video_url,
+        }),
+      })
+      if (concatRes.ok) {
+        const concatData = await concatRes.json()
+        if (concatData.outputUrl) {
+          await supabaseAdmin
+            .from('omnihuman_jobs')
+            .update({ result_video_url: concatData.outputUrl, updated_at: new Date().toISOString() })
+            .eq('id', job.id)
+          console.log(`[cron/process-kling] Catch-all concat done for job ${job.id}: ${concatData.outputUrl}`)
+          concatCount++
+        }
+      } else {
+        console.warn(`[cron/process-kling] Catch-all concat failed for job ${job.id}: ${concatRes.status}`)
+      }
+    } catch (concatErr) {
+      console.warn(`[cron/process-kling] Catch-all concat error for job ${job.id}:`, concatErr instanceof Error ? concatErr.message : concatErr)
+    }
+  }
+
   return NextResponse.json({
     processed: jobs?.length ?? 0,
     completed,
     failed,
     pending,
+    concatSweep: concatCount,
   })
 }
