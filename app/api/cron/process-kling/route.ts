@@ -523,11 +523,17 @@ export async function GET() {
     }
   }))
 
-  // ── Check if any movie_id now has ALL shots complete ─────────────────────
-  // Group pending shots by movie_id and check completion
-  const movieIds = [...new Set((pendingShots ?? []).map((s) => s.movie_id).filter(Boolean))]
+  // ── Find ALL movies where every shot is shot_complete but no final video ──
+  // This catches movies that completed in previous ticks too
+  const { data: completedMovieShots } = await supabaseAdmin
+    .from('movie_shots')
+    .select('movie_id')
+    .eq('status', 'shot_complete')
 
-  for (const movieId of movieIds) {
+  const allCompletedMovieIds = [...new Set((completedMovieShots ?? []).map((s: { movie_id: string }) => s.movie_id).filter(Boolean))]
+  console.log(`[cron/movie_shots] Found ${allCompletedMovieIds.length} movies with at least one shot_complete`)
+
+  for (const movieId of allCompletedMovieIds) {
     if (Date.now() - cronStart > CRON_BUDGET_MS) break
     try {
       const { data: allShots } = await supabaseAdmin
@@ -538,16 +544,22 @@ export async function GET() {
 
       if (!allShots || allShots.length === 0) continue
 
-      const completeShots = allShots.filter((s: { status: string }) => s.status === 'shot_complete')
-      if (completeShots.length < allShots.length) {
-        console.log(`[cron/movie_shots] movie ${movieId}: ${completeShots.length}/${allShots.length} shots complete`)
+      const allComplete = allShots.every((s: { status: string; final_shot_url: string | null }) =>
+        s.status === 'shot_complete' && s.final_shot_url
+      )
+
+      if (!allComplete) {
+        const completeCount = allShots.filter((s: { status: string }) => s.status === 'shot_complete').length
+        console.log(`[cron/movie_shots] movie ${movieId}: ${completeCount}/${allShots.length} shots complete, waiting...`)
         continue
       }
 
-      // All shots complete — check if final movie already submitted
+      console.log(`[cron/movie_shots] All ${allShots.length} shots complete for movie ${movieId}, checking final video...`)
+
+      // Check if final video already exists in omnihuman_jobs (keyed by movie_id as task_id)
       const { data: existingJob } = await supabaseAdmin
         .from('omnihuman_jobs')
-        .select('id, status, shotstack_render_id, result_video_url')
+        .select('id, result_video_url, shotstack_render_id')
         .eq('task_id', movieId)
         .single()
 
@@ -556,10 +568,11 @@ export async function GET() {
         continue
       }
 
-      const shotUrls: string[] = completeShots
-        .map((s: { final_shot_url: string }) => s.final_shot_url)
-        .filter(Boolean)
-      console.log(`[cron/movie_shots] All ${shotUrls.length} shots ready for movie ${movieId}, submitting final concat...`)
+      const shotUrls: string[] = allShots
+        .map((s: { final_shot_url: string | null }) => s.final_shot_url)
+        .filter(Boolean) as string[]
+
+      console.log(`[cron/movie_shots] Concatenating ${shotUrls.length} shots for movie ${movieId}`)
 
       if (shotstackKey && shotUrls.length > 0) {
         const clips = shotUrls.map((url, i) => ({
@@ -582,12 +595,25 @@ export async function GET() {
             const data = await res.json()
             const renderId: string | null = data?.response?.id ?? null
             if (renderId) {
-              await supabaseAdmin
-                .from('omnihuman_jobs')
-                .update({ shotstack_render_id: renderId, status: 'rendering', updated_at: new Date().toISOString() })
-                .eq('task_id', movieId)
+              if (existingJob?.id) {
+                await supabaseAdmin
+                  .from('omnihuman_jobs')
+                  .update({ shotstack_render_id: renderId, status: 'rendering', updated_at: new Date().toISOString() })
+                  .eq('id', existingJob.id)
+              } else {
+                // Insert a new omnihuman_jobs row to track the final render
+                await supabaseAdmin.from('omnihuman_jobs').insert({
+                  task_id: movieId,
+                  shotstack_render_id: renderId,
+                  status: 'rendering',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+              }
               console.log(`[cron/movie_shots] Final Shotstack render submitted for movie ${movieId}: ${renderId}`)
             }
+          } else {
+            console.warn(`[cron/movie_shots] Shotstack submit failed for movie ${movieId}: ${res.status}`)
           }
         }).catch((e) => console.warn(`[cron/movie_shots] final concat submit error for movie ${movieId}:`, e instanceof Error ? e.message : e))
       } else if (shotUrls.length > 0) {
@@ -605,10 +631,20 @@ export async function GET() {
               currentUrl = concatData.outputUrl ?? currentUrl
             }
           }
-          await supabaseAdmin
-            .from('omnihuman_jobs')
-            .update({ result_video_url: currentUrl, status: 'completed', updated_at: new Date().toISOString() })
-            .eq('task_id', movieId)
+          if (existingJob?.id) {
+            await supabaseAdmin
+              .from('omnihuman_jobs')
+              .update({ result_video_url: currentUrl, status: 'completed', updated_at: new Date().toISOString() })
+              .eq('id', existingJob.id)
+          } else {
+            await supabaseAdmin.from('omnihuman_jobs').insert({
+              task_id: movieId,
+              result_video_url: currentUrl,
+              status: 'completed',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          }
           console.log(`[cron/movie_shots] Final movie (Railway) for ${movieId}: ${currentUrl}`)
         })().catch((e) => console.warn(`[cron/movie_shots] Railway final concat error for movie ${movieId}:`, e instanceof Error ? e.message : e))
       }
