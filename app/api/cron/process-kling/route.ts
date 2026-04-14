@@ -284,7 +284,7 @@ export async function GET() {
             if (shotstackKey) {
               try {
                 console.log('[cron/process-kling] Both videos ready, submitting Shotstack render...')
-                const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
+                const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
                   method: 'POST',
                   headers: {
                     'x-api-key': shotstackKey,
@@ -330,7 +330,7 @@ export async function GET() {
                   for (let attempt = 0; attempt < 60; attempt++) {
                     await new Promise(r => setTimeout(r, 5000))
                     try {
-                      const pollRes = await fetch(`https://api.shotstack.io/v1/render/${renderId}`, {
+                      const pollRes = await fetch(`https://api.shotstack.io/stage/render/${renderId}`, {
                         headers: { 'x-api-key': shotstackKey }
                       })
                       const pollData = await pollRes.json()
