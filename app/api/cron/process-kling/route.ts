@@ -695,6 +695,65 @@ export async function GET() {
     }
   }
 
+  // Final movie assembly: concat all shot_complete shots
+  const { data: shotCompleteRows } = await supabaseAdmin
+    .from('movie_shots')
+    .select('movie_id, final_shot_url, shot_index')
+    .eq('status', 'shot_complete')
+    .order('shot_index')
+
+  if (shotCompleteRows && shotCompleteRows.length > 0) {
+    const movieGroups: Record<string, string[]> = {}
+    for (const row of shotCompleteRows) {
+      if (!movieGroups[row.movie_id]) movieGroups[row.movie_id] = []
+      movieGroups[row.movie_id].push(row.final_shot_url)
+    }
+    
+    for (const [movieId, shotUrls] of Object.entries(movieGroups)) {
+      const { data: allShots } = await supabaseAdmin
+        .from('movie_shots')
+        .select('status')
+        .eq('movie_id', movieId)
+      
+      const allDone = allShots?.every(s => s.status === 'shot_complete')
+      if (!allDone) continue
+      
+      const { data: existingJob } = await supabaseAdmin
+        .from('omnihuman_jobs')
+        .select('result_video_url')
+        .eq('id', movieId)
+        .single()
+      
+      if (existingJob?.result_video_url) continue
+      
+      console.log('[cron] All shots complete for movie:', movieId, 'shots:', shotUrls.length)
+      
+      // Use Railway concat as fallback
+      const railwayUrl = process.env.RAILWAY_URL
+      if (railwayUrl && shotUrls.length > 1) {
+        // Concat sequentially: merge first two, then merge result with third, etc.
+        let currentUrl = shotUrls[0]
+        for (let i = 1; i < shotUrls.length; i++) {
+          const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sceneVideoUrl: currentUrl, faceVideoUrl: shotUrls[i] })
+          })
+          const concatData = await concatRes.json()
+          if (concatData.outputUrl) currentUrl = concatData.outputUrl
+        }
+        
+        await supabaseAdmin.from('omnihuman_jobs').upsert({
+          id: movieId,
+          task_id: movieId,
+          status: 'completed',
+          result_video_url: currentUrl
+        })
+        console.log('[cron] Final movie concat done:', currentUrl)
+      }
+    }
+  }
+
   return NextResponse.json({
     processed: jobs?.length ?? 0,
     completed,
