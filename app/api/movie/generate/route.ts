@@ -16,12 +16,12 @@ export const maxDuration = 30
  * 4. Return { taskId } — frontend polls /api/omni-human/poll?taskId=xxx
  */
 const scenePrompts: Record<string, string> = {
-  'Dear Mom': 'A warm, cinematic scene with soft candlelight, flowers, a family photo on the wall, golden hour sunlight through curtains, emotional and tender atmosphere, no people visible',
-  'Let Them Go': 'A person standing alone at sunset on a rooftop overlooking the city, dramatic cinematic lighting, emotional release, freedom',
-  'Letter to My Younger Self': 'A nostalgic childhood bedroom, old photographs, soft warm light, emotional and reflective atmosphere',
-  'I Deserve Better': 'A confident woman walking alone in a beautiful city street at night, dramatic lighting, empowerment',
-  'Things I Never Said': 'An empty chair by a window at sunset, letters on a table, emotional and poetic atmosphere',
-  'I Finally Love Myself': 'A person in a beautiful garden at golden hour, flowers blooming, peaceful and joyful atmosphere',
+  'Dear Mom': 'Empty room with warm candlelight, flowers on the table, family photos on the wall, golden hour sunlight through curtains, no people, no humans, no figures, cinematic atmosphere, emotional and tender',
+  'Let Them Go': 'Empty rooftop at sunset overlooking the city lights, dramatic cinematic lighting, no people, no humans, no figures, emotional atmosphere, freedom',
+  'Letter to My Younger Self': 'Empty nostalgic childhood bedroom, old photographs on desk, soft warm light, no people, no humans, no figures, emotional and reflective',
+  'I Deserve Better': 'Beautiful empty city street at night, dramatic lighting, empowerment atmosphere, no people, no humans, no figures, cinematic',
+  'Things I Never Said': 'Empty chair by a window at sunset, letters on a table, no people, no humans, no figures, emotional and poetic atmosphere',
+  'I Finally Love Myself': 'Beautiful empty garden at golden hour, flowers blooming, peaceful and joyful atmosphere, no people, no humans, no figures',
 }
 
 export async function POST(request: NextRequest) {
@@ -131,6 +131,7 @@ export async function POST(request: NextRequest) {
         task_type: 'video_generation',
         input: {
           prompt: scenePrompt,
+          negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
           version: '3.0',
           mode: 'pro',
           duration: 10,

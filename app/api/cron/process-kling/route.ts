@@ -280,19 +280,95 @@ export async function GET() {
             .single()
 
           if (jobData?.scene_video_url) {
-            console.log('[cron/process-kling] Both videos ready, concatenating...')
-            const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sceneVideoUrl: jobData.scene_video_url,
-                faceVideoUrl: finalVideoUrl
+            const shotstackKey = process.env.SHOTSTACK_API_KEY
+            if (shotstackKey) {
+              try {
+                console.log('[cron/process-kling] Both videos ready, submitting Shotstack render...')
+                const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
+                  method: 'POST',
+                  headers: {
+                    'x-api-key': shotstackKey,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    timeline: {
+                      tracks: [
+                        {
+                          clips: [
+                            {
+                              asset: { type: 'video', src: finalVideoUrl },
+                              start: 0,
+                              length: 10,
+                              transition: { out: 'fade' }
+                            },
+                            {
+                              asset: { type: 'video', src: jobData.scene_video_url },
+                              start: 10,
+                              length: 10,
+                              transition: { in: 'fade' }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    output: {
+                      format: 'mp4',
+                      resolution: 'sd',
+                      aspectRatio: '9:16'
+                    }
+                  })
+                })
+                const shotstackData = await shotstackRes.json()
+                const renderId: string | null = shotstackData?.response?.id ?? null
+                console.log('[cron/process-kling] Shotstack renderId:', renderId)
+
+                if (renderId) {
+                  // Poll Shotstack until done (max 60 attempts × 5s = 5 min)
+                  let renderUrl: string | null = null
+                  for (let attempt = 0; attempt < 60; attempt++) {
+                    await new Promise(r => setTimeout(r, 5000))
+                    try {
+                      const pollRes = await fetch(`https://api.shotstack.io/v1/render/${renderId}`, {
+                        headers: { 'x-api-key': shotstackKey }
+                      })
+                      const pollData = await pollRes.json()
+                      const renderStatus: string = pollData?.response?.status ?? 'unknown'
+                      console.log(`[cron/process-kling] Shotstack render ${renderId} status=${renderStatus}`)
+                      if (renderStatus === 'done') {
+                        renderUrl = pollData?.response?.url ?? null
+                        break
+                      } else if (renderStatus === 'failed') {
+                        console.warn(`[cron/process-kling] Shotstack render failed for job ${job.id}`)
+                        break
+                      }
+                    } catch (pollErr) {
+                      console.warn(`[cron/process-kling] Shotstack poll error:`, pollErr instanceof Error ? pollErr.message : pollErr)
+                    }
+                  }
+                  if (renderUrl) {
+                    finalVideoUrl = renderUrl
+                    console.log('[cron/process-kling] Shotstack concat complete:', finalVideoUrl)
+                  }
+                }
+              } catch (shotstackErr) {
+                console.warn(`[cron/process-kling] Shotstack error (non-fatal):`, shotstackErr instanceof Error ? shotstackErr.message : shotstackErr)
+              }
+            } else {
+              // Fallback to Railway concat if no Shotstack key
+              console.log('[cron/process-kling] No SHOTSTACK_API_KEY, falling back to Railway concat...')
+              const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sceneVideoUrl: jobData.scene_video_url,
+                  faceVideoUrl: finalVideoUrl
+                })
               })
-            })
-            const concatData = await concatRes.json()
-            if (concatData.outputUrl) {
-              finalVideoUrl = concatData.outputUrl
-              console.log('[cron/process-kling] Concat complete:', finalVideoUrl)
+              const concatData = await concatRes.json()
+              if (concatData.outputUrl) {
+                finalVideoUrl = concatData.outputUrl
+                console.log('[cron/process-kling] Railway concat complete:', finalVideoUrl)
+              }
             }
           }
 
