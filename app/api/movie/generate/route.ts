@@ -126,9 +126,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'twinId and story are required' }, { status: 400 })
     }
 
+    // Always use service role key (admin) so RLS doesn't block inserts
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } },
     )
 
     // ── Get digital twin frame ────────────────────────────────────────────────
@@ -200,7 +202,7 @@ export async function POST(request: NextRequest) {
             if (omniInsertErr) {
               console.error('[movie/generate] omnihuman_jobs insert failed for shot', shot.shot, ':', omniInsertErr.message)
             } else {
-              console.log('[movie/generate] omnihuman_jobs insert SUCCESS for shot', shot.shot)
+              console.log('[movie/generate] omnihuman_jobs insert SUCCESS for shot', shot.shot, '— omni inserted into omnihuman_jobs:', omniTaskId)
             }
           } catch (omniDbErr) {
             console.error('[movie/generate] omnihuman_jobs insert FATAL for shot', shot.shot, ':', omniDbErr instanceof Error ? omniDbErr.message : omniDbErr)
