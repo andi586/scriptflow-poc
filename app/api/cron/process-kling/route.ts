@@ -415,11 +415,12 @@ export async function GET() {
           .select('status, result_video_url')
           .eq('task_id', shot.omni_task_id)
           .single()
+        console.log(`[cron/movie_shots] shot ${shot.id} omni lookup: status=${omniJob?.status} url=${omniJob?.result_video_url?.slice(0, 50)}`)
         if (omniJob?.result_video_url) {
           omniVideoUrl = omniJob.result_video_url
           shotStatus = 'omni_done'
           await supabaseAdmin.from('movie_shots').update({ omni_video_url: omniVideoUrl, status: 'omni_done' }).eq('id', shot.id)
-          console.log(`[cron/movie_shots] shot ${shot.id} omni_done: ${omniVideoUrl}`)
+          console.log(`[cron/movie_shots] shot ${shot.id} omni_done updated`)
         }
       }
 
