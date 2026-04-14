@@ -248,6 +248,7 @@ export default function AppFlowPage() {
 
     try {
       // Step 1: Generate script via Anthropic
+      console.log('[app-flow] calling generate-script...')
       const scriptRes = await fetch('/api/generate-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,6 +260,7 @@ export default function AppFlowPage() {
       const script: string = scriptData.script
 
       // Step 2: Submit to movie/generate
+      console.log('[app-flow] calling movie/generate...')
       const sessionId = getOrCreateSessionId()
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
