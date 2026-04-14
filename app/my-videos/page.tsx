@@ -33,17 +33,17 @@ export default function MyVideosPage() {
   }, [])
 
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this video?')
+    const confirmed = confirm('Delete this video?')
     if (!confirmed) return
 
     setDeletingId(id)
     setError(null)
 
     try {
-      const res = await fetch('/api/my-videos/delete', {
-        method: 'DELETE',
+      const res = await fetch('/api/videos/delete', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ jobId: id }),
       })
       const data = await res.json()
       if (!res.ok) {
