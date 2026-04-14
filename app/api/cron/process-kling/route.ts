@@ -319,6 +319,8 @@ export async function GET() {
                   })
                 })
                 const shotstackData = await shotstackRes.json()
+                console.log('[cron] Shotstack status:', shotstackRes.status)
+                console.log('[cron] Shotstack body:', JSON.stringify(shotstackData))
                 const renderId: string | null = shotstackData?.response?.id ?? null
                 console.log('[cron/process-kling] Shotstack renderId:', renderId)
 
