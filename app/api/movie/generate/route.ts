@@ -15,9 +15,18 @@ export const maxDuration = 30
  * 3. OmniHuman: frameUrl + audio → speaking video (taskId stored in omnihuman_jobs)
  * 4. Return { taskId } — frontend polls /api/omni-human/poll?taskId=xxx
  */
+const scenePrompts: Record<string, string> = {
+  'Dear Mom': 'A warm, cinematic scene with soft candlelight, flowers, a family photo on the wall, golden hour sunlight through curtains, emotional and tender atmosphere, no people visible',
+  'Let Them Go': 'A person standing alone at sunset on a rooftop overlooking the city, dramatic cinematic lighting, emotional release, freedom',
+  'Letter to My Younger Self': 'A nostalgic childhood bedroom, old photographs, soft warm light, emotional and reflective atmosphere',
+  'I Deserve Better': 'A confident woman walking alone in a beautiful city street at night, dramatic lighting, empowerment',
+  'Things I Never Said': 'An empty chair by a window at sunset, letters on a table, emotional and poetic atmosphere',
+  'I Finally Love Myself': 'A person in a beautiful garden at golden hour, flowers blooming, peaceful and joyful atmosphere',
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { twinId, story, sessionId } = await request.json()
+    const { twinId, story, sessionId, template } = await request.json()
 
     if (!twinId || !story) {
       return NextResponse.json({ error: 'twinId and story are required' }, { status: 400 })
@@ -115,12 +124,13 @@ export async function POST(request: NextRequest) {
     // ── Step 3a: Parallel Kling scene generation (text-to-video) ─────────
     let sceneTaskId: string | null = null
     try {
-      console.log('[movie/generate] Submitting parallel Kling scene generation...')
+      const scenePrompt = (template && scenePrompts[template as string]) ? scenePrompts[template as string] : story
+      console.log('[movie/generate] Submitting parallel Kling scene generation, prompt:', scenePrompt.slice(0, 80))
       const scenePayload = {
         model: 'kling',
         task_type: 'video_generation',
         input: {
-          prompt: story,
+          prompt: scenePrompt,
           version: '3.0',
           mode: 'pro',
           duration: 5,

@@ -265,7 +265,7 @@ export default function AppFlowPage() {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ twinId, story: script, sessionId }),
+        body: JSON.stringify({ twinId, story: script, sessionId, template: selectedTemplate.title }),
       })
       const data = await res.json()
       if (!res.ok || !data.taskId) throw new Error(data.error ?? 'Movie generation failed')
