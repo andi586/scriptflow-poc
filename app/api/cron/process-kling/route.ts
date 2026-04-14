@@ -700,6 +700,7 @@ export async function GET() {
     .from('movie_shots')
     .select('movie_id, final_shot_url, shot_index')
     .eq('status', 'shot_complete')
+    .not('status', 'eq', 'movie_complete')
     .order('shot_index')
 
   if (shotCompleteRows && shotCompleteRows.length > 0) {
@@ -749,6 +750,10 @@ export async function GET() {
           status: 'completed',
           result_video_url: currentUrl
         })
+        await supabaseAdmin
+          .from('movie_shots')
+          .update({ status: 'movie_complete' })
+          .eq('movie_id', movieId)
         console.log('[cron] Final movie concat done:', currentUrl)
       }
     }
