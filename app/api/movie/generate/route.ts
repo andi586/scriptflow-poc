@@ -46,7 +46,7 @@ async function generateAudioUrl(
       headers: { 'xi-api-key': elevenKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: text.slice(0, 300),
-        model_id: 'eleven_turbo_v2',
+        model_id: 'eleven_turbo_v2_5',
         voice_settings: { stability: 0.5, similarity_boost: 0.75 },
       }),
     })
@@ -152,8 +152,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
     }
 
-    const elevenKey = process.env.ELEVENLABS_API_KEY
-    const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL'
+  const elevenKey = process.env.ELEVENLABS_API_KEY
+  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // Adam - multilingual
 
     // ════════════════════════════════════════════════════════════════════════
     // MULTI-SHOT PATH
@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
           headers: { 'xi-api-key': elevenKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: firstSentence,
-            model_id: 'eleven_turbo_v2',
+            model_id: 'eleven_turbo_v2_5',
             voice_settings: { stability: 0.5, similarity_boost: 0.75 },
           }),
         })
