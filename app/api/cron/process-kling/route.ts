@@ -29,8 +29,241 @@ export async function GET() {
   const supabaseAdmin = createClient(supabaseUrl, serviceKey)
 
   const railwayUrl = process.env.RAILWAY_URL ?? 'https://scriptflow-video-merge-production.up.railway.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    ? process.env.NEXT_PUBLIC_APP_URL
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+  const shotstackKey = process.env.SHOTSTACK_API_KEY
 
-  // ── Step 0: Poll scene_task_id for jobs that have one ────────────────────
+  // ════════════════════════════════════════════════════════════════════════
+  // Step 0: Process movie_shots table (multi-shot pipeline)
+  // ════════════════════════════════════════════════════════════════════════
+  const { data: pendingShots } = await supabaseAdmin
+    .from('movie_shots')
+    .select('*')
+    .in('status', ['pending', 'processing'])
+    .limit(20)
+
+  console.log(`[cron/process-kling] Found ${pendingShots?.length ?? 0} pending movie_shots`)
+
+  for (const shot of pendingShots ?? []) {
+    try {
+      // ── Poll OmniHuman status ──────────────────────────────────────────
+      if (shot.omni_task_id && !shot.omni_video_url) {
+        try {
+          const omniRes = await fetch(`${baseUrl}/api/omni-human/poll?taskId=${shot.omni_task_id}`)
+          const omniData = await omniRes.json()
+          if (omniData.status === 'completed' && omniData.videoUrl) {
+            await supabaseAdmin.from('movie_shots').update({
+              omni_video_url: omniData.videoUrl,
+              status: 'omni_done',
+            }).eq('id', shot.id)
+            shot.omni_video_url = omniData.videoUrl
+            shot.status = 'omni_done'
+            console.log(`[cron/process-kling] movie_shot ${shot.id} omni_done: ${omniData.videoUrl}`)
+          }
+        } catch (omniErr) {
+          console.warn(`[cron/process-kling] omni poll error for shot ${shot.id}:`, omniErr instanceof Error ? omniErr.message : omniErr)
+        }
+      }
+
+      // ── Poll Kling scene status via PiAPI ─────────────────────────────
+      if (shot.kling_task_id && !shot.kling_scene_url) {
+        try {
+          const klingRes = await fetch(`https://api.piapi.ai/api/v1/task/${shot.kling_task_id}`, {
+            headers: { 'x-api-key': piApiKey },
+          })
+          if (klingRes.ok) {
+            const klingData = await klingRes.json()
+            const klingStatus: string = klingData?.data?.status ?? klingData?.status ?? 'unknown'
+            if (klingStatus === 'completed' || klingStatus === 'success') {
+              const sceneUrl: string | null =
+                klingData?.data?.output?.video?.resource_without_watermark ??
+                klingData?.data?.output?.video_url ??
+                klingData?.data?.output?.video ??
+                klingData?.data?.output?.url ??
+                null
+              if (sceneUrl) {
+                await supabaseAdmin.from('movie_shots').update({
+                  kling_scene_url: sceneUrl,
+                  status: 'kling_done',
+                }).eq('id', shot.id)
+                shot.kling_scene_url = sceneUrl
+                shot.status = 'kling_done'
+                console.log(`[cron/process-kling] movie_shot ${shot.id} kling_done: ${sceneUrl}`)
+              }
+            }
+          }
+        } catch (klingErr) {
+          console.warn(`[cron/process-kling] kling poll error for shot ${shot.id}:`, klingErr instanceof Error ? klingErr.message : klingErr)
+        }
+      }
+
+      // ── When both done, merge with Shotstack ──────────────────────────
+      if (shot.omni_video_url && shot.kling_scene_url && !shot.final_shot_url) {
+        try {
+          console.log(`[cron/process-kling] Both videos ready for shot ${shot.id}, merging...`)
+          let finalShotUrl: string | null = null
+
+          if (shotstackKey) {
+            const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
+              method: 'POST',
+              headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                timeline: {
+                  tracks: [{
+                    clips: [
+                      { asset: { type: 'video', src: shot.omni_video_url }, start: 0, length: 10, transition: { out: 'fade' } },
+                      { asset: { type: 'video', src: shot.kling_scene_url }, start: 10, length: 10, transition: { in: 'fade' } },
+                    ],
+                  }],
+                },
+                output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
+              }),
+            })
+            const shotstackData = await shotstackRes.json()
+            const renderId: string | null = shotstackData?.response?.id ?? null
+            console.log(`[cron/process-kling] Shotstack renderId for shot ${shot.id}:`, renderId)
+
+            if (renderId) {
+              for (let attempt = 0; attempt < 60; attempt++) {
+                await new Promise(r => setTimeout(r, 5000))
+                try {
+                  const pollRes = await fetch(`https://api.shotstack.io/stage/render/${renderId}`, {
+                    headers: { 'x-api-key': shotstackKey },
+                  })
+                  const pollData = await pollRes.json()
+                  const renderStatus: string = pollData?.response?.status ?? 'unknown'
+                  if (renderStatus === 'done') { finalShotUrl = pollData?.response?.url ?? null; break }
+                  if (renderStatus === 'failed') { console.warn(`[cron/process-kling] Shotstack render failed for shot ${shot.id}`); break }
+                } catch {}
+              }
+            }
+          } else {
+            // Fallback: Railway concat
+            const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sceneVideoUrl: shot.kling_scene_url, faceVideoUrl: shot.omni_video_url }),
+            })
+            if (concatRes.ok) {
+              const concatData = await concatRes.json()
+              finalShotUrl = concatData.outputUrl ?? null
+            }
+          }
+
+          if (finalShotUrl) {
+            await supabaseAdmin.from('movie_shots').update({
+              final_shot_url: finalShotUrl,
+              status: 'shot_complete',
+            }).eq('id', shot.id)
+            shot.final_shot_url = finalShotUrl
+            shot.status = 'shot_complete'
+            console.log(`[cron/process-kling] movie_shot ${shot.id} shot_complete: ${finalShotUrl}`)
+          }
+        } catch (mergeErr) {
+          console.warn(`[cron/process-kling] merge error for shot ${shot.id}:`, mergeErr instanceof Error ? mergeErr.message : mergeErr)
+        }
+      }
+    } catch (shotErr) {
+      console.warn(`[cron/process-kling] error processing shot ${shot.id}:`, shotErr instanceof Error ? shotErr.message : shotErr)
+    }
+  }
+
+  // ── When ALL shots of a movie are complete, concatenate into final video ──
+  // Find distinct movie_ids that have at least one shot_complete
+  const completedShotMovieIds = new Set<string>()
+  for (const shot of pendingShots ?? []) {
+    if (shot.status === 'shot_complete' || shot.final_shot_url) {
+      completedShotMovieIds.add(shot.movie_id)
+    }
+  }
+
+  for (const movieId of completedShotMovieIds) {
+    try {
+      const { data: allShots } = await supabaseAdmin
+        .from('movie_shots')
+        .select('*')
+        .eq('movie_id', movieId)
+        .order('shot_index', { ascending: true })
+
+      if (!allShots || allShots.length === 0) continue
+
+      const completeShots = allShots.filter((s: { status: string }) => s.status === 'shot_complete')
+      if (completeShots.length < allShots.length) {
+        console.log(`[cron/process-kling] movie ${movieId}: ${completeShots.length}/${allShots.length} shots complete, waiting...`)
+        continue
+      }
+
+      // All shots complete — concatenate final video
+      const shotUrls: string[] = completeShots.map((s: { final_shot_url: string }) => s.final_shot_url).filter(Boolean)
+      console.log(`[cron/process-kling] All ${shotUrls.length} shots ready for movie ${movieId}, concatenating...`)
+
+      let finalMovieUrl: string | null = null
+      if (shotstackKey && shotUrls.length > 0) {
+        const clips = shotUrls.map((url, i) => ({
+          asset: { type: 'video', src: url },
+          start: i * 10,
+          length: 10,
+          ...(i > 0 ? { transition: { in: 'fade' } } : {}),
+          ...(i < shotUrls.length - 1 ? { transition: { out: 'fade' } } : {}),
+        }))
+        const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
+          method: 'POST',
+          headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timeline: { tracks: [{ clips }] },
+            output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
+          }),
+        })
+        const shotstackData = await shotstackRes.json()
+        const renderId: string | null = shotstackData?.response?.id ?? null
+        if (renderId) {
+          for (let attempt = 0; attempt < 60; attempt++) {
+            await new Promise(r => setTimeout(r, 5000))
+            try {
+              const pollRes = await fetch(`https://api.shotstack.io/stage/render/${renderId}`, {
+                headers: { 'x-api-key': shotstackKey },
+              })
+              const pollData = await pollRes.json()
+              const renderStatus: string = pollData?.response?.status ?? 'unknown'
+              if (renderStatus === 'done') { finalMovieUrl = pollData?.response?.url ?? null; break }
+              if (renderStatus === 'failed') { console.warn(`[cron/process-kling] Shotstack final concat failed for movie ${movieId}`); break }
+            } catch {}
+          }
+        }
+      } else if (shotUrls.length > 0) {
+        // Fallback: Railway concat (sequential)
+        let currentUrl = shotUrls[0]
+        for (let i = 1; i < shotUrls.length; i++) {
+          const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sceneVideoUrl: shotUrls[i], faceVideoUrl: currentUrl }),
+          })
+          if (concatRes.ok) {
+            const concatData = await concatRes.json()
+            currentUrl = concatData.outputUrl ?? currentUrl
+          }
+        }
+        finalMovieUrl = currentUrl
+      }
+
+      if (finalMovieUrl) {
+        // Store in omnihuman_jobs using movie_id as task_id lookup
+        await supabaseAdmin
+          .from('omnihuman_jobs')
+          .update({ result_video_url: finalMovieUrl, status: 'completed', updated_at: new Date().toISOString() })
+          .eq('task_id', movieId)
+        console.log(`[cron/process-kling] Final movie for ${movieId}: ${finalMovieUrl}`)
+      }
+    } catch (movieErr) {
+      console.warn(`[cron/process-kling] final concat error for movie ${movieId}:`, movieErr instanceof Error ? movieErr.message : movieErr)
+    }
+  }
+
+  // ── Step 0 (original): Poll scene_task_id for jobs that have one ────────────────────
   const { data: sceneJobs } = await supabaseAdmin
     .from('omnihuman_jobs')
     .select('*')
