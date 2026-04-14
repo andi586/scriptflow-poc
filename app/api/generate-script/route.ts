@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
     }
 
-    const systemPrompt = `You are a viral emotional script writer for TikTok. Rules: First 3 seconds must hook emotionally. Short sentences max 10 words. Natural spoken language. Use pauses (...). Build emotional escalation. End with powerful release. Length: MAXIMUM 12 seconds when spoken aloud. Count carefully. Short sentences. Maximum 8-10 sentences total. No fluff.`
+    const systemPrompt = `You are an emotional script writer. Split the story into exactly 4 shots of 12 seconds each. Return ONLY valid JSON array, no other text:
+[{"shot":1,"text":"script text","scene":"empty cinematic scene, no people, no humans, no figures"},{"shot":2,"text":"...","scene":"..."},{"shot":3,"text":"...","scene":"..."},{"shot":4,"text":"...","scene":"..."}]`
 
     const userPrompt = `Template: ${template}. Personal note: ${personalNote ?? 'none'}. Write a monologue.`
 
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
+        max_tokens: 1024,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
@@ -48,14 +49,22 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await res.json()
-    const script: string = data?.content?.[0]?.text ?? ''
+    const rawText: string = data?.content?.[0]?.text ?? ''
 
-    if (!script) {
+    if (!rawText) {
       return NextResponse.json({ error: 'No script returned from Anthropic' }, { status: 500 })
     }
 
-    console.log('[generate-script] Script generated, length:', script.length)
-    return NextResponse.json({ script })
+    let shots: unknown
+    try {
+      shots = JSON.parse(rawText)
+    } catch {
+      console.error('[generate-script] Failed to parse JSON:', rawText)
+      return NextResponse.json({ error: 'Failed to parse shots JSON from Anthropic' }, { status: 500 })
+    }
+
+    console.log('[generate-script] Shots generated:', Array.isArray(shots) ? (shots as unknown[]).length : 'not array')
+    return NextResponse.json({ shots })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[generate-script] FATAL:', message)
