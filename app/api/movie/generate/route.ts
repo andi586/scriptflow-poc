@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
           prompt: scenePrompt,
           version: '3.0',
           mode: 'pro',
-          duration: 5,
+          duration: 10,
           aspect_ratio: '9:16',
           enable_audio: true,
         },

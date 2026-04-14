@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
     }
 
-    const systemPrompt = `You are a viral emotional script writer for TikTok. Rules: First 3 seconds must hook emotionally. Short sentences max 10 words. Natural spoken language. Use pauses (...). Build emotional escalation. End with powerful release. Length 25-35 seconds when spoken. No fluff.`
+    const systemPrompt = `You are a viral emotional script writer for TikTok. Rules: First 3 seconds must hook emotionally. Short sentences max 10 words. Natural spoken language. Use pauses (...). Build emotional escalation. End with powerful release. Length: MAXIMUM 12 seconds when spoken aloud. Count carefully. Short sentences. Maximum 8-10 sentences total. No fluff.`
 
     const userPrompt = `Template: ${template}. Personal note: ${personalNote ?? 'none'}. Write a monologue.`
 
