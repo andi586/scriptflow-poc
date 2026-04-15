@@ -252,16 +252,16 @@ export async function GET() {
   for (const movieId of movieIds) {
     if (Date.now() - cronStart > CRON_BUDGET_MS) break
     try {
-      // Check if already has movie_complete shots (already processed)
+      // Check if already has final_complete shots (already processed)
       const { data: doneShots } = await supabaseAdmin
         .from('movie_shots')
         .select('id')
         .eq('movie_id', movieId)
-        .eq('status', 'movie_complete')
+        .eq('status', 'final_complete')
         .limit(1)
 
       if (doneShots && doneShots.length > 0) {
-        console.log(`[cron/process-movies] movie ${movieId} already movie_complete, skipping`)
+        console.log(`[cron/process-movies] movie ${movieId} already final_complete, skipping`)
         continue
       }
 
@@ -387,7 +387,7 @@ export async function GET() {
           const finalMovieUrl: string | null = pollData?.response?.url ?? null
           if (finalMovieUrl) {
             await supabaseAdmin.from('omnihuman_jobs').update({ result_video_url: finalMovieUrl, status: 'completed', shotstack_render_id: null, updated_at: new Date().toISOString() }).eq('id', job.id)
-            await supabaseAdmin.from('movie_shots').update({ status: 'movie_complete' }).eq('movie_id', job.task_id)
+            await supabaseAdmin.from('movie_shots').update({ status: 'final_complete' }).eq('movie_id', job.task_id)
             console.log(`[cron/process-movies] Final movie complete for ${job.task_id}: ${finalMovieUrl}`)
           }
         } else if (renderStatus === 'failed') {

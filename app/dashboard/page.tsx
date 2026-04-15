@@ -82,12 +82,12 @@ export default function Dashboard() {
       kling_done: '#f59e0b',
       processing: '#f59e0b',
       shot_complete: '#10b981',
-      movie_complete: '#8b5cf6',
+      final_complete: '#8b5cf6',
     }
     return colors[status] ?? '#666'
   }
 
-  const activeMovies = movies.filter(m => !m.shots.every((s: any) => s.status === 'movie_complete'))
+  const activeMovies = movies.filter(m => !m.shots.every((s: any) => s.status === 'final_complete'))
   const completedMovies = jobs.filter(j => j.result_video_url)
 
   const MONTHLY_COSTS = {
@@ -171,7 +171,7 @@ export default function Dashboard() {
       <h2 style={{ color: '#f59e0b', marginBottom: '16px' }}>⚡ Active Movies ({activeMovies.length})</h2>
       {activeMovies.length === 0 && <div style={{ color: '#666', marginBottom: '24px' }}>No active movies</div>}
       {activeMovies.map(movie => {
-        const complete = movie.shots.filter((s: any) => s.status === 'shot_complete' || s.status === 'movie_complete').length
+        const complete = movie.shots.filter((s: any) => s.status === 'shot_complete' || s.status === 'final_complete').length
         const total = movie.shots.length
         const pct = Math.round((complete / total) * 100)
         const cost = calcMovieCost(movie.shots)
