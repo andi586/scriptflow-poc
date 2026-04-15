@@ -135,3 +135,104 @@
 - 两套流程并存导致路由复杂度增加
 - Middleware 重定向逻辑需要重新设计
 - 需要明确新旧流程的边界和职责
+
+---
+
+## Day 30 - 2026年4月15日
+
+### 🎯 今日核心里程碑
+
+**"大脑开始工作了"** — Cognitive Core v1.0首次成功指挥完整视频生成
+
+---
+
+### ✅ 今日完成
+
+**Cognitive Core v1.0（三模块大脑）**
+- `app/lib/cognitive-core.ts` — Producer + Director + NEL三模块串行执行
+- Producer Engine：一句话→世界观/角色/冲突/张力曲线
+- Director Agent：故事→8镜头电影分镜计划（face/scene交替）
+- NEL：分镜计划→可执行Pipeline JSON
+- 使用claude-opus-4-6，质量显著提升
+
+**Orchestrator统一调度器**
+- `app/api/cron/orchestrator/route.ts` — 6步状态机
+- Step1: 重试pending shots（最多3次）
+- Step2: 轮询OmniHuman/Kling状态（直接查PiAPI）
+- Step3: 轮询Shotstack per-shot合并
+- Step4: 检测全部完成→触发最终concat
+- Step5: 轮询最终渲染
+- Step6: 自动恢复卡住的任务
+- 替换process-kling和process-movies，统一调度
+
+**声音克隆接入**
+- `app/api/digital-twin/create/route.ts` — 建立分身时自动克隆声音
+- Railway `/extract-audio` — FFmpeg提取音频
+- ElevenLabs `/v1/voices/add` — 声音克隆
+- `digital_twins.voice_id` — 存储克隆声音ID
+- 视频生成时自动使用克隆声音
+
+**Shotstack统一替换Railway**
+- 所有视频合并操作统一使用Shotstack
+- Railway只保留音频提取功能
+- 彻底解决FFmpeg分辨率不匹配问题
+
+**Dashboard升级**
+- 实时监控：活跃电影进度条+每个shot状态彩色点
+- 成本监控：今日成本/视频数/均价/盈亏平衡
+- API服务状态面板：7个服务实时显示
+- 盈亏平衡点：13部视频/月
+
+**技术规范更新**
+- `TECHNICAL_RULES.md` — 新增NEL优先原则
+- 新增100分钟电影技术选型原则
+- 新增Face镜头关键路径性能优化规则
+
+---
+
+### ❌ 已知问题
+
+1. **声音腔调不稳定** — 克隆声音有时洋腔洋调，需要调整ElevenLabs参数
+2. **镜头截断突兀** — face镜头台词有时被截断，缺少自然停顿
+3. **Orchestrator状态混用** — 新旧状态值（submitted/processing vs omni_done/shot_complete）需要统一
+4. **编剧质量不稳定** — Director有时生成低质量台词，需要更好的prompt
+5. **Shotstack水印** — 免费版有水印，需要升级付费
+
+---
+
+### 📊 今日成本
+
+- PiAPI消耗：约$20
+- Vercel超额费用：$61.93
+- 总计：约$82
+
+---
+
+### 🔬 今日产品洞察
+
+**关键发现：Face镜头是生产关键路径**
+- Scene镜头：Kling 2-3分钟完成
+- Face镜头：Kling+OmniHuman+Shotstack = 6-10分钟
+- 优化方向：Face镜头优先提交，未来OmniHuman缓存
+
+**战略决策：工具只是四肢，NEL才是护城河**
+- OmniHuman/Kling/ElevenLabs/Shotstack随时可替换
+- NEL+Orchestrator是ScriptFlow真正的竞争壁垒
+- LPM 1.0一旦开放API，直接替换OmniHuman
+
+---
+
+### 📅 明日计划（Day 31）
+
+1. **用户系统** — 多用户数字分身隔离，My Videos按用户隔离
+2. **收费系统** — Stripe接入，$9.99单次/$29.99订阅
+3. **Cognitive Core优化** — Producer+Director prompt质量提升
+4. **状态机统一** — 消除新旧状态值混用
+
+---
+
+### 💡 今日金句
+
+> "大脑没有发育，建成了强大的四肢。今天大脑开始工作了。"
+
+> "工具只是四肢，NEL才是护城河。目前他们只是猖狂了一时，未来鹿死谁手谁也不知道。"
