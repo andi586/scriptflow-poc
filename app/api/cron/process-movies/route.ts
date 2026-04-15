@@ -187,46 +187,30 @@ export async function GET() {
         return
       }
 
-      // ── Both ready → submit Shotstack or Railway ─────────────────────
-      if (omniVideoUrl && klingSceneUrl && !shot.final_shot_url && !shot.shotstack_render_id) {
-        if (shotstackKey) {
-          fetch('https://api.shotstack.io/stage/render', {
-            method: 'POST',
-            headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              timeline: {
-                tracks: [{ clips: [
-                  { asset: { type: 'video', src: omniVideoUrl }, start: 0, length: 10, transition: { out: 'fade' } },
-                  { asset: { type: 'video', src: klingSceneUrl }, start: 10, length: 10, transition: { in: 'fade' } },
-                ]}],
-              },
-              output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
-            }),
-          }).then(async (res) => {
-            if (res.ok) {
-              const data = await res.json()
-              const renderId: string | null = data?.response?.id ?? null
-              if (renderId) {
-                await supabaseAdmin.from('movie_shots').update({ shotstack_render_id: renderId, status: 'processing' }).eq('id', shot.id)
-                console.log(`[cron/process-movies] shot ${shot.id} Shotstack render submitted: ${renderId}`)
-              }
+      // ── Both ready → submit Shotstack (per-shot merge) ───────────────
+      if (omniVideoUrl && klingSceneUrl && !shot.final_shot_url && !shot.shotstack_render_id && shotstackKey) {
+        fetch('https://api.shotstack.io/stage/render', {
+          method: 'POST',
+          headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timeline: {
+              tracks: [{ clips: [
+                { asset: { type: 'video', src: omniVideoUrl }, start: 0, length: 10, transition: { out: 'fade' } },
+                { asset: { type: 'video', src: klingSceneUrl }, start: 10, length: 10, transition: { in: 'fade' } },
+              ]}],
+            },
+            output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
+          }),
+        }).then(async (res) => {
+          if (res.ok) {
+            const data = await res.json()
+            const renderId: string | null = data?.response?.id ?? null
+            if (renderId) {
+              await supabaseAdmin.from('movie_shots').update({ shotstack_render_id: renderId, status: 'processing' }).eq('id', shot.id)
+              console.log(`[cron/process-movies] shot ${shot.id} Shotstack render submitted: ${renderId}`)
             }
-          }).catch((e) => console.warn(`[cron/process-movies] shot ${shot.id} Shotstack error:`, e instanceof Error ? e.message : e))
-        } else {
-          fetch(`${railwayUrl}/concat-videos`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sceneVideoUrl: klingSceneUrl, faceVideoUrl: omniVideoUrl }),
-          }).then(async (res) => {
-            if (res.ok) {
-              const data = await res.json()
-              if (data.outputUrl) {
-                await supabaseAdmin.from('movie_shots').update({ final_shot_url: data.outputUrl, status: 'shot_complete' }).eq('id', shot.id)
-                console.log(`[cron/process-movies] shot ${shot.id} shot_complete via Railway: ${data.outputUrl}`)
-              }
-            }
-          }).catch((e) => console.warn(`[cron/process-movies] shot ${shot.id} Railway error:`, e instanceof Error ? e.message : e))
-        }
+          }
+        }).catch((e) => console.warn(`[cron/process-movies] shot ${shot.id} Shotstack error:`, e instanceof Error ? e.message : e))
       }
 
       void shotStatus
