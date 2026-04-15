@@ -1,12 +1,11 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/orchestrator",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/cron/check-costs",
-      "schedule": "0 9 * * *"
-    }
+    { "path": "/api/cron/step1-retry", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/step2-poll", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/step3-merge", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/step4-assemble", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/step5-render", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/step6-recover", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/check-costs", "schedule": "0 9 * * *" }
   ]
 }
