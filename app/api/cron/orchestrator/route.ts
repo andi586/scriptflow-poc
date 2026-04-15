@@ -170,6 +170,17 @@ export async function GET() {
       .is('shotstack_render_id', null)
       .limit(20)
 
+    // Migrate legacy statuses on-the-fly
+    for (const shot of activeShots ?? []) {
+      if (['omni_done', 'kling_done'].includes(shot.status)) {
+        await db.from('movie_shots').update({ status: 'processing' }).eq('id', shot.id)
+        shot.status = 'processing'
+      } else if (shot.status === 'scene_only') {
+        await db.from('movie_shots').update({ status: 'submitted' }).eq('id', shot.id)
+        shot.status = 'submitted'
+      }
+    }
+
     log.push(`[step2] active shots to poll: ${activeShots?.length ?? 0}`)
 
     for (const shot of activeShots ?? []) {
@@ -198,9 +209,9 @@ export async function GET() {
               await db.from('omnihuman_jobs')
                 .update({ status: 'completed', result_video_url: omniUrl, updated_at: new Date().toISOString() })
                 .eq('task_id', shot.omni_task_id)
-              // Update movie_shots
-              await db.from('movie_shots').update({ omni_video_url: omniUrl, status: 'omni_done' }).eq('id', shot.id)
-              log.push(`[step2] shot ${shot.id} omni_done via PiAPI: ${omniUrl}`)
+              // Update movie_shots — use unified 'processing' (omni done, waiting for kling)
+              await db.from('movie_shots').update({ omni_video_url: omniUrl, status: 'processing' }).eq('id', shot.id)
+              log.push(`[step2] shot ${shot.id} omni done → processing via PiAPI: ${omniUrl}`)
             }
           }
         }
@@ -220,8 +231,8 @@ export async function GET() {
                 klingData?.data?.output?.video ??
                 klingData?.data?.output?.url ?? null
               if (klingSceneUrl) {
-                await db.from('movie_shots').update({ kling_scene_url: klingSceneUrl, status: 'kling_done' }).eq('id', shot.id)
-                log.push(`[step2] shot ${shot.id} kling_done`)
+                await db.from('movie_shots').update({ kling_scene_url: klingSceneUrl, status: 'processing' }).eq('id', shot.id)
+                log.push(`[step2] shot ${shot.id} kling done → processing`)
               }
             }
           }
@@ -297,8 +308,8 @@ export async function GET() {
         if (renderStatus === 'done') {
           const finalUrl: string | null = pollData?.response?.url ?? null
           if (finalUrl) {
-            await db.from('movie_shots').update({ final_shot_url: finalUrl, status: 'shot_complete', shotstack_render_id: null }).eq('id', shot.id)
-            log.push(`[step3] shot ${shot.id} shot_complete: ${finalUrl}`)
+            await db.from('movie_shots').update({ final_shot_url: finalUrl, status: 'done', shotstack_render_id: null }).eq('id', shot.id)
+            log.push(`[step3] shot ${shot.id} done: ${finalUrl}`)
           }
         } else if (renderStatus === 'failed') {
           const retryCount = (shot.retry_count ?? 0) + 1
@@ -322,11 +333,11 @@ export async function GET() {
   console.log('[orchestrator] Starting step 4...')
   if (Date.now() - cronStart > MAX_RUNTIME) { log.push('[orchestrator] Max runtime reached, stopping'); return NextResponse.json({ elapsed: elapsed(), log }) }
   if (!overBudget() && shotstackKey) {
-    // Find movies with at least one shot_complete
+    // Find movies with at least one done shot (unified status)
     const { data: shotCompleteRows } = await db
       .from('movie_shots')
       .select('movie_id')
-      .eq('status', 'shot_complete')
+      .in('status', ['done', 'shot_complete'])
 
     const candidateMovieIds = [...new Set((shotCompleteRows ?? []).map((r: { movie_id: string }) => r.movie_id))]
     log.push(`[step4] candidate movies: ${candidateMovieIds.length}`)

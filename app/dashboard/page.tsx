@@ -77,12 +77,18 @@ export default function Dashboard() {
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: '#666',
+      submitted: '#4a9eff',
+      processing: '#f59e0b',
+      merging: '#f97316',
+      done: '#10b981',
+      final_complete: '#8b5cf6',
+      failed: '#ef4444',
+      // legacy aliases
       scene_only: '#4a9eff',
       omni_done: '#f59e0b',
       kling_done: '#f59e0b',
-      processing: '#f59e0b',
       shot_complete: '#10b981',
-      final_complete: '#8b5cf6',
+      movie_complete: '#8b5cf6',
     }
     return colors[status] ?? '#666'
   }

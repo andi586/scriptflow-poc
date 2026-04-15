@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
               kling_task_id: klingTaskId,
               audio_url: audioUrl,
               narrative: shotNarrative,
-              status: 'pending',
+              status: 'submitted',
               created_at: new Date().toISOString(),
             })
             if (insertErr) {
@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
               kling_task_id: klingTaskId,
               audio_url: null,
               narrative: shotNarrative,
-              status: 'scene_only',
+              status: 'submitted',
               created_at: new Date().toISOString(),
             })
             if (insertErr) {
