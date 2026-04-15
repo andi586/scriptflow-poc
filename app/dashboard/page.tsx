@@ -90,6 +90,21 @@ export default function Dashboard() {
   const activeMovies = movies.filter(m => !m.shots.every((s: any) => s.status === 'movie_complete'))
   const completedMovies = jobs.filter(j => j.result_video_url)
 
+  const MONTHLY_COSTS = {
+    piapi: { name: 'PiAPI (Kling+OmniHuman)', monthly: null, perUnit: '$0.04-0.10/task', color: '#4a9eff' },
+    elevenlabs: { name: 'ElevenLabs', monthly: '$22/mo (Creator)', perUnit: '$0.02/TTS', color: '#10b981' },
+    shotstack: { name: 'Shotstack', monthly: '$39/mo', perUnit: '$0.20/min', color: '#f59e0b' },
+    railway: { name: 'Railway (FFmpeg)', monthly: '$5/mo', perUnit: 'included', color: '#8b5cf6' },
+    supabase: { name: 'Supabase', monthly: '$25/mo', perUnit: 'included', color: '#06b6d4' },
+    vercel: { name: 'Vercel', monthly: '$20/mo', perUnit: 'included', color: '#a78bfa' },
+    anthropic: { name: 'Anthropic (Claude)', monthly: null, perUnit: '$0.001/script', color: '#ef4444' },
+  }
+
+  const fixedMonthly = 111
+  const variablePerVideo = 1.31
+  const pricePerVideo = 9.99
+  const breakEven = Math.ceil(fixedMonthly / (pricePerVideo - variablePerVideo))
+
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff', padding: '24px', fontFamily: 'monospace' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -110,6 +125,46 @@ export default function Dashboard() {
             <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: card.color }}>{card.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* API Services Cost Monitor */}
+      <h2 style={{ color: '#06b6d4', marginBottom: '16px' }}>🔌 API Services Status & Cost</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+        {Object.values(MONTHLY_COSTS).map((svc, i) => (
+          <div key={i} style={{ background: '#1a1a1a', borderRadius: '10px', padding: '14px', border: '1px solid #333' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: svc.color, flexShrink: 0 }} />
+              <span style={{ color: '#ccc', fontSize: '0.75rem', fontWeight: 'bold' }}>{svc.name}</span>
+            </div>
+            <div style={{ color: svc.monthly ? '#fff' : '#666', fontSize: '0.8rem', marginBottom: '4px' }}>
+              {svc.monthly ?? 'Pay-as-you-go'}
+            </div>
+            <div style={{ color: '#888', fontSize: '0.7rem', marginBottom: '8px' }}>{svc.perUnit}</div>
+            <div style={{ fontSize: '0.7rem' }}>
+              <span style={{ color: '#10b981' }}>✅ Active</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Break-even summary */}
+      <div style={{ background: '#1a1a1a', borderRadius: '12px', padding: '20px', marginBottom: '32px', border: '1px solid #333', display: 'flex', gap: '32px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '4px' }}>Fixed Monthly Overhead</div>
+          <div style={{ color: '#ef4444', fontSize: '1.4rem', fontWeight: 'bold' }}>${fixedMonthly}/mo</div>
+        </div>
+        <div>
+          <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '4px' }}>Variable Cost / Video</div>
+          <div style={{ color: '#f59e0b', fontSize: '1.4rem', fontWeight: 'bold' }}>${variablePerVideo}</div>
+        </div>
+        <div>
+          <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '4px' }}>Price / Video</div>
+          <div style={{ color: '#4a9eff', fontSize: '1.4rem', fontWeight: 'bold' }}>${pricePerVideo}</div>
+        </div>
+        <div style={{ borderLeft: '1px solid #333', paddingLeft: '32px' }}>
+          <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '4px' }}>Break-even</div>
+          <div style={{ color: '#10b981', fontSize: '1.8rem', fontWeight: 'bold' }}>{breakEven} videos/month</div>
+          <div style={{ color: '#666', fontSize: '0.7rem' }}>${fixedMonthly} ÷ (${pricePerVideo} − ${variablePerVideo}) = {breakEven} videos</div>
+        </div>
       </div>
 
       {/* Active Movies */}
