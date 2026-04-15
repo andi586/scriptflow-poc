@@ -161,17 +161,30 @@ export async function GET() {
         let omniVideoUrl: string | null = shot.omni_video_url ?? null
         let klingSceneUrl: string | null = shot.kling_scene_url ?? null
 
-        // Check OmniHuman via omnihuman_jobs table
+        // Check OmniHuman via PiAPI directly (source of truth)
         if (shot.omni_task_id && !omniVideoUrl) {
-          const { data: omniJob } = await db
-            .from('omnihuman_jobs')
-            .select('result_video_url, status')
-            .eq('task_id', shot.omni_task_id)
-            .single()
-          if (omniJob?.result_video_url) {
-            omniVideoUrl = omniJob.result_video_url
-            await db.from('movie_shots').update({ omni_video_url: omniVideoUrl, status: 'omni_done' }).eq('id', shot.id)
-            log.push(`[step2] shot ${shot.id} omni_done`)
+          const piRes = await fetch(`https://api.piapi.ai/api/v1/task/${shot.omni_task_id}`, {
+            headers: { 'x-api-key': piApiKey },
+          })
+          if (piRes.ok) {
+            const piData = await piRes.json()
+            const omniStatus: string = piData?.data?.status ?? 'unknown'
+            const omniUrl: string | null =
+              piData?.data?.output?.video?.resource_without_watermark ??
+              piData?.data?.output?.video_url ??
+              piData?.data?.output?.video ??
+              piData?.data?.output?.url ?? null
+            log.push(`[step2] shot ${shot.id} omni PiAPI status=${omniStatus}`)
+            if ((omniStatus === 'completed' || omniStatus === 'success') && omniUrl) {
+              omniVideoUrl = omniUrl
+              // Update omnihuman_jobs
+              await db.from('omnihuman_jobs')
+                .update({ status: 'completed', result_video_url: omniUrl, updated_at: new Date().toISOString() })
+                .eq('task_id', shot.omni_task_id)
+              // Update movie_shots
+              await db.from('movie_shots').update({ omni_video_url: omniUrl, status: 'omni_done' }).eq('id', shot.id)
+              log.push(`[step2] shot ${shot.id} omni_done via PiAPI: ${omniUrl}`)
+            }
           }
         }
 
