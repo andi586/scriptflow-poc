@@ -118,6 +118,14 @@ export default function Dashboard() {
 
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff', padding: '24px', fontFamily: 'monospace', maxWidth: '100vw', overflowX: 'hidden' }}>
+      {parseFloat(todayCost) > 30 && (
+        <div style={{ background: '#7f1d1d', border: '1px solid #ef4444', borderRadius: '10px', padding: '14px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+          <span style={{ color: '#fca5a5', fontWeight: 'bold', fontSize: '0.9rem' }}>
+            今日成本已超$30，请检查任务是否异常 — 当前: <strong style={{ color: '#ef4444' }}>${todayCost}</strong>
+          </span>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#a78bfa' }}>🎬 ScriptFlow Dashboard</h1>
         <span style={{ color: '#666', fontSize: '0.8rem' }}>Auto-refresh 10s | Last: {lastRefresh.toLocaleTimeString()}</span>
