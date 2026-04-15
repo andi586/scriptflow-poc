@@ -36,23 +36,37 @@ Story: "${story}"
 Template: "${template}"
 
 Rules:
-- Create 6-8 shots alternating between face shots and scene shots
-- Face shots: person speaks (8-12 seconds each)
-- Scene shots: empty cinematic scene, NO people, NO humans (4-6 seconds each)  
+- Create EXACTLY 8 shots: 4 face shots + 4 scene shots, strictly alternating (face, scene, face, scene, ...)
+- Face shots: person speaks (8-10 seconds each)
+- Scene shots: empty cinematic scene, NO people, NO humans (4-6 seconds each)
 - Tension rises from 2 to 10 across the shots
-- Total duration: 60-90 seconds
+- Total duration: 60-70 seconds
 - Chinese language for face shot text
+
+STRICT face shot text rules:
+- Maximum 2 sentences per shot
+- Maximum 15 Chinese characters per sentence
+- Must include at least one '...' pause per shot
+- Speak slowly, emotionally, with breathing room
+
+GOOD examples (short, with pauses):
+"妈妈... 我好想你。"
+"十五年了... 我还是会梦见你。"
+"你走的那天... 我没来得及说再见。"
+
+BAD examples (too long, no pauses — DO NOT do this):
+"妈妈这是你离开后的第15个母亲节我也老了昨晚我梦见你了"
 
 Return ONLY valid JSON:
 {
   "title": "video title",
-  "total_duration": 75,
+  "total_duration": 65,
   "shots": [
     {
       "shot_index": 1,
       "type": "face",
-      "duration": 10,
-      "text": "spoken text in Chinese",
+      "duration": 9,
+      "text": "妈妈... 我好想你。",
       "scene": null,
       "narrative": { "tension": 2, "beat": "setup", "goal": "connect with mom", "emotion": "tender" }
     },
