@@ -272,7 +272,7 @@ export default function AppFlowPage() {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ twinId, story: script, sessionId, template: selectedTemplate.title, shots }),
+        body: JSON.stringify({ story: script, sessionId, template: selectedTemplate.title, shots }),
       })
       const data = await res.json()
 
@@ -303,7 +303,7 @@ export default function AppFlowPage() {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ twinId, story: story.trim(), sessionId }),
+        body: JSON.stringify({ story: story.trim(), sessionId }),
       })
       const data = await res.json()
       if (!res.ok || !data.taskId) throw new Error(data.error ?? 'Movie generation failed')

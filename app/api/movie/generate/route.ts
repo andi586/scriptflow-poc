@@ -139,10 +139,10 @@ async function submitOmniHuman(frameUrl: string, audioUrl: string, piApiKey: str
 
 export async function POST(request: NextRequest) {
   try {
-    const { twinId, story, sessionId, template, shots } = await request.json()
+    const { story, sessionId, template, shots } = await request.json()
 
-    if (!twinId || !story) {
-      return NextResponse.json({ error: 'twinId and story are required' }, { status: 400 })
+    if (!story) {
+      return NextResponse.json({ error: 'story is required' }, { status: 400 })
     }
 
     // Always use service role key (admin) so RLS doesn't block inserts
@@ -163,12 +163,15 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single()
 
-    // Fallback: use twinId from request
+    // Fallback: find any active twin with frame_url_mid
     if (!twin) {
       const { data: fallback } = await supabase
         .from('digital_twins')
         .select('id, frame_url_mid, voice_id')
-        .eq('id', twinId)
+        .eq('is_active', true)
+        .not('frame_url_mid', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single()
       twin = fallback
     }
@@ -176,12 +179,12 @@ export async function POST(request: NextRequest) {
     console.log('[movie/generate] Using twin:', twin?.id, 'voice_id:', twin?.voice_id)
 
     if (!twin?.frame_url_mid) {
-      console.error('[movie/generate] Twin not found for twinId:', twinId)
+      console.error('[movie/generate] No active digital twin found')
       return NextResponse.json({ error: 'Digital twin not found' }, { status: 404 })
     }
 
     const frameUrl = twin.frame_url_mid
-    console.log('[movie/generate] twinId:', twinId, 'frameUrl:', frameUrl)
+    console.log('[movie/generate] twin.id:', twin.id, 'frameUrl:', frameUrl)
 
     const piApiKey = process.env.PIAPI_API_KEY ?? process.env.KLING_API_KEY
     if (!piApiKey) {
