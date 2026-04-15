@@ -19,10 +19,24 @@ export const maxDuration = 60
  */
 
 const CRON_BUDGET_MS = 50_000
+const MAX_RUNTIME = 50_000
 const cronStart = Date.now()
 
 function elapsed() { return Date.now() - cronStart }
 function overBudget() { return elapsed() > CRON_BUDGET_MS }
+
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 5000): Promise<Response> => {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal })
+    clearTimeout(timeout)
+    return res
+  } catch (e) {
+    clearTimeout(timeout)
+    throw e
+  }
+}
 
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -44,6 +58,7 @@ export async function GET() {
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 1: Retry pending shots missing task IDs
   // ══════════════════════════════════════════════════════════════════════════
+  console.log('[orchestrator] Starting step 1...')
   if (!overBudget()) {
     // Daily budget check: count omnihuman_jobs created today
     const todayStart = new Date()
@@ -145,6 +160,8 @@ export async function GET() {
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 2: Poll submitted/processing shots
   // ══════════════════════════════════════════════════════════════════════════
+  console.log('[orchestrator] Starting step 2...')
+  if (Date.now() - cronStart > MAX_RUNTIME) { log.push('[orchestrator] Max runtime reached, stopping'); return NextResponse.json({ elapsed: elapsed(), log }) }
   if (!overBudget()) {
     const { data: activeShots } = await db
       .from('movie_shots')
@@ -254,6 +271,8 @@ export async function GET() {
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 3: Poll merging shots (also catch old 'processing' with render_id)
   // ══════════════════════════════════════════════════════════════════════════
+  console.log('[orchestrator] Starting step 3...')
+  if (Date.now() - cronStart > MAX_RUNTIME) { log.push('[orchestrator] Max runtime reached, stopping'); return NextResponse.json({ elapsed: elapsed(), log }) }
   if (!overBudget() && shotstackKey) {
     const { data: mergingShots } = await db
       .from('movie_shots')
@@ -300,6 +319,8 @@ export async function GET() {
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 4: Assemble complete movies
   // ══════════════════════════════════════════════════════════════════════════
+  console.log('[orchestrator] Starting step 4...')
+  if (Date.now() - cronStart > MAX_RUNTIME) { log.push('[orchestrator] Max runtime reached, stopping'); return NextResponse.json({ elapsed: elapsed(), log }) }
   if (!overBudget() && shotstackKey) {
     // Find movies with at least one shot_complete
     const { data: shotCompleteRows } = await db
@@ -392,6 +413,8 @@ export async function GET() {
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 5: Poll rendering movies
   // ══════════════════════════════════════════════════════════════════════════
+  console.log('[orchestrator] Starting step 5...')
+  if (Date.now() - cronStart > MAX_RUNTIME) { log.push('[orchestrator] Max runtime reached, stopping'); return NextResponse.json({ elapsed: elapsed(), log }) }
   if (!overBudget() && shotstackKey) {
     const { data: renderingJobs } = await db
       .from('omnihuman_jobs')
@@ -433,6 +456,7 @@ export async function GET() {
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 6: Auto-recovery for stuck shots
   // ══════════════════════════════════════════════════════════════════════════
+  console.log('[orchestrator] Starting step 6...')
   if (!overBudget()) {
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
