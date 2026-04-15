@@ -153,22 +153,24 @@ export async function POST(request: NextRequest) {
     )
 
     // ── Get digital twin frame + voice_id ─────────────────────────────────────
+    // First try to find twin with voice_id
     let { data: twin } = await supabase
       .from('digital_twins')
       .select('id, frame_url_mid, voice_id')
-      .eq('id', twinId)
+      .not('voice_id', 'is', null)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single()
 
+    // Fallback: use twinId from request
     if (!twin) {
-      console.warn('[movie/generate] Twin not found by id, trying fallback by is_active...')
-      const { data: fallbackTwin } = await supabase
+      const { data: fallback } = await supabase
         .from('digital_twins')
         .select('id, frame_url_mid, voice_id')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('id', twinId)
         .single()
-      twin = fallbackTwin
+      twin = fallback
     }
 
     console.log('[movie/generate] Using twin:', twin?.id, 'voice_id:', twin?.voice_id)
