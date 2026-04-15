@@ -97,7 +97,7 @@ export default function Dashboard() {
     railway: { name: 'Railway (FFmpeg)', monthly: '$5/mo', perUnit: 'included', color: '#8b5cf6' },
     supabase: { name: 'Supabase', monthly: '$25/mo', perUnit: 'included', color: '#06b6d4' },
     vercel: { name: 'Vercel', monthly: '$20/mo', perUnit: 'included', color: '#a78bfa' },
-    anthropic: { name: 'Anthropic (Claude)', monthly: null, perUnit: '$0.001/script', color: '#ef4444' },
+    anthropic: { name: 'Anthropic (Claude)', monthly: null, perUnit: '$0.001/script', color: '#10b981' },
   }
 
   const fixedMonthly = 111
@@ -106,21 +106,21 @@ export default function Dashboard() {
   const breakEven = Math.ceil(fixedMonthly / (pricePerVideo - variablePerVideo))
 
   return (
-    <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff', padding: '24px', fontFamily: 'monospace' }}>
+    <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff', padding: '24px', fontFamily: 'monospace', maxWidth: '100vw', overflowX: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#a78bfa' }}>🎬 ScriptFlow Dashboard</h1>
         <span style={{ color: '#666', fontSize: '0.8rem' }}>Auto-refresh 10s | Last: {lastRefresh.toLocaleTimeString()}</span>
       </div>
 
       {/* Cost Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '32px', overflowX: 'hidden' }}>
         {[
           { label: "Today's Cost", value: `$${todayCost}`, color: parseFloat(todayCost) > 5 ? '#ef4444' : parseFloat(todayCost) > 2 ? '#f59e0b' : '#10b981' },
           { label: 'Videos Today', value: todayMovies.length, color: '#a78bfa' },
           { label: 'Avg Per Video', value: `$${avgCost}`, color: '#4a9eff' },
           { label: 'Active Now', value: activeMovies.length, color: '#f59e0b' },
         ].map((card, i) => (
-          <div key={i} style={{ background: '#1a1a1a', borderRadius: '12px', padding: '20px', border: '1px solid #333' }}>
+          <div key={i} style={{ background: '#1a1a1a', borderRadius: '12px', padding: '20px', border: '1px solid #333', overflowX: 'hidden', wordBreak: 'break-word' }}>
             <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '8px' }}>{card.label}</div>
             <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: card.color }}>{card.value}</div>
           </div>
@@ -129,9 +129,9 @@ export default function Dashboard() {
 
       {/* API Services Cost Monitor */}
       <h2 style={{ color: '#06b6d4', marginBottom: '16px' }}>🔌 API Services Status & Cost</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px', overflowX: 'hidden' }}>
         {Object.values(MONTHLY_COSTS).map((svc, i) => (
-          <div key={i} style={{ background: '#1a1a1a', borderRadius: '10px', padding: '14px', border: '1px solid #333' }}>
+          <div key={i} style={{ background: '#1a1a1a', borderRadius: '10px', padding: '14px', border: '1px solid #333', overflowX: 'hidden', wordBreak: 'break-word' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: svc.color, flexShrink: 0 }} />
               <span style={{ color: '#ccc', fontSize: '0.75rem', fontWeight: 'bold' }}>{svc.name}</span>
