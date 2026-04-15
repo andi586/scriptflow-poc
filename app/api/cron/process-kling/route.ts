@@ -279,7 +279,7 @@ export async function GET() {
           if (jobData?.scene_video_url) {
             if (shotstackKey) {
               try {
-                const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
+                const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
                   method: 'POST',
                   headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
                   body: JSON.stringify({

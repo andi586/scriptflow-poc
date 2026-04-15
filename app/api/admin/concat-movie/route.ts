@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
   })
 
   // Submit to Shotstack
-  const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
+  const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
     method: 'POST',
     headers: {
       'x-api-key': process.env.SHOTSTACK_API_KEY!,
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
   let finalUrl: string | null = null
   for (let i = 0; i < 36; i++) {
     await new Promise(r => setTimeout(r, 5000))
-    const pollRes = await fetch(`https://api.shotstack.io/stage/render/${renderId}`, {
+    const pollRes = await fetch(`https://api.shotstack.io/v1/render/${renderId}`, {
       headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY! },
     })
     const pollData = await pollRes.json()

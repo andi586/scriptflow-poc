@@ -241,7 +241,7 @@ export async function GET() {
                 { asset: { type: 'video', src: klingSceneUrl }, start: shot.duration ?? 10, length: shot.duration ?? 10 },
               ]
 
-          const ssRes = await fetch('https://api.shotstack.io/stage/render', {
+          const ssRes = await fetch('https://api.shotstack.io/v1/render', {
             method: 'POST',
             headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -286,7 +286,7 @@ export async function GET() {
     for (const shot of mergingShots ?? []) {
       if (overBudget()) break
       try {
-        const pollRes = await fetch(`https://api.shotstack.io/stage/render/${shot.shotstack_render_id}`, {
+        const pollRes = await fetch(`https://api.shotstack.io/v1/render/${shot.shotstack_render_id}`, {
           headers: { 'x-api-key': shotstackKey },
         })
         if (!pollRes.ok) continue
@@ -383,7 +383,7 @@ export async function GET() {
           return { asset: { type: 'video', src: s.final_shot_url }, start, length: s.duration ?? 10 }
         })
 
-        const ssRes = await fetch('https://api.shotstack.io/stage/render', {
+        const ssRes = await fetch('https://api.shotstack.io/v1/render', {
           method: 'POST',
           headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({ timeline: { tracks: [{ clips }] }, output: { format: 'mp4', resolution: 'sd' } }),
@@ -428,7 +428,7 @@ export async function GET() {
     for (const job of renderingJobs ?? []) {
       if (overBudget()) break
       try {
-        const pollRes = await fetch(`https://api.shotstack.io/stage/render/${job.shotstack_render_id}`, {
+        const pollRes = await fetch(`https://api.shotstack.io/v1/render/${job.shotstack_render_id}`, {
           headers: { 'x-api-key': shotstackKey },
         })
         if (!pollRes.ok) continue

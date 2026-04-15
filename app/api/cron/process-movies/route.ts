@@ -165,7 +165,7 @@ export async function GET() {
 
       // ── Poll existing Shotstack render ───────────────────────────────
       if (shot.shotstack_render_id && !shot.final_shot_url && shotstackKey) {
-        const pollRes = await fetch(`https://api.shotstack.io/stage/render/${shot.shotstack_render_id}`, {
+        const pollRes = await fetch(`https://api.shotstack.io/v1/render/${shot.shotstack_render_id}`, {
           headers: { 'x-api-key': shotstackKey },
         })
         if (pollRes.ok) {
@@ -189,7 +189,7 @@ export async function GET() {
 
       // ── Both ready → submit Shotstack (per-shot merge) ───────────────
       if (omniVideoUrl && klingSceneUrl && !shot.final_shot_url && !shot.shotstack_render_id && shotstackKey) {
-        fetch('https://api.shotstack.io/stage/render', {
+        fetch('https://api.shotstack.io/v1/render', {
           method: 'POST',
           headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -312,7 +312,7 @@ export async function GET() {
 
           console.log(`[cron/process-movies] Shotstack body for movie ${movieId}:`, JSON.stringify(body).slice(0, 500))
 
-          const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
+          const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
             method: 'POST',
             headers: {
               'x-api-key': shotstackKey!,
@@ -376,7 +376,7 @@ export async function GET() {
     for (const job of renderingJobs ?? []) {
       if (Date.now() - cronStart > CRON_BUDGET_MS) break
       try {
-        const pollRes = await fetch(`https://api.shotstack.io/stage/render/${job.shotstack_render_id}`, {
+        const pollRes = await fetch(`https://api.shotstack.io/v1/render/${job.shotstack_render_id}`, {
           headers: { 'x-api-key': shotstackKey },
         })
         if (!pollRes.ok) continue
