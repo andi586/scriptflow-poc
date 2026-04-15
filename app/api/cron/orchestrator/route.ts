@@ -45,85 +45,99 @@ export async function GET() {
   // STEP 1: Retry pending shots missing task IDs
   // ══════════════════════════════════════════════════════════════════════════
   if (!overBudget()) {
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-    const { data: pendingShots } = await db
-      .from('movie_shots')
-      .select('*')
-      .eq('status', 'pending')
-      .or(`omni_task_id.is.null,kling_task_id.is.null`)
-      .or(`submitted_at.is.null,submitted_at.lt.${fiveMinAgo}`)
-      .limit(10)
+    // Daily budget check: count omnihuman_jobs created today
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const { count: todayJobCount } = await db
+      .from('omnihuman_jobs')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', todayStart.toISOString())
 
-    log.push(`[step1] pending shots to retry: ${pendingShots?.length ?? 0}`)
+    const DAILY_BUDGET = 50
+    if ((todayJobCount ?? 0) >= DAILY_BUDGET) {
+      log.push(`[step1] DAILY BUDGET REACHED: ${todayJobCount}/${DAILY_BUDGET} jobs today — skipping new submissions`)
+    } else {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      const { data: pendingShots } = await db
+        .from('movie_shots')
+        .select('*')
+        .eq('status', 'pending')
+        .or(`omni_task_id.is.null,kling_task_id.is.null`)
+        .or(`submitted_at.is.null,submitted_at.lt.${fiveMinAgo}`)
+        .limit(10)
 
-    for (const shot of pendingShots ?? []) {
-      if (overBudget()) break
-      try {
-        const retryCount = shot.retry_count ?? 0
-        if (retryCount >= 3) {
-          await db.from('movie_shots').update({ status: 'failed' }).eq('id', shot.id)
-          log.push(`[step1] shot ${shot.id} exceeded retries → failed`)
-          continue
-        }
+      log.push(`[step1] pending shots to retry: ${pendingShots?.length ?? 0} (today: ${todayJobCount}/${DAILY_BUDGET})`)
 
-        let omniTaskId: string | null = shot.omni_task_id ?? null
-        let klingTaskId: string | null = shot.kling_task_id ?? null
-
-        // Face shots: TTS → OmniHuman
-        if (shot.shot_type === 'face' && !omniTaskId && elevenKey && shot.audio_url) {
-          // OmniHuman needs audio_url — if already stored, submit directly
-          const omniRes = await fetch('https://api.piapi.ai/api/v1/task', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
-            body: JSON.stringify({
-              model: 'omni-human',
-              task_type: 'omni-human-1.5',
-              input: { image_url: shot.image_url ?? shot.frame_url, audio_url: shot.audio_url, prompt: 'person speaks naturally, cinematic' },
-            }),
-          })
-          if (omniRes.ok) {
-            const omniData = await omniRes.json()
-            omniTaskId = omniData?.data?.task_id ?? omniData?.task_id ?? null
-            log.push(`[step1] shot ${shot.id} re-submitted OmniHuman: ${omniTaskId}`)
+      for (const shot of pendingShots ?? []) {
+        if (overBudget()) break
+        try {
+          const retryCount = shot.retry_count ?? 0
+          if (retryCount >= 3) {
+            await db.from('movie_shots').update({ status: 'failed' }).eq('id', shot.id)
+            log.push(`[step1] shot ${shot.id} exceeded retries → failed`)
+            continue
           }
-        }
 
-        // All shots: Kling
-        if (!klingTaskId) {
-          const scenePrompt = shot.scene ?? 'empty cinematic scene, no people, no humans, dramatic lighting'
-          const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
-            body: JSON.stringify({
-              model: 'kling',
-              task_type: 'video_generation',
-              input: {
-                prompt: scenePrompt,
-                negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
-                version: '3.0',
-                mode: 'pro',
-                duration: shot.duration ?? 5,
-                aspect_ratio: '9:16',
-                enable_audio: true,
-              },
-            }),
-          })
-          if (klingRes.ok) {
-            const klingData = await klingRes.json()
-            klingTaskId = klingData?.data?.task_id ?? null
-            log.push(`[step1] shot ${shot.id} re-submitted Kling: ${klingTaskId}`)
+          let omniTaskId: string | null = shot.omni_task_id ?? null
+          let klingTaskId: string | null = shot.kling_task_id ?? null
+
+          // Face shots: TTS → OmniHuman
+          if (shot.shot_type === 'face' && !omniTaskId && elevenKey && shot.audio_url) {
+            await new Promise(r => setTimeout(r, 2000))
+            const omniRes = await fetch('https://api.piapi.ai/api/v1/task', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
+              body: JSON.stringify({
+                model: 'omni-human',
+                task_type: 'omni-human-1.5',
+                input: { image_url: shot.image_url ?? shot.frame_url, audio_url: shot.audio_url, prompt: 'person speaks naturally, cinematic' },
+              }),
+            })
+            if (omniRes.ok) {
+              const omniData = await omniRes.json()
+              omniTaskId = omniData?.data?.task_id ?? omniData?.task_id ?? null
+              log.push(`[step1] shot ${shot.id} re-submitted OmniHuman: ${omniTaskId}`)
+            }
           }
-        }
 
-        await db.from('movie_shots').update({
-          omni_task_id: omniTaskId,
-          kling_task_id: klingTaskId,
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-          retry_count: retryCount + 1,
-        }).eq('id', shot.id)
-      } catch (e) {
-        log.push(`[step1] error for shot ${shot.id}: ${e instanceof Error ? e.message : e}`)
+          // All shots: Kling
+          if (!klingTaskId) {
+            await new Promise(r => setTimeout(r, 2000))
+            const scenePrompt = shot.scene ?? 'empty cinematic scene, no people, no humans, dramatic lighting'
+            const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
+              body: JSON.stringify({
+                model: 'kling',
+                task_type: 'video_generation',
+                input: {
+                  prompt: scenePrompt,
+                  negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
+                  version: '3.0',
+                  mode: 'pro',
+                  duration: shot.duration ?? 5,
+                  aspect_ratio: '9:16',
+                  enable_audio: true,
+                },
+              }),
+            })
+            if (klingRes.ok) {
+              const klingData = await klingRes.json()
+              klingTaskId = klingData?.data?.task_id ?? null
+              log.push(`[step1] shot ${shot.id} re-submitted Kling: ${klingTaskId}`)
+            }
+          }
+
+          await db.from('movie_shots').update({
+            omni_task_id: omniTaskId,
+            kling_task_id: klingTaskId,
+            status: 'submitted',
+            submitted_at: new Date().toISOString(),
+            retry_count: retryCount + 1,
+          }).eq('id', shot.id)
+        } catch (e) {
+          log.push(`[step1] error for shot ${shot.id}: ${e instanceof Error ? e.message : e}`)
+        }
       }
     }
   }

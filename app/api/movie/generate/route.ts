@@ -203,8 +203,8 @@ export async function POST(request: NextRequest) {
       const jobId = crypto.randomUUID()
       console.log('[movie/generate] Multi-shot mode, jobId:', jobId, 'shots:', shots.length)
 
-      for (const shot of shots as Shot[]) {
-        const shotIndex = shot.shot_index ?? shot.shot ?? 0
+      for (const [idx, shot] of (shots as Shot[]).entries()) {
+        const shotIndex = shot.shot_index ?? (shot as { shotNumber?: number }).shotNumber ?? (idx + 1)
         const shotType = shot.type ?? 'face'
         const shotText = shot.text ?? ''
         const shotScene = shot.scene ?? (template && scenePrompts[template as string] ? scenePrompts[template as string] : story)
