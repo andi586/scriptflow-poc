@@ -131,7 +131,14 @@ async function submitOmniHuman(frameUrl: string, audioUrl: string, piApiKey: str
     })
     if (!res.ok) { console.warn('[movie/generate] OmniHuman submit failed:', res.status, await res.text()); return null }
     const data = await res.json()
-    return data?.data?.task_id ?? data?.task_id ?? null
+    // Check if task was actually created successfully
+    if (!data?.data?.task_id || data?.data?.status === 'failed') {
+      console.error('[movie/generate] OmniHuman submission failed:', JSON.stringify(data))
+      return null
+    }
+    const omniTaskId = data.data.task_id
+    console.log('[movie/generate] OmniHuman task created:', omniTaskId, 'status:', data.data.status)
+    return omniTaskId
   } catch (e) {
     console.warn('[movie/generate] OmniHuman submit error:', e instanceof Error ? e.message : e)
     return null
@@ -193,6 +200,7 @@ export async function POST(request: NextRequest) {
     console.log('[movie/generate] twin.id:', twin.id, 'frameUrl:', frameUrl)
 
     const piApiKey = process.env.PIAPI_API_KEY ?? process.env.KLING_API_KEY
+    console.log('[movie/generate] PIAPI_API_KEY present:', !!process.env.PIAPI_API_KEY)
     if (!piApiKey) {
       return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
     }
