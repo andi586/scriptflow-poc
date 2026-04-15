@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runDirector } from '@/app/lib/nel-director'
+import { runCognitiveCore } from '@/app/lib/cognitive-core'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+export const maxDuration = 60
 
 /**
  * POST /api/generate-script
  * Body: { template: string, personalNote?: string }
- * Returns: { shots: Shot[], title: string }
+ * Returns: { shots: ExecutionPlan.pipeline, storyState, directionPlan }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,10 +20,14 @@ export async function POST(request: NextRequest) {
 
     const story = personalNote ?? template
 
-    const directorOutput = await runDirector(story, template)
+    const output = await runCognitiveCore(story, template)
 
-    console.log('[generate-script] Director output:', directorOutput.title, 'shots:', directorOutput.shots.length)
-    return NextResponse.json({ shots: directorOutput.shots, title: directorOutput.title })
+    console.log('[generate-script] CognitiveCore complete. Shots:', output.executionPlan.pipeline.length)
+    return NextResponse.json({
+      shots: output.executionPlan.pipeline,
+      storyState: output.storyState,
+      directionPlan: output.directionPlan,
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[generate-script] FATAL:', message)
