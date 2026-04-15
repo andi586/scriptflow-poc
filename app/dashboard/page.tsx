@@ -87,7 +87,12 @@ export default function Dashboard() {
     return colors[status] ?? '#666'
   }
 
-  const activeMovies = movies.filter(m => !m.shots.every((s: any) => s.status === 'final_complete'))
+  const activeMovies = movies.filter(m => {
+    const completeCount = m.shots.filter((s: any) =>
+      s.status === 'shot_complete' || s.status === 'final_complete'
+    ).length
+    return completeCount < m.shots.length
+  })
   const completedMovies = jobs.filter(j => j.result_video_url)
 
   const MONTHLY_COSTS = {
