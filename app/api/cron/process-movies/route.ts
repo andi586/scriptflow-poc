@@ -247,6 +247,20 @@ export async function GET() {
   for (const movieId of allCompletedMovieIds) {
     if (Date.now() - cronStart > CRON_BUDGET_MS) break
     try {
+      // Step 1: Check if final video already exists (any shot marked movie_complete)
+      const { data: existingFinal } = await supabaseAdmin
+        .from('movie_shots')
+        .select('id')
+        .eq('movie_id', movieId)
+        .eq('status', 'movie_complete')
+        .limit(1)
+
+      if (existingFinal && existingFinal.length > 0) {
+        console.log(`[cron/process-movies] movie ${movieId} already movie_complete, skipping`)
+        continue
+      }
+
+      // Step 2: Get ALL shots for this movie and verify all are shot_complete
       const { data: allShots } = await supabaseAdmin
         .from('movie_shots')
         .select('id, status, final_shot_url, shot_index')
@@ -265,77 +279,57 @@ export async function GET() {
         continue
       }
 
-      console.log(`[cron/process-movies] All ${allShots.length} shots complete for movie ${movieId}`)
+      console.log(`[cron/process-movies] All ${allShots.length} shots complete for movie ${movieId}, starting final concat`)
 
-      const { data: existingJob } = await supabaseAdmin
-        .from('omnihuman_jobs')
-        .select('id, result_video_url, shotstack_render_id')
-        .eq('task_id', movieId)
-        .single()
-
-      if (existingJob?.result_video_url || existingJob?.shotstack_render_id) {
-        console.log(`[cron/process-movies] movie ${movieId} final concat already in progress or done`)
-        continue
-      }
-
+      // Step 3: Get all final_shot_urls in order
       const shotUrls: string[] = allShots
         .map((s: { final_shot_url: string | null }) => s.final_shot_url)
         .filter(Boolean) as string[]
 
       console.log(`[cron/process-movies] Concatenating ${shotUrls.length} shots for movie ${movieId}`)
 
-      if (shotstackKey && shotUrls.length > 0) {
-        const clips = shotUrls.map((url, i) => ({
-          asset: { type: 'video', src: url },
-          start: i * 10,
-          length: 10,
-          ...(i > 0 ? { transition: { in: 'fade' } } : {}),
-          ...(i < shotUrls.length - 1 ? { transition: { out: 'fade' } } : {}),
-        }))
-        fetch('https://api.shotstack.io/stage/render', {
-          method: 'POST',
-          headers: { 'x-api-key': shotstackKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            timeline: { tracks: [{ clips }] },
-            output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
-          }),
-        }).then(async (res) => {
-          if (res.ok) {
-            const data = await res.json()
-            const renderId: string | null = data?.response?.id ?? null
-            if (renderId) {
-              if (existingJob?.id) {
-                await supabaseAdmin.from('omnihuman_jobs').update({ shotstack_render_id: renderId, status: 'rendering', updated_at: new Date().toISOString() }).eq('id', existingJob.id)
-              } else {
-                await supabaseAdmin.from('omnihuman_jobs').insert({ task_id: movieId, shotstack_render_id: renderId, status: 'rendering', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-              }
-              console.log(`[cron/process-movies] Final Shotstack render submitted for movie ${movieId}: ${renderId}`)
-            }
-          }
-        }).catch((e) => console.warn(`[cron/process-movies] final concat error for movie ${movieId}:`, e instanceof Error ? e.message : e))
-      } else if (shotUrls.length > 0) {
-        ;(async () => {
+      // Step 4: Concat sequentially via Railway
+      ;(async () => {
+        try {
           let currentUrl = shotUrls[0]
           for (let i = 1; i < shotUrls.length; i++) {
             const concatRes = await fetch(`${railwayUrl}/concat-videos`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sceneVideoUrl: shotUrls[i], faceVideoUrl: currentUrl }),
+              body: JSON.stringify({ sceneVideoUrl: currentUrl, faceVideoUrl: shotUrls[i] }),
             })
             if (concatRes.ok) {
               const concatData = await concatRes.json()
-              currentUrl = concatData.outputUrl ?? currentUrl
+              if (concatData.outputUrl) currentUrl = concatData.outputUrl
+            } else {
+              console.warn(`[cron/process-movies] concat-videos failed for movie ${movieId} at step ${i}: ${concatRes.status}`)
             }
           }
-          if (existingJob?.id) {
-            await supabaseAdmin.from('omnihuman_jobs').update({ result_video_url: currentUrl, status: 'completed', updated_at: new Date().toISOString() }).eq('id', existingJob.id)
-          } else {
-            await supabaseAdmin.from('omnihuman_jobs').insert({ task_id: movieId, result_video_url: currentUrl, status: 'completed', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-          }
-          await supabaseAdmin.from('movie_shots').update({ status: 'movie_complete' }).eq('movie_id', movieId)
-          console.log(`[cron/process-movies] Final movie (Railway) for ${movieId}: ${currentUrl}`)
-        })().catch((e) => console.warn(`[cron/process-movies] Railway final concat error for movie ${movieId}:`, e instanceof Error ? e.message : e))
-      }
+
+          // Step 5a: Store final URL in shot_index=1 and mark all shots movie_complete
+          await supabaseAdmin.from('movie_shots').update({
+            status: 'movie_complete',
+            final_shot_url: currentUrl,
+          }).eq('movie_id', movieId).eq('shot_index', 1)
+
+          await supabaseAdmin.from('movie_shots').update({
+            status: 'movie_complete',
+          }).eq('movie_id', movieId).neq('shot_index', 1)
+
+          // Step 5b: Insert into omnihuman_jobs so My Videos can display it
+          await supabaseAdmin.from('omnihuman_jobs').insert({
+            task_id: movieId,
+            status: 'completed',
+            result_video_url: currentUrl,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+          console.log(`[cron/process-movies] Final movie ready for ${movieId}: ${currentUrl}`)
+        } catch (concatErr) {
+          console.warn(`[cron/process-movies] Railway final concat error for movie ${movieId}:`, concatErr instanceof Error ? concatErr.message : concatErr)
+        }
+      })()
     } catch (movieErr) {
       console.warn(`[cron/process-movies] final concat error for movie ${movieId}:`, movieErr instanceof Error ? movieErr.message : movieErr)
     }
