@@ -1,299 +1,165 @@
 'use client'
-
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-interface MovieShot {
-  id: string
-  movie_id: string
-  shot_index: number
-  shot_type: string
-  status: string
-  final_shot_url: string | null
-  created_at: string
+const COSTS = {
+  omniHuman: 0.04,
+  kling: 0.10,
+  elevenLabs: 0.02,
+  shotstack: 0.20
 }
 
-interface MovieGroup {
-  movieId: string
-  shots: MovieShot[]
-  total: number
-  completed: number
-  progress: number
-  latestStatus: string
-}
-
-interface OmniJob {
-  id: string
-  task_id: string
-  status: string
-  result_video_url: string | null
-  created_at: string
-  updated_at: string
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-  scene_only: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  processing: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  omni_done: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  kling_done: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  shot_complete: 'bg-green-500/20 text-green-300 border-green-500/30',
-  movie_complete: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  completed: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  failed: 'bg-red-500/20 text-red-300 border-red-500/30',
-  rendering: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-  kling_processing: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const cls = STATUS_COLORS[status] ?? 'bg-gray-500/20 text-gray-300 border-gray-500/30'
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-mono ${cls}`}>
-      {status}
-    </span>
-  )
-}
-
-function ProgressBar({ value }: { value: number }) {
-  const color = value === 100 ? 'bg-emerald-500' : value > 50 ? 'bg-blue-500' : 'bg-yellow-500'
-  return (
-    <div className="w-full bg-white/10 rounded-full h-2">
-      <div
-        className={`h-2 rounded-full transition-all duration-500 ${color}`}
-        style={{ width: `${value}%` }}
-      />
-    </div>
-  )
-}
-
-export default function MonitoringDashboard() {
-  const [movieGroups, setMovieGroups] = useState<MovieGroup[]>([])
-  const [omniJobs, setOmniJobs] = useState<OmniJob[]>([])
+export default function Dashboard() {
+  const [movies, setMovies] = useState<any[]>([])
+  const [jobs, setJobs] = useState<any[]>([])
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
-  const [loading, setLoading] = useState(true)
 
-  const fetchData = useCallback(async () => {
-    try {
-      // Fetch active movie_shots (not movie_complete)
-      const { data: shots } = await supabase
-        .from('movie_shots')
-        .select('id, movie_id, shot_index, shot_type, status, final_shot_url, created_at')
-        .not('status', 'eq', 'movie_complete')
-        .order('created_at', { ascending: false })
-        .limit(200)
+  const fetchData = async () => {
+    // Get all movie_shots grouped by movie_id
+    const { data: shots } = await supabase
+      .from('movie_shots')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
 
-      if (shots) {
-        const groups: Record<string, MovieShot[]> = {}
-        for (const shot of shots) {
-          if (!groups[shot.movie_id]) groups[shot.movie_id] = []
-          groups[shot.movie_id].push(shot)
-        }
+    // Get recent omnihuman_jobs
+    const { data: jobData } = await supabase
+      .from('omnihuman_jobs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20)
 
-        const grouped: MovieGroup[] = Object.entries(groups).map(([movieId, shotList]) => {
-          const sorted = [...shotList].sort((a, b) => a.shot_index - b.shot_index)
-          const completed = sorted.filter(s => s.status === 'shot_complete').length
-          const total = sorted.length
-          const progress = total > 0 ? Math.round((completed / total) * 100) : 0
-          const latestStatus = sorted[0]?.status ?? 'unknown'
-          return { movieId, shots: sorted, total, completed, progress, latestStatus }
-        })
-
-        // Sort: in-progress first, then by most recent
-        grouped.sort((a, b) => {
-          if (a.progress === 100 && b.progress !== 100) return 1
-          if (b.progress === 100 && a.progress !== 100) return -1
-          return 0
-        })
-
-        setMovieGroups(grouped)
+    if (shots) {
+      // Group by movie_id
+      const grouped: Record<string, any[]> = {}
+      for (const shot of shots) {
+        if (!grouped[shot.movie_id]) grouped[shot.movie_id] = []
+        grouped[shot.movie_id].push(shot)
       }
-
-      // Fetch recent omnihuman_jobs
-      const { data: jobs } = await supabase
-        .from('omnihuman_jobs')
-        .select('id, task_id, status, result_video_url, created_at, updated_at')
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (jobs) setOmniJobs(jobs)
-      setLastRefresh(new Date())
-    } catch (err) {
-      console.error('[dashboard] fetch error:', err)
-    } finally {
-      setLoading(false)
+      setMovies(Object.entries(grouped).map(([id, s]) => ({ id, shots: s })))
     }
-  }, [])
+    if (jobData) setJobs(jobData)
+    setLastRefresh(new Date())
+  }
 
   useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 10000)
     return () => clearInterval(interval)
-  }, [fetchData])
+  }, [])
 
-  const activeMovies = movieGroups.filter(m => m.progress < 100)
-  const completedMovies = movieGroups.filter(m => m.progress === 100)
+  const calcMovieCost = (shots: any[]) => {
+    const faceCount = shots.filter(s => s.shot_type === 'face').length
+    const totalShots = shots.length
+    const duration = shots.reduce((sum, s) => sum + (s.duration ?? 10), 0)
+    return (
+      faceCount * COSTS.omniHuman +
+      totalShots * COSTS.kling +
+      faceCount * COSTS.elevenLabs +
+      (duration / 60) * COSTS.shotstack
+    ).toFixed(2)
+  }
+
+  const todayMovies = movies.filter(m => {
+    const created = new Date(m.shots[0]?.created_at)
+    const today = new Date()
+    return created.toDateString() === today.toDateString()
+  })
+
+  const todayCost = todayMovies.reduce((sum, m) => sum + parseFloat(calcMovieCost(m.shots)), 0).toFixed(2)
+  const avgCost = todayMovies.length > 0 ? (parseFloat(todayCost) / todayMovies.length).toFixed(2) : '0.00'
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: '#666',
+      scene_only: '#4a9eff',
+      omni_done: '#f59e0b',
+      kling_done: '#f59e0b',
+      processing: '#f59e0b',
+      shot_complete: '#10b981',
+      movie_complete: '#8b5cf6',
+    }
+    return colors[status] ?? '#666'
+  }
+
+  const activeMovies = movies.filter(m => !m.shots.every((s: any) => s.status === 'movie_complete'))
+  const completedMovies = jobs.filter(j => j.result_video_url)
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-white">🎬 ScriptFlow Monitor</h1>
-          <p className="text-white/40 text-sm mt-1">Real-time pipeline dashboard</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-white/40">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" />
-            Auto-refresh every 10s
-          </div>
-          <span className="text-xs text-white/30">
-            Last: {lastRefresh.toLocaleTimeString()}
-          </span>
-          <button
-            onClick={fetchData}
-            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
-          >
-            ↻ Refresh
-          </button>
-        </div>
+    <div style={{ background: '#0a0a0a', minHeight: '100vh', color: '#fff', padding: '24px', fontFamily: 'monospace' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#a78bfa' }}>🎬 ScriptFlow Dashboard</h1>
+        <span style={{ color: '#666', fontSize: '0.8rem' }}>Auto-refresh 10s | Last: {lastRefresh.toLocaleTimeString()}</span>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-64 text-white/40">Loading...</div>
-      ) : (
-        <div className="space-y-8">
-          {/* ── Active Movies ── */}
-          <section>
-            <h2 className="text-lg font-semibold text-white/80 mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse inline-block" />
-              Active Movies ({activeMovies.length})
-            </h2>
-            {activeMovies.length === 0 ? (
-              <div className="bg-white/5 rounded-xl p-6 text-center text-white/30 text-sm">
-                No active movies
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeMovies.map(movie => (
-                  <div key={movie.movieId} className="bg-white/5 border border-white/10 rounded-xl p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-mono text-xs text-white/40 mb-1">movie_id</p>
-                        <p className="font-mono text-sm text-white/80 break-all">{movie.movieId}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-white">{movie.progress}%</p>
-                        <p className="text-xs text-white/40">{movie.completed}/{movie.total} shots</p>
-                      </div>
-                    </div>
-                    <ProgressBar value={movie.progress} />
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {movie.shots.map(shot => (
-                        <div key={shot.id} className="flex items-center gap-1.5 bg-white/5 rounded-lg px-2 py-1">
-                          <span className="text-xs text-white/40 font-mono">#{shot.shot_index}</span>
-                          <span className="text-xs text-white/50">{shot.shot_type}</span>
-                          <StatusBadge status={shot.status} />
-                          {shot.final_shot_url && (
-                            <a
-                              href={shot.final_shot_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-400 hover:text-blue-300"
-                            >
-                              ▶
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+      {/* Cost Summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+        {[
+          { label: "Today's Cost", value: `$${todayCost}`, color: parseFloat(todayCost) > 5 ? '#ef4444' : parseFloat(todayCost) > 2 ? '#f59e0b' : '#10b981' },
+          { label: 'Videos Today', value: todayMovies.length, color: '#a78bfa' },
+          { label: 'Avg Per Video', value: `$${avgCost}`, color: '#4a9eff' },
+          { label: 'Active Now', value: activeMovies.length, color: '#f59e0b' },
+        ].map((card, i) => (
+          <div key={i} style={{ background: '#1a1a1a', borderRadius: '12px', padding: '20px', border: '1px solid #333' }}>
+            <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '8px' }}>{card.label}</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: card.color }}>{card.value}</div>
+          </div>
+        ))}
+      </div>
 
-          {/* ── Completed Movies ── */}
-          {completedMovies.length > 0 && (
-            <section>
-              <h2 className="text-lg font-semibold text-white/80 mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-                Completed Movies ({completedMovies.length})
-              </h2>
-              <div className="space-y-3">
-                {completedMovies.map(movie => (
-                  <div key={movie.movieId} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between">
-                    <p className="font-mono text-xs text-white/50 break-all">{movie.movieId}</p>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-white/40">{movie.total} shots</span>
-                      <StatusBadge status="shot_complete" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+      {/* Active Movies */}
+      <h2 style={{ color: '#f59e0b', marginBottom: '16px' }}>⚡ Active Movies ({activeMovies.length})</h2>
+      {activeMovies.length === 0 && <div style={{ color: '#666', marginBottom: '24px' }}>No active movies</div>}
+      {activeMovies.map(movie => {
+        const complete = movie.shots.filter((s: any) => s.status === 'shot_complete' || s.status === 'movie_complete').length
+        const total = movie.shots.length
+        const pct = Math.round((complete / total) * 100)
+        const cost = calcMovieCost(movie.shots)
+        const costColor = parseFloat(cost) > 2 ? '#ef4444' : parseFloat(cost) > 1 ? '#f59e0b' : '#10b981'
+        return (
+          <div key={movie.id} style={{ background: '#1a1a1a', borderRadius: '12px', padding: '20px', marginBottom: '16px', border: '1px solid #333' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <span style={{ color: '#a78bfa', fontSize: '0.85rem' }}>🎬 {movie.id.slice(0, 8)}...</span>
+              <span style={{ color: costColor, fontSize: '0.85rem' }}>Est. ${cost}</span>
+            </div>
+            {/* Progress bar */}
+            <div style={{ background: '#333', borderRadius: '4px', height: '8px', marginBottom: '12px' }}>
+              <div style={{ background: '#10b981', height: '8px', borderRadius: '4px', width: `${pct}%`, transition: 'width 0.5s' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {movie.shots.sort((a: any, b: any) => a.shot_index - b.shot_index).map((shot: any) => (
+                <div key={shot.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#2a2a2a', padding: '4px 8px', borderRadius: '6px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: getStatusColor(shot.status) }} />
+                  <span style={{ fontSize: '0.75rem', color: '#aaa' }}>{shot.shot_type === 'face' ? '👤' : '🎬'}{shot.shot_index}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: '8px', color: '#666', fontSize: '0.75rem' }}>{complete}/{total} shots complete ({pct}%)</div>
+          </div>
+        )
+      })}
+
+      {/* Completed Videos */}
+      <h2 style={{ color: '#10b981', marginBottom: '16px', marginTop: '32px' }}>✅ Recent Completed ({completedMovies.length})</h2>
+      {completedMovies.slice(0, 10).map(job => (
+        <div key={job.id} style={{ background: '#1a1a1a', borderRadius: '12px', padding: '16px', marginBottom: '12px', border: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ color: '#a78bfa', fontSize: '0.8rem', marginBottom: '4px' }}>{job.task_id?.slice(0, 16)}...</div>
+            <div style={{ color: '#666', fontSize: '0.75rem' }}>{new Date(job.created_at).toLocaleString()}</div>
+          </div>
+          {job.result_video_url && (
+            <a href={job.result_video_url} target="_blank" rel="noreferrer"
+              style={{ background: '#7c3aed', color: '#fff', padding: '8px 16px', borderRadius: '8px', fontSize: '0.8rem', textDecoration: 'none' }}>
+              ▶ Watch
+            </a>
           )}
-
-          {/* ── Recent OmniHuman Jobs ── */}
-          <section>
-            <h2 className="text-lg font-semibold text-white/80 mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />
-              Recent OmniHuman Jobs (last 10)
-            </h2>
-            {omniJobs.length === 0 ? (
-              <div className="bg-white/5 rounded-xl p-6 text-center text-white/30 text-sm">
-                No jobs found
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-white/40 text-xs border-b border-white/10">
-                      <th className="text-left pb-2 pr-4">Task ID</th>
-                      <th className="text-left pb-2 pr-4">Status</th>
-                      <th className="text-left pb-2 pr-4">Created</th>
-                      <th className="text-left pb-2">Video</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {omniJobs.map(job => (
-                      <tr key={job.id} className="hover:bg-white/5 transition-colors">
-                        <td className="py-2 pr-4 font-mono text-xs text-white/50 max-w-[200px] truncate">
-                          {job.task_id}
-                        </td>
-                        <td className="py-2 pr-4">
-                          <StatusBadge status={job.status} />
-                        </td>
-                        <td className="py-2 pr-4 text-xs text-white/40">
-                          {new Date(job.created_at).toLocaleString()}
-                        </td>
-                        <td className="py-2">
-                          {job.result_video_url ? (
-                            <a
-                              href={job.result_video_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-400 hover:text-blue-300 underline"
-                            >
-                              ▶ Preview
-                            </a>
-                          ) : (
-                            <span className="text-xs text-white/20">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
         </div>
-      )}
+      ))}
     </div>
   )
 }
