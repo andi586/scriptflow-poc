@@ -46,14 +46,15 @@ Rules:
 STRICT face shot text rules:
 - MAXIMUM 1-2 sentences only
 - MAXIMUM 12 Chinese characters per sentence
-- MUST include '...' pause between sentences
-- MUST include emotional stage direction in brackets like [停顿] [轻声] [哽咽]
+- MUST use '...' for pauses between sentences
+- NO bracket stage directions like [停顿] [轻声] [哽咽] — these are FORBIDDEN
+- The text field must contain ONLY spoken words
 - Total spoken time per shot: 6-8 seconds maximum
 
 GOOD examples (perfect):
-"妈妈... 我好想你。[停顿] 十五年了。"
-"你走的那天... [哽咽] 我没说再见。"
-"我终于... [轻声] 原谅自己了。"
+"妈妈... 我好想你。"
+"你走的那天... 我没说再见。"
+"我终于... 原谅自己了。"
 
 BAD examples (too long, reject this — DO NOT do this):
 "妈妈这是你离开后的第十五个母亲节我也老了昨晚我梦见了你"

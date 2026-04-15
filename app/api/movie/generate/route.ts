@@ -156,9 +156,13 @@ export async function POST(request: NextRequest) {
     const { data: twin, error: twinErr } = await supabase
       .from('digital_twins')
       .select('id, frame_url_mid, voice_id')
-      .eq('id', twinId)
       .eq('is_active', true)
+      .eq('user_id', twinId)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single()
+
+    console.log('[movie/generate] Using twin:', twin?.id, 'voice_id:', twin?.voice_id)
 
     if (twinErr || !twin?.frame_url_mid) {
       console.error('[movie/generate] Twin not found:', twinErr?.message)
