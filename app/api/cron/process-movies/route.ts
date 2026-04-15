@@ -236,34 +236,39 @@ export async function GET() {
   }))
 
   // ── Find movies where all shots are shot_complete → concat final movie ────
-  const { data: completedMovieShots } = await supabaseAdmin
+  const { data: shotCompleteRows } = await supabaseAdmin
     .from('movie_shots')
     .select('movie_id')
     .eq('status', 'shot_complete')
 
-  const allCompletedMovieIds = [...new Set((completedMovieShots ?? []).map((s: { movie_id: string }) => s.movie_id).filter(Boolean))]
-  console.log(`[cron/process-movies] Found ${allCompletedMovieIds.length} movies with at least one shot_complete`)
+  if (!shotCompleteRows || shotCompleteRows.length === 0) {
+    console.log('[cron/process-movies] No shot_complete movies found')
+    return NextResponse.json({ processed: pendingShots?.length ?? 0, elapsed: Date.now() - cronStart })
+  }
 
-  for (const movieId of allCompletedMovieIds) {
+  const movieIds = [...new Set(shotCompleteRows.map((r: { movie_id: string }) => r.movie_id))]
+  console.log(`[cron/process-movies] Found ${movieIds.length} movies with at least one shot_complete`)
+
+  for (const movieId of movieIds) {
     if (Date.now() - cronStart > CRON_BUDGET_MS) break
     try {
-      // Step 1: Check if final video already exists (any shot marked movie_complete)
-      const { data: existingFinal } = await supabaseAdmin
+      // Check if already has movie_complete shots (already processed)
+      const { data: doneShots } = await supabaseAdmin
         .from('movie_shots')
         .select('id')
         .eq('movie_id', movieId)
         .eq('status', 'movie_complete')
         .limit(1)
 
-      if (existingFinal && existingFinal.length > 0) {
+      if (doneShots && doneShots.length > 0) {
         console.log(`[cron/process-movies] movie ${movieId} already movie_complete, skipping`)
         continue
       }
 
-      // Step 2: Get ALL shots for this movie and verify all are shot_complete
+      // Check if ALL shots are shot_complete
       const { data: allShots } = await supabaseAdmin
         .from('movie_shots')
-        .select('id, status, final_shot_url, shot_index')
+        .select('status, final_shot_url, shot_index, duration')
         .eq('movie_id', movieId)
         .order('shot_index', { ascending: true })
 
@@ -279,7 +284,7 @@ export async function GET() {
         continue
       }
 
-      console.log(`[cron/process-movies] All ${allShots.length} shots complete for movie ${movieId}, starting final concat`)
+      console.log(`[cron/process-movies] All shots complete for movie: ${movieId}, starting final concat...`)
 
       // Step 3: Get all final_shot_urls in order
       const shotUrls: string[] = allShots
