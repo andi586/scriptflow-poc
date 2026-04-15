@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   console.log('[concat-movie] Shotstack concat', urls.length, 'shots for movie:', movieId)
 
-  // Build Shotstack timeline with all shots
+  // Build Shotstack timeline with all shots (1s overlap between clips)
   let currentTime = 0
   const clips = urls.map((url, i) => {
     const duration = (shots[i] as { duration?: number })?.duration ?? 10
@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
       start: currentTime,
       length: duration,
     }
-    if (i > 0) clip.transition = { in: 'fade' }
-    currentTime += duration
+    if (i > 0) clip.transition = { in: 'fadeIn', out: 'fadeOut' }
+    currentTime += (duration - 1) // 1 second overlap between clips
     return clip
   })
 

@@ -291,7 +291,7 @@ export async function GET() {
       // Step 4: Submit to Shotstack for final assembly
       ;(async () => {
         try {
-          // Build Shotstack timeline
+          // Build Shotstack timeline (1s overlap between clips)
           let currentTime = 0
           const clips = shotUrls.map((url, i) => {
             const duration = (allShots[i] as { duration?: number })?.duration ?? 10
@@ -300,8 +300,8 @@ export async function GET() {
               start: currentTime,
               length: duration,
             }
-            if (i > 0) clip.transition = { in: 'fade' }
-            currentTime += duration
+            if (i > 0) clip.transition = { in: 'fadeIn', out: 'fadeOut' }
+            currentTime += (duration - 1) // 1 second overlap between clips
             return clip
           })
 

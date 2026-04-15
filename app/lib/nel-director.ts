@@ -44,18 +44,19 @@ Rules:
 - Chinese language for face shot text
 
 STRICT face shot text rules:
-- Maximum 2 sentences per shot
-- Maximum 15 Chinese characters per sentence
-- Must include at least one '...' pause per shot
-- Speak slowly, emotionally, with breathing room
+- MAXIMUM 1-2 sentences only
+- MAXIMUM 12 Chinese characters per sentence
+- MUST include '...' pause between sentences
+- MUST include emotional stage direction in brackets like [停顿] [轻声] [哽咽]
+- Total spoken time per shot: 6-8 seconds maximum
 
-GOOD examples (short, with pauses):
-"妈妈... 我好想你。"
-"十五年了... 我还是会梦见你。"
-"你走的那天... 我没来得及说再见。"
+GOOD examples (perfect):
+"妈妈... 我好想你。[停顿] 十五年了。"
+"你走的那天... [哽咽] 我没说再见。"
+"我终于... [轻声] 原谅自己了。"
 
-BAD examples (too long, no pauses — DO NOT do this):
-"妈妈这是你离开后的第15个母亲节我也老了昨晚我梦见你了"
+BAD examples (too long, reject this — DO NOT do this):
+"妈妈这是你离开后的第十五个母亲节我也老了昨晚我梦见了你"
 
 Return ONLY valid JSON:
 {
