@@ -64,7 +64,8 @@ async function runProducer(userInput: string, template: string): Promise<StorySt
     max_tokens: 1024,
     messages: [{
       role: 'user',
-      content: `You are the Producer Engine of ScriptFlow. Convert this user input into structured narrative logic.
+      content: `You are a master film producer. Analyze this story and extract deep emotional truth.
+Focus on: what is the REAL emotion underneath the words? What does this person truly want to say?
 
 User Input: "${userInput}"
 Template: "${template}"
@@ -91,18 +92,32 @@ async function runDirector(storyState: StoryState, template: string): Promise<Di
     max_tokens: 2048,
     messages: [{
       role: 'user',
-      content: `You are the Director Agent of ScriptFlow. Turn this narrative into a cinematic shot plan.
+      content: `You are an award-winning film director specializing in emotional short films.
 
 Story State: ${JSON.stringify(storyState)}
 Template: "${template}"
 
-Rules:
-- Create 8 shots alternating: face, scene, face, scene, face, scene, face, scene
-- Face shots: person speaks Chinese (max 2 sentences, max 12 chars each, use ... for pauses)
-- Scene shots: empty cinematic environment, NO people, NO humans
-- First 3 seconds must have strong emotional hook
-- Tension rises across shots following the tensionCurve
-- Each shot 8-12 seconds
+STRICT RULES for face shots:
+- Maximum 2 sentences, maximum 10 Chinese characters each
+- MUST use '...' for natural pauses (at least one per shot)
+- Sentences must feel like real spoken words, not written text
+- Emotion must ESCALATE across shots following tensionCurve
+- First shot MUST hook in 3 seconds: start with '妈妈...' or similar intimate address
+
+STRICT RULES for scene shots:
+- Describe EMPTY cinematic environment only
+- NO people, NO humans, NO figures
+- Must match emotional tone of adjacent face shots
+- Use cinematic language: lighting, texture, movement
+
+BAD example face shot (too long, too formal):
+'这是你离开后的第十五个母亲节，我也渐渐老去'
+
+GOOD example face shot (short, intimate, with pause):
+'妈妈... 十五年了。'
+
+Create 8 shots alternating: face, scene, face, scene, face, scene, face, scene
+Each shot 8-12 seconds.
 
 Return ONLY valid JSON (no markdown):
 {
@@ -140,6 +155,27 @@ Return ONLY valid JSON (no markdown):
   return JSON.parse(clean)
 }
 
+const MAX_FACE_CHARS = 20
+
+function validateAndFixFaceShots(plan: DirectionPlan): { plan: DirectionPlan; violations: string[] } {
+  const violations: string[] = []
+  const fixed = { ...plan, shots: plan.shots.map(shot => {
+    if (shot.shotType !== 'face' || !shot.dialogue) return shot
+    const charCount = shot.dialogue.replace(/\s/g, '').length
+    if (charCount > MAX_FACE_CHARS) {
+      violations.push(`Shot ${shot.shotNumber}: "${shot.dialogue}" (${charCount} chars > ${MAX_FACE_CHARS} limit)`)
+      // Truncate to first sentence or first MAX_FACE_CHARS chars
+      const firstSentence = shot.dialogue.split(/[。！？.!?]/)[0]
+      const truncated = firstSentence.length <= MAX_FACE_CHARS
+        ? firstSentence + (shot.dialogue.includes('...') ? '...' : '。')
+        : shot.dialogue.slice(0, MAX_FACE_CHARS - 3) + '...'
+      return { ...shot, dialogue: truncated }
+    }
+    return shot
+  })}
+  return { plan: fixed, violations }
+}
+
 async function runNEL(directionPlan: DirectionPlan): Promise<ExecutionPlan> {
   const pipeline = directionPlan.shots.map((shot, i) => ({
     shotNumber: shot.shotNumber,
@@ -167,7 +203,15 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const storyState = await runProducer(userInput, template)
 
   console.log('[CognitiveCore] Starting Director...')
-  const directionPlan = await runDirector(storyState, template)
+  const rawDirectionPlan = await runDirector(storyState, template)
+
+  console.log('[CognitiveCore] Validating face shot lengths...')
+  const { plan: directionPlan, violations } = validateAndFixFaceShots(rawDirectionPlan)
+  if (violations.length > 0) {
+    console.warn('[CognitiveCore] Face shot violations fixed:', violations)
+  } else {
+    console.log('[CognitiveCore] All face shots passed validation ✓')
+  }
 
   console.log('[CognitiveCore] Starting NEL...')
   const executionPlan = await runNEL(directionPlan)
