@@ -410,6 +410,7 @@ export async function GET() {
 
       // ── SCENE-ONLY SHOT: only wait for Kling, no OmniHuman needed ────
       if (shot.shot_type === 'scene' && shot.status === 'scene_only') {
+        console.log('[cron/movie_shots] Processing scene_only shot:', shot.id, 'kling_task_id:', shot.kling_task_id)
         if (shot.kling_task_id && !shot.final_shot_url) {
           const klingRes = await fetch(`https://api.piapi.ai/api/v1/task/${shot.kling_task_id}`, {
             headers: { 'x-api-key': piApiKey },
@@ -417,6 +418,7 @@ export async function GET() {
           if (klingRes.ok) {
             const klingData = await klingRes.json()
             const klingStatus: string = klingData?.data?.status ?? klingData?.status ?? 'unknown'
+            console.log(`[cron/movie_shots] scene-only shot ${shot.id} kling status=${klingStatus}`)
             if (klingStatus === 'completed' || klingStatus === 'success') {
               const sceneUrl: string | null =
                 klingData?.data?.output?.video?.resource_without_watermark ??
@@ -431,11 +433,15 @@ export async function GET() {
                   status: 'shot_complete',
                 }).eq('id', shot.id)
                 console.log(`[cron/movie_shots] scene-only shot ${shot.id} shot_complete: ${sceneUrl}`)
+              } else {
+                console.warn(`[cron/movie_shots] scene-only shot ${shot.id} kling completed but no video url found`)
               }
-            } else {
-              console.log(`[cron/movie_shots] scene-only shot ${shot.id} kling status=${klingStatus}`)
             }
+          } else {
+            console.warn(`[cron/movie_shots] scene-only shot ${shot.id} kling poll failed: ${klingRes.status}`)
           }
+        } else if (!shot.kling_task_id) {
+          console.warn(`[cron/movie_shots] scene-only shot ${shot.id} has no kling_task_id`)
         }
         return // scene_only shots don't need OmniHuman or Shotstack
       }
