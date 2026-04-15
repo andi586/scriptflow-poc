@@ -9,6 +9,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/process-movies",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/check-costs",
       "schedule": "0 9 * * *"
     }
