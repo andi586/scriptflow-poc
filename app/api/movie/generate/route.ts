@@ -9,18 +9,32 @@ export const maxDuration = 60
  * POST /api/movie/generate
  * Body: { twinId: string, story: string, sessionId?: string, template?: string, shots?: Shot[] }
  *
- * If shots array provided:
- *   - For each shot: ElevenLabs TTS → audioUrl, OmniHuman → omni_task_id, Kling → kling_task_id
- *   - Insert rows into movie_shots table
+ * If shots array provided (NEL Director output):
+ *   - For each shot with type === 'face':
+ *       ElevenLabs TTS → audioUrl, OmniHuman → omni_task_id, Kling → kling_task_id
+ *   - For each shot with type === 'scene':
+ *       NO OmniHuman, Kling text-to-video only, status = 'scene_only'
+ *   - Insert rows into movie_shots and omnihuman_jobs
  *   - Return { movieId, totalShots }
  *
  * Fallback (no shots): single-video pipeline
  */
 
+interface NarrativeState {
+  tension: number
+  beat: string
+  goal: string
+  emotion: string
+}
+
 interface Shot {
-  shot: number
-  text: string
-  scene: string
+  shot_index?: number
+  shot?: number
+  type?: 'face' | 'scene'
+  text?: string
+  scene?: string
+  duration?: number
+  narrative?: NarrativeState
 }
 
 const scenePrompts: Record<string, string> = {
@@ -69,7 +83,7 @@ async function generateAudioUrl(
 }
 
 // ── Helper: Submit Kling text-to-video ────────────────────────────────────────
-async function submitKling(scenePrompt: string, piApiKey: string): Promise<string | null> {
+async function submitKling(scenePrompt: string, piApiKey: string, duration = 10): Promise<string | null> {
   try {
     const res = await fetch('https://api.piapi.ai/api/v1/task', {
       method: 'POST',
@@ -82,7 +96,7 @@ async function submitKling(scenePrompt: string, piApiKey: string): Promise<strin
           negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
           version: '3.0',
           mode: 'pro',
-          duration: 10,
+          duration,
           aspect_ratio: '9:16',
           enable_audio: true,
         },
@@ -154,79 +168,114 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
     }
 
-  const elevenKey = process.env.ELEVENLABS_API_KEY
-  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // Adam - multilingual
+    const elevenKey = process.env.ELEVENLABS_API_KEY
+    const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // Adam - multilingual
 
     // ════════════════════════════════════════════════════════════════════════
-    // MULTI-SHOT PATH
+    // MULTI-SHOT PATH (NEL Director output)
     // ════════════════════════════════════════════════════════════════════════
     if (Array.isArray(shots) && shots.length > 0) {
       const jobId = crypto.randomUUID()
       console.log('[movie/generate] Multi-shot mode, jobId:', jobId, 'shots:', shots.length)
 
       for (const shot of shots as Shot[]) {
-        console.log('[movie/generate] Processing shot', shot.shot)
+        const shotIndex = shot.shot_index ?? shot.shot ?? 0
+        const shotType = shot.type ?? 'face'
+        const shotText = shot.text ?? ''
+        const shotScene = shot.scene ?? (template && scenePrompts[template as string] ? scenePrompts[template as string] : story)
+        const shotDuration = shot.duration ?? 10
+        const shotNarrative = shot.narrative ?? null
 
-        // TTS for this shot
-        let audioUrl: string | null = null
-        if (elevenKey) {
-          audioUrl = await generateAudioUrl(shot.text, supabase, elevenKey, voiceId)
-          console.log('[movie/generate] Shot', shot.shot, 'audioUrl:', audioUrl)
-        } else {
-          console.warn('[movie/generate] ELEVENLABS_API_KEY not set, skipping TTS for shot', shot.shot)
-        }
+        console.log('[movie/generate] Processing shot', shotIndex, 'type:', shotType)
 
-        // OmniHuman (requires audioUrl)
-        let omniTaskId: string | null = null
-        if (audioUrl) {
-          omniTaskId = await submitOmniHuman(frameUrl, audioUrl, piApiKey)
-          console.log('[movie/generate] Shot', shot.shot, 'omni_task_id:', omniTaskId)
-        }
-
-        // Kling text-to-video for scene
-        const klingTaskId = await submitKling(shot.scene, piApiKey)
-        console.log('[movie/generate] Shot', shot.shot, 'kling_task_id:', klingTaskId)
-
-        // Insert into omnihuman_jobs so the cron can poll OmniHuman for this shot
-        if (omniTaskId) {
-          try {
-            const { error: omniInsertErr } = await supabase.from('omnihuman_jobs').insert({
-              task_id: omniTaskId,
-              status: 'processing',
-              image_url: frameUrl,
-              audio_url: audioUrl,
-              scene_task_id: klingTaskId,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            if (omniInsertErr) {
-              console.error('[movie/generate] omnihuman_jobs insert failed for shot', shot.shot, ':', omniInsertErr.message)
-            } else {
-              console.log('[movie/generate] omnihuman_jobs insert SUCCESS for shot', shot.shot, '— omni inserted into omnihuman_jobs:', omniTaskId)
-            }
-          } catch (omniDbErr) {
-            console.error('[movie/generate] omnihuman_jobs insert FATAL for shot', shot.shot, ':', omniDbErr instanceof Error ? omniDbErr.message : omniDbErr)
-          }
-        }
-
-        // Insert into movie_shots
-        try {
-          const { error: insertErr } = await supabase.from('movie_shots').insert({
-            movie_id: jobId,
-            shot_index: shot.shot,
-            omni_task_id: omniTaskId,
-            kling_task_id: klingTaskId,
-            audio_url: audioUrl,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          })
-          if (insertErr) {
-            console.error('[movie/generate] movie_shots insert failed for shot', shot.shot, ':', insertErr.message)
+        if (shotType === 'face') {
+          // ── FACE SHOT: TTS + OmniHuman + Kling ──────────────────────────
+          let audioUrl: string | null = null
+          if (elevenKey && shotText) {
+            audioUrl = await generateAudioUrl(shotText, supabase, elevenKey, voiceId)
+            console.log('[movie/generate] Shot', shotIndex, 'audioUrl:', audioUrl)
           } else {
-            console.log('[movie/generate] movie_shots insert SUCCESS for shot', shot.shot)
+            console.warn('[movie/generate] Skipping TTS for shot', shotIndex, '- no key or text')
           }
-        } catch (dbErr) {
-          console.error('[movie/generate] movie_shots insert FATAL for shot', shot.shot, ':', dbErr instanceof Error ? dbErr.message : dbErr)
+
+          let omniTaskId: string | null = null
+          if (audioUrl) {
+            omniTaskId = await submitOmniHuman(frameUrl, audioUrl, piApiKey)
+            console.log('[movie/generate] Shot', shotIndex, 'omni_task_id:', omniTaskId)
+          }
+
+          const klingTaskId = await submitKling(shotScene, piApiKey, shotDuration)
+          console.log('[movie/generate] Shot', shotIndex, 'kling_task_id:', klingTaskId)
+
+          // Insert into omnihuman_jobs so cron can poll OmniHuman
+          if (omniTaskId) {
+            try {
+              const { error: omniInsertErr } = await supabase.from('omnihuman_jobs').insert({
+                task_id: omniTaskId,
+                status: 'processing',
+                image_url: frameUrl,
+                audio_url: audioUrl,
+                scene_task_id: klingTaskId,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              if (omniInsertErr) {
+                console.error('[movie/generate] omnihuman_jobs insert failed for shot', shotIndex, ':', omniInsertErr.message)
+              } else {
+                console.log('[movie/generate] omnihuman_jobs insert SUCCESS for shot', shotIndex)
+              }
+            } catch (omniDbErr) {
+              console.error('[movie/generate] omnihuman_jobs insert FATAL for shot', shotIndex, ':', omniDbErr instanceof Error ? omniDbErr.message : omniDbErr)
+            }
+          }
+
+          // Insert into movie_shots
+          try {
+            const { error: insertErr } = await supabase.from('movie_shots').insert({
+              movie_id: jobId,
+              shot_index: shotIndex,
+              shot_type: 'face',
+              omni_task_id: omniTaskId,
+              kling_task_id: klingTaskId,
+              audio_url: audioUrl,
+              narrative: shotNarrative,
+              status: 'pending',
+              created_at: new Date().toISOString(),
+            })
+            if (insertErr) {
+              console.error('[movie/generate] movie_shots insert failed for shot', shotIndex, ':', insertErr.message)
+            } else {
+              console.log('[movie/generate] movie_shots insert SUCCESS for face shot', shotIndex)
+            }
+          } catch (dbErr) {
+            console.error('[movie/generate] movie_shots insert FATAL for shot', shotIndex, ':', dbErr instanceof Error ? dbErr.message : dbErr)
+          }
+
+        } else {
+          // ── SCENE SHOT: Kling only, no OmniHuman ────────────────────────
+          const klingTaskId = await submitKling(shotScene, piApiKey, shotDuration)
+          console.log('[movie/generate] Scene shot', shotIndex, 'kling_task_id:', klingTaskId)
+
+          try {
+            const { error: insertErr } = await supabase.from('movie_shots').insert({
+              movie_id: jobId,
+              shot_index: shotIndex,
+              shot_type: 'scene',
+              omni_task_id: null,
+              kling_task_id: klingTaskId,
+              audio_url: null,
+              narrative: shotNarrative,
+              status: 'scene_only',
+              created_at: new Date().toISOString(),
+            })
+            if (insertErr) {
+              console.error('[movie/generate] movie_shots insert failed for scene shot', shotIndex, ':', insertErr.message)
+            } else {
+              console.log('[movie/generate] movie_shots insert SUCCESS for scene shot', shotIndex)
+            }
+          } catch (dbErr) {
+            console.error('[movie/generate] movie_shots insert FATAL for scene shot', shotIndex, ':', dbErr instanceof Error ? dbErr.message : dbErr)
+          }
         }
       }
 
@@ -356,6 +405,9 @@ export async function POST(request: NextRequest) {
     } catch (dbErr) {
       console.error('[movie/generate] DB insert FAILED:', dbErr instanceof Error ? dbErr.message : JSON.stringify(dbErr))
     }
+
+    // suppress unused warning
+    void sessionId
 
     return NextResponse.json({ success: true, taskId, audioUrl, frameUrl })
   } catch (err) {
