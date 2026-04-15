@@ -203,7 +203,13 @@ export async function POST(request: NextRequest) {
       const jobId = crypto.randomUUID()
       console.log('[movie/generate] Multi-shot mode, jobId:', jobId, 'shots:', shots.length)
 
-      for (const [idx, shot] of (shots as Shot[]).entries()) {
+      // Submit face shots first (critical path), then scene shots
+      const faceShots = (shots as Shot[]).filter(s => (s.type ?? 'face') === 'face')
+      const sceneShots = (shots as Shot[]).filter(s => s.type === 'scene')
+      const orderedShots = [...faceShots, ...sceneShots]
+      console.log('[movie/generate] Submission order: face shots first:', faceShots.length, 'then scene shots:', sceneShots.length)
+
+      for (const [idx, shot] of orderedShots.entries()) {
         const shotIndex = shot.shot_index ?? (shot as { shotNumber?: number }).shotNumber ?? (idx + 1)
         const shotType = shot.type ?? 'face'
         const shotText = shot.text ?? ''
