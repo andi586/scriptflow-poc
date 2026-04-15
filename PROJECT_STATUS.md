@@ -236,3 +236,95 @@
 > "大脑没有发育，建成了强大的四肢。今天大脑开始工作了。"
 
 > "工具只是四肢，NEL才是护城河。目前他们只是猖狂了一时，未来鹿死谁手谁也不知道。"
+
+---
+
+## Day 30 - 2026年4月15日（修订版）
+
+### 🎯 今日核心里程碑
+
+**"大脑开始工作了"** — Cognitive Core v1.0首次成功指挥完整视频生成
+（注：尚未全自动闭环，仍需Orchestrator人工兜底）
+
+---
+
+### ✅ 今日完成
+
+**Cognitive Core v1.0（三模块大脑）**
+- `app/lib/cognitive-core.ts` — Producer + Director + NEL三模块串行执行
+- Producer Engine：一句话→世界观/角色/冲突/张力曲线
+- Director Agent：故事→8镜头电影分镜计划（face/scene交替）
+- NEL：分镜计划→可执行Pipeline JSON
+- 使用claude-opus-4-6
+
+**Orchestrator统一调度器**
+- `app/api/cron/orchestrator/route.ts` — 6步状态机
+- 替换process-kling和process-movies，统一调度
+- 自动重试（最多3次）、超时恢复、状态轮询
+
+**声音克隆接入**
+- 建立数字分身时自动克隆声音（Railway提取+ElevenLabs克隆）
+- `digital_twins.voice_id` 存储克隆声音ID
+- 视频生成时自动使用克隆声音
+
+**Shotstack统一替换Railway concat**
+- 所有视频合并统一使用Shotstack
+- Railway只保留音频提取
+- 彻底解决FFmpeg分辨率不匹配问题
+
+**Dashboard升级**
+- 实时监控：活跃电影进度+shot状态彩色点
+- API服务状态面板+成本监控
+- 盈亏平衡点：13部视频/月（$9.99售价，$1.31成本）
+
+**技术规范**
+- `TECHNICAL_RULES.md` 新增NEL优先原则、100分钟电影选型原则、Face镜头关键路径规则
+
+---
+
+### ❌ 已知问题（按优先级）
+
+1. **Shotstack免费版水印** — 严重影响交付质量，必须48小时内升级付费计划
+2. **Orchestrator新旧状态混用** — submitted/processing vs omni_done/shot_complete需统一
+3. **声音腔调不稳定** — 克隆声音有时洋腔，需调整ElevenLabs stability参数
+4. **编剧质量不稳定** — Director台词有时截断突兀，缺少自然停顿
+5. **Face镜头瓶颈未解决** — 6-10分钟/个，用户等待时间过长
+
+---
+
+### 📊 今日成本
+
+- PiAPI：约$20
+- Vercel超额：$61.93
+- 合计：约$82
+- ⚠️ 按当前burn rate，30天内必须验证付费转化，否则现金流风险较高
+
+---
+
+### 🔬 今日产品洞察
+
+**Face镜头是生产关键路径**
+- Scene：Kling 2-3分钟
+- Face：Kling+OmniHuman+Shotstack = 6-10分钟
+- 解法：Face优先提交；未来OmniHuman缓存；等待LPM 1.0
+
+**工具只是四肢，NEL才是护城河**
+- 所有工具随时可替换
+- NEL+Orchestrator是ScriptFlow真正的竞争壁垒
+
+---
+
+### 📅 明日计划（Day 31，按优先级）
+
+1. 状态机统一 + Cognitive Core prompt质量优化 + 镜头自然停顿
+2. Shotstack付费升级（移除水印）
+3. 成本预警机制（超$50/天自动告警）
+4. 用户系统（多用户数字分身隔离）
+5. 收费系统（延后至质量稳定后）
+
+---
+
+### 💡 今日金句
+
+> "大脑没有发育，建成了强大的四肢。今天大脑开始工作了。"
+> "工具只是四肢，NEL才是护城河。目前他们只是猖狂了一时，未来鹿死谁手谁也不知道。"
