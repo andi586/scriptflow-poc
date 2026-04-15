@@ -163,15 +163,17 @@ export async function GET() {
   console.log('[orchestrator] Starting step 2...')
   if (Date.now() - cronStart > MAX_RUNTIME) { log.push('[orchestrator] Max runtime reached, stopping'); return NextResponse.json({ elapsed: elapsed(), log }) }
   if (!overBudget()) {
-    const { data: activeShots } = await db
+    const { data: pendingShots } = await db
       .from('movie_shots')
       .select('*')
-      .in('status', ['submitted', 'processing', 'omni_done', 'kling_done', 'scene_only', 'pending'])
+      .in('status', ['submitted', 'processing', 'merging', 'omni_done', 'kling_done', 'scene_only'])
       .is('shotstack_render_id', null)
       .limit(20)
 
+    console.log('[orchestrator] step2] active shots:', pendingShots?.length ?? 0)
+
     // Migrate legacy statuses on-the-fly
-    for (const shot of activeShots ?? []) {
+    for (const shot of pendingShots ?? []) {
       if (['omni_done', 'kling_done'].includes(shot.status)) {
         await db.from('movie_shots').update({ status: 'processing' }).eq('id', shot.id)
         shot.status = 'processing'
@@ -181,6 +183,7 @@ export async function GET() {
       }
     }
 
+    const activeShots = pendingShots
     log.push(`[step2] active shots to poll: ${activeShots?.length ?? 0}`)
 
     for (const shot of activeShots ?? []) {
