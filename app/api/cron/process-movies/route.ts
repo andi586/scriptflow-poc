@@ -83,7 +83,41 @@ export async function GET() {
             console.warn(`[cron/process-movies] scene-only shot ${shot.id} kling poll failed: ${klingRes.status}`)
           }
         } else if (!shot.kling_task_id) {
-          console.warn(`[cron/process-movies] scene-only shot ${shot.id} has no kling_task_id`)
+          // Re-submit Kling task for this scene_only shot
+          console.log(`[cron/process-movies] scene-only shot ${shot.id} has no kling_task_id, re-submitting Kling...`)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          try {
+            const scenePrompt = shot.scene ?? 'empty cinematic scene, no people, no humans, dramatic lighting'
+            const klingSubmitRes = await fetch('https://api.piapi.ai/api/v1/task', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
+              body: JSON.stringify({
+                model: 'kling',
+                task_type: 'video_generation',
+                input: {
+                  prompt: scenePrompt,
+                  negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
+                  version: '3.0',
+                  mode: 'pro',
+                  duration: shot.duration ?? 5,
+                  aspect_ratio: '9:16',
+                  enable_audio: true,
+                },
+              }),
+            })
+            if (klingSubmitRes.ok) {
+              const klingSubmitData = await klingSubmitRes.json()
+              const newKlingTaskId: string | null = klingSubmitData?.data?.task_id ?? null
+              if (newKlingTaskId) {
+                await supabaseAdmin.from('movie_shots').update({ kling_task_id: newKlingTaskId }).eq('id', shot.id)
+                console.log(`[cron/process-movies] scene-only shot ${shot.id} re-submitted Kling: ${newKlingTaskId}`)
+              }
+            } else {
+              console.warn(`[cron/process-movies] scene-only shot ${shot.id} Kling re-submit failed: ${klingSubmitRes.status}`)
+            }
+          } catch (resubErr) {
+            console.warn(`[cron/process-movies] scene-only shot ${shot.id} Kling re-submit error:`, resubErr instanceof Error ? resubErr.message : resubErr)
+          }
         }
         return
       }
