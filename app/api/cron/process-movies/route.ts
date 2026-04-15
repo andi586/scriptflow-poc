@@ -252,6 +252,8 @@ export async function GET() {
   for (const movieId of movieIds) {
     if (Date.now() - cronStart > CRON_BUDGET_MS) break
     try {
+      console.log('[process-movies] Checking movie:', movieId)
+
       // Check if already has final_complete shots (already processed)
       const { data: doneShots } = await supabaseAdmin
         .from('movie_shots')
@@ -259,6 +261,8 @@ export async function GET() {
         .eq('movie_id', movieId)
         .eq('status', 'final_complete')
         .limit(1)
+
+      console.log('[process-movies] doneShots:', doneShots?.length)
 
       if (doneShots && doneShots.length > 0) {
         console.log(`[cron/process-movies] movie ${movieId} already final_complete, skipping`)
@@ -272,11 +276,19 @@ export async function GET() {
         .eq('movie_id', movieId)
         .order('shot_index', { ascending: true })
 
+      console.log('[process-movies] allShots count:', allShots?.length)
+
       if (!allShots || allShots.length === 0) continue
+
+      for (const s of allShots) {
+        console.log('[process-movies] shot', s.shot_index, 'status:', s.status, 'has_url:', !!s.final_shot_url)
+      }
 
       const allComplete = allShots.every((s: { status: string; final_shot_url: string | null }) =>
         s.status === 'shot_complete' && s.final_shot_url
       )
+
+      console.log('[process-movies] allComplete:', allComplete)
 
       if (!allComplete) {
         const completeCount = allShots.filter((s: { status: string }) => s.status === 'shot_complete').length
