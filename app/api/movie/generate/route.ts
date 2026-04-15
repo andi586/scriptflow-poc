@@ -147,10 +147,10 @@ export async function POST(request: NextRequest) {
       { auth: { persistSession: false } },
     )
 
-    // ── Get digital twin frame ────────────────────────────────────────────────
+    // ── Get digital twin frame + voice_id ─────────────────────────────────────
     const { data: twin, error: twinErr } = await supabase
       .from('digital_twins')
-      .select('id, frame_url_mid')
+      .select('id, frame_url_mid, voice_id')
       .eq('id', twinId)
       .eq('is_active', true)
       .single()
@@ -169,7 +169,9 @@ export async function POST(request: NextRequest) {
     }
 
     const elevenKey = process.env.ELEVENLABS_API_KEY
-    const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // Adam - multilingual
+    // Use cloned voice from digital twin if available, fall back to env or default
+    const voiceId = twin.voice_id ?? process.env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // Adam - multilingual
+    console.log('[movie/generate] Using voiceId:', voiceId, twin.voice_id ? '(cloned)' : '(default)')
 
     // ════════════════════════════════════════════════════════════════════════
     // MULTI-SHOT PATH (NEL Director output)
