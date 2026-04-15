@@ -17,19 +17,35 @@ export default function MyVideosPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from('omnihuman_jobs')
-      .select('id, result_video_url, created_at')
-      .not('result_video_url', 'is', null)
-      .order('created_at', { ascending: false })
-      .then(({ data, error: err }) => {
-        if (err) {
-          setError(err.message)
-        } else {
-          setVideos((data ?? []) as VideoJob[])
-        }
+
+    const loadVideos = async () => {
+      // Get current user session
+      const { data: { user } } = await supabase.auth.getUser()
+
+      let query = supabase
+        .from('omnihuman_jobs')
+        .select('id, result_video_url, created_at')
+        .not('result_video_url', 'is', null)
+        .order('created_at', { ascending: false })
+
+      // Require login to view videos
+      if (!user?.id) {
+        setError('Please login to view your videos.')
         setLoading(false)
-      })
+        return
+      }
+
+      // Filter by user_id
+      const { data, error: err } = await query.eq('user_id', user.id)
+      if (err) {
+        setError(err.message)
+      } else {
+        setVideos((data ?? []) as VideoJob[])
+      }
+      setLoading(false)
+    }
+
+    void loadVideos()
   }, [])
 
   const handleDelete = async (id: string) => {

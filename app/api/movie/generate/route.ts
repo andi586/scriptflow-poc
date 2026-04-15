@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -145,6 +146,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'story is required' }, { status: 400 })
     }
 
+    // Get current user from auth session
+    const serverSupabase = await createServerClient()
+    const { data: { session } } = await serverSupabase.auth.getSession()
+    const userId = session?.user?.id ?? null
+
     // Always use service role key (admin) so RLS doesn't block inserts
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -247,6 +253,7 @@ export async function POST(request: NextRequest) {
                 image_url: frameUrl,
                 audio_url: audioUrl,
                 scene_task_id: klingTaskId,
+                user_id: userId,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               })
@@ -271,6 +278,7 @@ export async function POST(request: NextRequest) {
               audio_url: audioUrl,
               narrative: shotNarrative,
               status: 'submitted',
+              user_id: userId,
               created_at: new Date().toISOString(),
             })
             if (insertErr) {
@@ -297,6 +305,7 @@ export async function POST(request: NextRequest) {
               audio_url: null,
               narrative: shotNarrative,
               status: 'submitted',
+              user_id: userId,
               created_at: new Date().toISOString(),
             })
             if (insertErr) {
@@ -425,6 +434,7 @@ export async function POST(request: NextRequest) {
         image_url: frameUrl,
         audio_url: audioUrl,
         scene_task_id: sceneTaskId ?? null,
+        user_id: userId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
