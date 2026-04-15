@@ -292,19 +292,25 @@ export async function GET() {
       // Step 4: Submit to Shotstack for final assembly
       ;(async () => {
         try {
-          // Build Shotstack timeline (1s overlap between clips)
-          let currentTime = 0
-          const clips = shotUrls.map((url, i) => {
-            const duration = (allShots[i] as { duration?: number })?.duration ?? 10
-            const clip: Record<string, unknown> = {
-              asset: { type: 'video', src: url },
-              start: currentTime,
-              length: duration,
+          // Build Shotstack timeline — sequential clips, no overlap, no transitions
+          const shotsWithUrl = allShots.filter((s: { final_shot_url: string | null }) => s.final_shot_url)
+          const clips = shotsWithUrl.map((s: { final_shot_url: string | null; duration?: number }, i: number) => {
+            let start = 0
+            for (let j = 0; j < i; j++) {
+              start += (shotsWithUrl[j] as { duration?: number }).duration ?? 10
             }
-            if (i > 0) clip.transition = { in: 'fadeIn', out: 'fadeOut' }
-            currentTime += (duration - 1) // 1 second overlap between clips
-            return clip
+            return {
+              asset: { type: 'video', src: s.final_shot_url },
+              start,
+              length: s.duration ?? 10,
+            }
           })
+
+          const timeline = { tracks: [{ clips }] }
+          const output = { format: 'mp4', resolution: 'sd' }
+          const body = { timeline, output }
+
+          console.log(`[cron/process-movies] Shotstack body for movie ${movieId}:`, JSON.stringify(body).slice(0, 500))
 
           const shotstackRes = await fetch('https://api.shotstack.io/stage/render', {
             method: 'POST',
@@ -312,13 +318,11 @@ export async function GET() {
               'x-api-key': shotstackKey!,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              timeline: { tracks: [{ clips }] },
-              output: { format: 'mp4', resolution: 'sd', aspectRatio: '9:16' },
-            }),
+            body: JSON.stringify(body),
           })
 
           const shotstackData = await shotstackRes.json()
+          console.log('[process-movies] Shotstack errors:', JSON.stringify(shotstackData?.response?.errors, null, 2))
           const renderId: string | null = shotstackData?.response?.id ?? null
           console.log(`[cron/process-movies] Shotstack renderId for movie ${movieId}:`, renderId)
 
