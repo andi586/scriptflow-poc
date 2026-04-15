@@ -135,7 +135,7 @@ export async function GET() {
     const { data: activeShots } = await db
       .from('movie_shots')
       .select('*')
-      .in('status', ['submitted', 'processing', 'pending', 'scene_only', 'omni_done', 'kling_done'])
+      .in('status', ['submitted', 'processing', 'omni_done', 'kling_done', 'scene_only', 'pending'])
       .is('shotstack_render_id', null)
       .limit(20)
 
@@ -225,13 +225,13 @@ export async function GET() {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // STEP 3: Poll merging shots
+  // STEP 3: Poll merging shots (also catch old 'processing' with render_id)
   // ══════════════════════════════════════════════════════════════════════════
   if (!overBudget() && shotstackKey) {
     const { data: mergingShots } = await db
       .from('movie_shots')
       .select('id, shotstack_render_id, retry_count, movie_id')
-      .eq('status', 'merging')
+      .in('status', ['merging', 'processing'])
       .not('shotstack_render_id', 'is', null)
       .limit(20)
 
@@ -438,6 +438,36 @@ export async function GET() {
         .update({ status: 'pending' })
         .in('id', stuckProcessing.map((s: { id: string }) => s.id))
       log.push(`[step6] reset ${stuckProcessing.length} stuck processing shots`)
+    }
+
+    // Stuck omni_done shots (OmniHuman done but Kling never finished)
+    const { data: stuckOmniDone } = await db
+      .from('movie_shots')
+      .select('id')
+      .eq('status', 'omni_done')
+      .lt('updated_at', tenMinAgo)
+      .limit(10)
+
+    if (stuckOmniDone && stuckOmniDone.length > 0) {
+      await db.from('movie_shots')
+        .update({ status: 'pending' })
+        .in('id', stuckOmniDone.map((s: { id: string }) => s.id))
+      log.push(`[step6] reset ${stuckOmniDone.length} stuck omni_done shots`)
+    }
+
+    // scene_only shots with no kling_task_id
+    const { data: sceneNoKling } = await db
+      .from('movie_shots')
+      .select('id')
+      .eq('status', 'scene_only')
+      .is('kling_task_id', null)
+      .limit(10)
+
+    if (sceneNoKling && sceneNoKling.length > 0) {
+      await db.from('movie_shots')
+        .update({ status: 'pending' })
+        .in('id', sceneNoKling.map((s: { id: string }) => s.id))
+      log.push(`[step6] reset ${sceneNoKling.length} scene_only shots with no kling_task_id`)
     }
   }
 
