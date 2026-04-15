@@ -153,19 +153,28 @@ export async function POST(request: NextRequest) {
     )
 
     // ── Get digital twin frame + voice_id ─────────────────────────────────────
-    const { data: twin, error: twinErr } = await supabase
+    let { data: twin } = await supabase
       .from('digital_twins')
       .select('id, frame_url_mid, voice_id')
-      .eq('is_active', true)
-      .eq('user_id', twinId)
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('id', twinId)
       .single()
+
+    if (!twin) {
+      console.warn('[movie/generate] Twin not found by id, trying fallback by is_active...')
+      const { data: fallbackTwin } = await supabase
+        .from('digital_twins')
+        .select('id, frame_url_mid, voice_id')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      twin = fallbackTwin
+    }
 
     console.log('[movie/generate] Using twin:', twin?.id, 'voice_id:', twin?.voice_id)
 
-    if (twinErr || !twin?.frame_url_mid) {
-      console.error('[movie/generate] Twin not found:', twinErr?.message)
+    if (!twin?.frame_url_mid) {
+      console.error('[movie/generate] Twin not found for twinId:', twinId)
       return NextResponse.json({ error: 'Digital twin not found' }, { status: 404 })
     }
 
