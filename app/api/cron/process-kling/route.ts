@@ -395,7 +395,7 @@ export async function GET() {
   const { data: pendingShots } = await supabaseAdmin
     .from('movie_shots')
     .select('*')
-    .in('status', ['pending', 'processing', 'omni_done', 'kling_done'])
+    .in('status', ['pending', 'processing', 'omni_done', 'kling_done', 'scene_only'])
     .limit(20) // Process all pending shots per tick
 
   console.log(`[cron/process-kling] Found ${pendingShots?.length ?? 0} pending movie_shots`)
@@ -407,6 +407,38 @@ export async function GET() {
       let omniVideoUrl: string | null = shot.omni_video_url ?? null
       let klingSceneUrl: string | null = shot.kling_scene_url ?? null
       let shotStatus: string = shot.status
+
+      // ── SCENE-ONLY SHOT: only wait for Kling, no OmniHuman needed ────
+      if (shot.shot_type === 'scene' && shot.status === 'scene_only') {
+        if (shot.kling_task_id && !shot.final_shot_url) {
+          const klingRes = await fetch(`https://api.piapi.ai/api/v1/task/${shot.kling_task_id}`, {
+            headers: { 'x-api-key': piApiKey },
+          })
+          if (klingRes.ok) {
+            const klingData = await klingRes.json()
+            const klingStatus: string = klingData?.data?.status ?? klingData?.status ?? 'unknown'
+            if (klingStatus === 'completed' || klingStatus === 'success') {
+              const sceneUrl: string | null =
+                klingData?.data?.output?.video?.resource_without_watermark ??
+                klingData?.data?.output?.video_url ??
+                klingData?.data?.output?.video ??
+                klingData?.data?.output?.url ??
+                null
+              if (sceneUrl) {
+                await supabaseAdmin.from('movie_shots').update({
+                  kling_scene_url: sceneUrl,
+                  final_shot_url: sceneUrl,
+                  status: 'shot_complete',
+                }).eq('id', shot.id)
+                console.log(`[cron/movie_shots] scene-only shot ${shot.id} shot_complete: ${sceneUrl}`)
+              }
+            } else {
+              console.log(`[cron/movie_shots] scene-only shot ${shot.id} kling status=${klingStatus}`)
+            }
+          }
+        }
+        return // scene_only shots don't need OmniHuman or Shotstack
+      }
 
       // ── Check OmniHuman via omnihuman_jobs (DB lookup, fast) ─────────
       if (shot.omni_task_id && !omniVideoUrl) {
