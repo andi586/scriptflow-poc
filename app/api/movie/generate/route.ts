@@ -131,9 +131,11 @@ async function submitOmniHuman(frameUrl: string, audioUrl: string, piApiKey: str
         model: 'omni-human',
         task_type: 'omni-human-1.5',
         input: { image_url: frameUrl, audio_url: audioUrl, prompt: 'person speaks naturally, cinematic' },
-        webhook_config: {
-          endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
-          secret: '',
+        config: {
+          webhook_config: {
+            endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
+            secret: '',
+          },
         },
       }),
     })

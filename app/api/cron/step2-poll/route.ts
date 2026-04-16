@@ -71,6 +71,7 @@ export async function GET() {
             piData?.data?.output?.video_url ??
             piData?.data?.output?.video ??
             piData?.data?.output?.url ?? null
+          console.log('[step2] OmniHuman task', shot.omni_task_id, 'status:', piData?.data?.status)
           log.push(`[step2] shot ${shot.id} omni PiAPI status=${omniStatus}`)
           if ((omniStatus === 'completed' || omniStatus === 'success') && omniUrl) {
             omniVideoUrl = omniUrl
