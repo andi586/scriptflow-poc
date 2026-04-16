@@ -270,11 +270,18 @@ async function pollShots() {
 
 async function main() {
   console.log('[worker] Starting ScriptFlow Worker...')
+  console.log('[worker] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 30))
+  console.log('[worker] PIAPI key present:', !!process.env.PIAPI_API_KEY)
+  console.log('[worker] Shotstack key present:', !!process.env.SHOTSTACK_API_KEY)
+  
   while (true) {
     try {
+      console.log('[worker] polling...')
       await pollShots()
+      console.log('[worker] poll complete')
     } catch (e) {
-      console.error('[worker] main error:', e.message)
+      console.error('[worker] FATAL ERROR:', e.message)
+      console.error('[worker] Stack:', e.stack)
     }
     await new Promise(r => setTimeout(r, 5000))
   }
