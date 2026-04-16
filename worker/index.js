@@ -133,6 +133,40 @@ async function pollShots() {
       console.error('[worker] Shotstack error:', e.message)
     }
   }
+
+  // Poll Shotstack for merging shots
+  const { data: mergingShots } = await supabase
+    .from('movie_shots')
+    .select('*')
+    .eq('status', 'merging')
+    .not('shotstack_render_id', 'is', null)
+
+  for (const shot of mergingShots ?? []) {
+    try {
+      const res = await fetch('https://api.shotstack.io/v1/render/' + shot.shotstack_render_id, {
+        headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
+      })
+      const data = await res.json()
+      const status = data?.response?.status
+      const url = data?.response?.url
+
+      console.log('[worker] Shotstack poll shot', shot.shot_index, 'status:', status)
+
+      if (status === 'done' && url) {
+        await supabase.from('movie_shots')
+          .update({ final_shot_url: url, status: 'done' })
+          .eq('id', shot.id)
+        console.log('[worker] Shot complete:', shot.shot_index, url)
+      } else if (status === 'failed') {
+        await supabase.from('movie_shots')
+          .update({ status: 'pending', retry_count: (shot.retry_count ?? 0) + 1 })
+          .eq('id', shot.id)
+        console.log('[worker] Shot failed, resetting:', shot.shot_index)
+      }
+    } catch (e) {
+      console.error('[worker] Shotstack poll error:', e.message)
+    }
+  }
 }
 
 async function main() {
