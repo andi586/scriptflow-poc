@@ -8,23 +8,48 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// BUG 4: Timeout protection on all API calls
+const fetchWithTimeout = async (url, options, ms = 10000) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal })
+    clearTimeout(timer)
+    return res
+  } catch (e) {
+    clearTimeout(timer)
+    throw e
+  }
+}
+
 async function pollShots() {
+  // BUG 5: Fetch shots grouped by movie, process max 3 per movie per cycle
   const { data: shots } = await supabase
     .from('movie_shots')
     .select('*')
     .in('status', ['submitted', 'processing', 'merging'])
-    .limit(20)
+    .order('movie_id')
+    .limit(60)
 
   if (!shots || shots.length === 0) return
 
-  console.log('[worker] polling', shots.length, 'shots')
+  // Group by movie_id, cap at 3 shots per movie
+  const shotsByMovie = {}
+  for (const shot of shots) {
+    const mid = shot.movie_id ?? 'unknown'
+    if (!shotsByMovie[mid]) shotsByMovie[mid] = []
+    if (shotsByMovie[mid].length < 3) shotsByMovie[mid].push(shot)
+  }
+  const cappedShots = Object.values(shotsByMovie).flat()
+
+  console.log('[worker] polling', cappedShots.length, 'shots across', Object.keys(shotsByMovie).length, 'movies')
 
   // Poll OmniHuman status
-  for (const shot of shots) {
+  for (const shot of cappedShots) {
     if (!shot.omni_task_id) continue
-    
+
     try {
-      const res = await fetch('https://api.piapi.ai/api/v1/task/' + shot.omni_task_id, {
+      const res = await fetchWithTimeout('https://api.piapi.ai/api/v1/task/' + shot.omni_task_id, {
         headers: { 'x-api-key': process.env.PIAPI_API_KEY }
       })
       const data = await res.json()
@@ -49,11 +74,11 @@ async function pollShots() {
   }
 
   // Poll Kling status for shots with kling_task_id
-  for (const shot of shots) {
+  for (const shot of cappedShots) {
     if (!shot.kling_task_id) continue
-    
+
     try {
-      const res = await fetch('https://api.piapi.ai/api/v1/task/' + shot.kling_task_id, {
+      const res = await fetchWithTimeout('https://api.piapi.ai/api/v1/task/' + shot.kling_task_id, {
         headers: { 'x-api-key': process.env.PIAPI_API_KEY }
       })
       const data = await res.json()
@@ -94,18 +119,28 @@ async function pollShots() {
   const readyShots = [...(faceShots ?? []), ...(sceneShots ?? [])]
 
   for (const shot of readyShots) {
+    // BUG 1: Idempotency - skip if already has render ID
     if (shot.shotstack_render_id) {
       console.log('[worker] Shot already has render ID, skipping:', shot.shot_index)
       continue
     }
 
+    // BUG 2: Permanently fail shots with too many retries
+    if ((shot.retry_count ?? 0) >= 3) {
+      await supabase.from('movie_shots')
+        .update({ status: 'failed' })
+        .eq('id', shot.id)
+      console.log('[worker] Shot permanently failed:', shot.shot_index)
+      continue
+    }
+
     console.log('[worker] Ready for shot', shot.shot_index, 'type:', shot.shot_type, '- triggering Shotstack')
-    
+
     const videoSrc = shot.shot_type === 'face' ? shot.omni_video_url : shot.kling_scene_url
 
     // Call Shotstack to render shot
     try {
-      const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
+      const shotstackRes = await fetchWithTimeout('https://api.shotstack.io/v1/render', {
         method: 'POST',
         headers: {
           'x-api-key': process.env.SHOTSTACK_API_KEY,
@@ -122,7 +157,7 @@ async function pollShots() {
           },
           output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
         })
-      })
+      }, 15000)
       const shotstackData = await shotstackRes.json()
       console.log('[worker] Shotstack response:', JSON.stringify(shotstackData).slice(0, 300))
       const renderId = shotstackData?.response?.id
@@ -148,7 +183,7 @@ async function pollShots() {
 
   for (const shot of mergingShots ?? []) {
     try {
-      const res = await fetch('https://api.shotstack.io/v1/render/' + shot.shotstack_render_id, {
+      const res = await fetchWithTimeout('https://api.shotstack.io/v1/render/' + shot.shotstack_render_id, {
         headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
       })
       const data = await res.json()
@@ -163,10 +198,19 @@ async function pollShots() {
           .eq('id', shot.id)
         console.log('[worker] Shot complete:', shot.shot_index, url)
       } else if (status === 'failed') {
-        await supabase.from('movie_shots')
-          .update({ status: 'pending', retry_count: (shot.retry_count ?? 0) + 1 })
-          .eq('id', shot.id)
-        console.log('[worker] Shot failed, resetting:', shot.shot_index)
+        const newRetryCount = (shot.retry_count ?? 0) + 1
+        if (newRetryCount >= 3) {
+          // BUG 2: Permanently fail after 3 retries
+          await supabase.from('movie_shots')
+            .update({ status: 'failed', retry_count: newRetryCount })
+            .eq('id', shot.id)
+          console.log('[worker] Shot permanently failed after retries:', shot.shot_index)
+        } else {
+          await supabase.from('movie_shots')
+            .update({ status: 'pending', retry_count: newRetryCount, shotstack_render_id: null })
+            .eq('id', shot.id)
+          console.log('[worker] Shot failed, resetting for retry:', shot.shot_index, '(attempt', newRetryCount, ')')
+        }
       }
     } catch (e) {
       console.error('[worker] Shotstack poll error:', e.message)
@@ -174,82 +218,113 @@ async function pollShots() {
   }
 
   // Stage 5: Assemble complete movies
-  const { data: doneShots } = await supabase
+  // BUG 3: Also fetch shots with 'failed' status so we can detect terminal state
+  const { data: terminalShots } = await supabase
     .from('movie_shots')
     .select('movie_id')
-    .eq('status', 'done')
+    .in('status', ['done', 'failed'])
 
-  if (doneShots && doneShots.length > 0) {
-    const movieIds = [...new Set(doneShots.map(s => s.movie_id))]
-    
+  if (terminalShots && terminalShots.length > 0) {
+    const movieIds = [...new Set(terminalShots.map(s => s.movie_id))]
+
     for (const movieId of movieIds) {
-      // Check if all shots for this movie are done
+      // Check if all shots for this movie are in a terminal state (done or failed)
       const { data: allShots } = await supabase
         .from('movie_shots')
         .select('*')
         .eq('movie_id', movieId)
         .order('shot_index')
-      
-      const allDone = allShots?.every(s => s.status === 'done')
+
+      // BUG 3: Accept 'failed' as terminal state so one bad shot doesn't block the movie
+      const allDone = allShots?.every(s => s.status === 'done' || s.status === 'failed' || s.status === 'final_complete')
       if (!allDone) continue
-      
+
+      // BUG 5: Warn if movie has been stuck for >30 minutes
+      const oldestUpdated = allShots?.reduce((oldest, s) => {
+        const t = new Date(s.updated_at ?? s.created_at ?? 0).getTime()
+        return t < oldest ? t : oldest
+      }, Date.now())
+      const stuckMinutes = (Date.now() - oldestUpdated) / 60000
+      if (stuckMinutes > 30) {
+        console.warn('[worker] WARNING: Movie stuck for', Math.round(stuckMinutes), 'minutes:', movieId)
+      }
+
       // Check if movie already being assembled
       const { data: existingMovie } = await supabase
         .from('movies')
         .select('*')
         .eq('id', movieId)
         .single()
-      
+
       if (existingMovie?.status === 'rendering' || existingMovie?.status === 'complete') continue
 
+      // BUG 1: Idempotency - skip if movie already has render ID
       if (existingMovie?.shotstack_render_id) {
         console.log('[worker] Movie already rendering, skipping:', movieId)
         continue
       }
-      
-      console.log('[worker] Assembling movie:', movieId, 'shots:', allShots.length)
-      
-      // Build Shotstack timeline with all shots in order
-      const clips = allShots.map((shot, i) => ({
-        asset: { type: 'video', src: shot.final_shot_url },
-        start: allShots.slice(0, i).reduce((sum, s) => sum + (s.duration ?? 10), 0),
-        length: shot.duration ?? 10
-      }))
-      
-      const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
-        method: 'POST',
-        headers: {
-          'x-api-key': process.env.SHOTSTACK_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          timeline: {
-            tracks: [{ clips }]
-          },
-          output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
-        })
-      })
-      
-      const shotstackData = await shotstackRes.json()
-      console.log('[worker] Shotstack assembly response:', JSON.stringify(shotstackData).slice(0, 200))
-      const renderId = shotstackData?.response?.id
-      
-      if (renderId) {
-        // Upsert movie record
-        const { error: movieError } = await supabase.from('movies').upsert({
-          id: movieId,
-          status: 'rendering',
-          shotstack_render_id: renderId,
-          total_shots: allShots.length,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'id' })
 
-        if (movieError) {
-          console.error('[worker] Movie upsert error:', movieError.message)
-        } else {
-          console.log('[worker] Movie record saved:', movieId)
+      // BUG 3: Only use successful shots in the timeline, skip failed ones
+      const successShots = allShots?.filter(s => s.status === 'done')
+      const failedCount = allShots?.filter(s => s.status === 'failed').length ?? 0
+
+      if (!successShots || successShots.length === 0) {
+        console.log('[worker] Movie has no successful shots, skipping assembly:', movieId)
+        continue
+      }
+
+      console.log('[worker] Assembling movie:', movieId, 'shots:', successShots.length, '(skipping', failedCount, 'failed)')
+
+      // Build Shotstack timeline with successful shots in order
+      let startTime = 0
+      const clips = successShots.map((shot) => {
+        const clip = {
+          asset: { type: 'video', src: shot.final_shot_url },
+          start: startTime,
+          length: shot.duration ?? 10
         }
-        console.log('[worker] Movie render started:', movieId, renderId)
+        startTime += shot.duration ?? 10
+        return clip
+      })
+
+      try {
+        const shotstackRes = await fetchWithTimeout('https://api.shotstack.io/v1/render', {
+          method: 'POST',
+          headers: {
+            'x-api-key': process.env.SHOTSTACK_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            timeline: {
+              tracks: [{ clips }]
+            },
+            output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
+          })
+        }, 15000)
+
+        const shotstackData = await shotstackRes.json()
+        console.log('[worker] Shotstack assembly response:', JSON.stringify(shotstackData).slice(0, 200))
+        const renderId = shotstackData?.response?.id
+
+        if (renderId) {
+          // Upsert movie record
+          const { error: movieError } = await supabase.from('movies').upsert({
+            id: movieId,
+            status: 'rendering',
+            shotstack_render_id: renderId,
+            total_shots: allShots.length,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' })
+
+          if (movieError) {
+            console.error('[worker] Movie upsert error:', movieError.message)
+          } else {
+            console.log('[worker] Movie record saved:', movieId)
+          }
+          console.log('[worker] Movie render started:', movieId, renderId)
+        }
+      } catch (e) {
+        console.error('[worker] Shotstack assembly error:', e.message)
       }
     }
   }
@@ -262,7 +337,7 @@ async function pollShots() {
 
   for (const movie of renderingMovies ?? []) {
     try {
-      const res = await fetch('https://api.shotstack.io/v1/render/' + movie.shotstack_render_id, {
+      const res = await fetchWithTimeout('https://api.shotstack.io/v1/render/' + movie.shotstack_render_id, {
         headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
       })
       const data = await res.json()
@@ -291,7 +366,7 @@ async function main() {
   console.log('[worker] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 30))
   console.log('[worker] PIAPI key present:', !!process.env.PIAPI_API_KEY)
   console.log('[worker] Shotstack key present:', !!process.env.SHOTSTACK_API_KEY)
-  
+
   while (true) {
     try {
       console.log('[worker] polling...')
