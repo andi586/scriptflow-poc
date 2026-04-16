@@ -73,18 +73,32 @@ async function pollShots() {
     }
   }
 
-  // Check if both omni and kling are done, trigger Shotstack
-  const { data: readyShots } = await supabase
+  // Check if shots are ready, trigger Shotstack
+  // Face shots: need both omni and kling
+  const { data: faceShots } = await supabase
     .from('movie_shots')
     .select('*')
     .eq('status', 'processing')
+    .eq('shot_type', 'face')
     .not('omni_video_url', 'is', null)
     .not('kling_scene_url', 'is', null)
 
-  for (const shot of readyShots ?? []) {
-    console.log('[worker] Both done for shot', shot.shot_index, '- triggering Shotstack')
+  // Scene shots: only need kling
+  const { data: sceneShots } = await supabase
+    .from('movie_shots')
+    .select('*')
+    .eq('status', 'processing')
+    .eq('shot_type', 'scene')
+    .not('kling_scene_url', 'is', null)
+
+  const readyShots = [...(faceShots ?? []), ...(sceneShots ?? [])]
+
+  for (const shot of readyShots) {
+    console.log('[worker] Ready for shot', shot.shot_index, 'type:', shot.shot_type, '- triggering Shotstack')
     
-    // Call Shotstack to merge omni + kling
+    const videoSrc = shot.shot_type === 'face' ? shot.omni_video_url : shot.kling_scene_url
+
+    // Call Shotstack to render shot
     const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
       method: 'POST',
       headers: {
@@ -95,7 +109,7 @@ async function pollShots() {
         timeline: {
           tracks: [{
             clips: [{
-              asset: { type: 'video', src: shot.omni_video_url },
+              asset: { type: 'video', src: videoSrc },
               start: 0, length: shot.duration ?? 10
             }]
           }]
