@@ -60,7 +60,7 @@ const client = new Anthropic()
 
 async function runProducer(userInput: string, template: string): Promise<StoryState> {
   const response = await client.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
     messages: [{
       role: 'user',
@@ -88,7 +88,7 @@ Return ONLY valid JSON (no markdown):
 
 async function runDirector(storyState: StoryState, template: string): Promise<DirectionPlan> {
   const response = await client.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 2048,
     messages: [{
       role: 'user',
