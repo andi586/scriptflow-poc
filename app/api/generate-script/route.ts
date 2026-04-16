@@ -13,6 +13,7 @@ export const maxDuration = 60
 export async function POST(request: NextRequest) {
   try {
     const { template, personalNote } = await request.json()
+    console.log('[generate-script] received request, story length:', (template ?? '').length, 'template:', template)
 
     if (!template) {
       return NextResponse.json({ error: 'template is required' }, { status: 400 })

@@ -252,11 +252,15 @@ export default function AppFlowPage() {
     try {
       // Step 1: Generate script via Anthropic
       console.log('[app-flow] calling generate-script...')
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 55000)
       const scriptRes = await fetch('/api/generate-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ template: selectedTemplate.title, personalNote: personalNote.trim() || undefined }),
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
       const scriptData = await scriptRes.json()
       if (!scriptRes.ok) throw new Error(scriptData.error ?? 'Script generation failed')
 
