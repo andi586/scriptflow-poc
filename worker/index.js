@@ -99,32 +99,38 @@ async function pollShots() {
     const videoSrc = shot.shot_type === 'face' ? shot.omni_video_url : shot.kling_scene_url
 
     // Call Shotstack to render shot
-    const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
-      method: 'POST',
-      headers: {
-        'x-api-key': process.env.SHOTSTACK_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        timeline: {
-          tracks: [{
-            clips: [{
-              asset: { type: 'video', src: videoSrc },
-              start: 0, length: shot.duration ?? 10
-            }]
-          }]
+    try {
+      const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.SHOTSTACK_API_KEY,
+          'Content-Type': 'application/json'
         },
-        output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
+        body: JSON.stringify({
+          timeline: {
+            tracks: [{
+              clips: [{
+                asset: { type: 'video', src: videoSrc },
+                start: 0, length: shot.duration ?? 10
+              }]
+            }]
+          },
+          output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
+        })
       })
-    })
-    const shotstackData = await shotstackRes.json()
-    const renderId = shotstackData?.response?.id
-
-    if (renderId) {
-      await supabase.from('movie_shots')
-        .update({ status: 'merging', shotstack_render_id: renderId })
-        .eq('id', shot.id)
-      console.log('[worker] Shotstack render started:', renderId)
+      const shotstackData = await shotstackRes.json()
+      console.log('[worker] Shotstack response:', JSON.stringify(shotstackData).slice(0, 300))
+      const renderId = shotstackData?.response?.id
+      if (renderId) {
+        await supabase.from('movie_shots')
+          .update({ status: 'merging', shotstack_render_id: renderId })
+          .eq('id', shot.id)
+        console.log('[worker] Shotstack render started:', renderId)
+      } else {
+        console.error('[worker] Shotstack no renderId:', JSON.stringify(shotstackData))
+      }
+    } catch (e) {
+      console.error('[worker] Shotstack error:', e.message)
     }
   }
 }
