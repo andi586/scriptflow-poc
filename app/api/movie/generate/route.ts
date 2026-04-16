@@ -127,6 +127,10 @@ async function submitOmniHuman(frameUrl: string, audioUrl: string, piApiKey: str
         model: 'omni-human',
         task_type: 'omni-human-1.5',
         input: { image_url: frameUrl, audio_url: audioUrl, prompt: 'person speaks naturally, cinematic' },
+        webhook_config: {
+          endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/omnihuman`,
+          secret: process.env.WEBHOOK_SECRET ?? '',
+        },
       }),
     })
     if (!res.ok) { console.warn('[movie/generate] OmniHuman submit failed:', res.status, await res.text()); return null }
