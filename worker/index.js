@@ -221,16 +221,24 @@ async function pollShots() {
       })
       
       const shotstackData = await shotstackRes.json()
+      console.log('[worker] Shotstack assembly response:', JSON.stringify(shotstackData).slice(0, 200))
       const renderId = shotstackData?.response?.id
       
       if (renderId) {
         // Upsert movie record
-        await supabase.from('movies').upsert({
+        const { error: movieError } = await supabase.from('movies').upsert({
           id: movieId,
           status: 'rendering',
           shotstack_render_id: renderId,
-          total_shots: allShots.length
-        })
+          total_shots: allShots.length,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' })
+
+        if (movieError) {
+          console.error('[worker] Movie upsert error:', movieError.message)
+        } else {
+          console.log('[worker] Movie record saved:', movieId)
+        }
         console.log('[worker] Movie render started:', movieId, renderId)
       }
     }
