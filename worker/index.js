@@ -12,7 +12,7 @@ async function pollShots() {
   const { data: shots } = await supabase
     .from('movie_shots')
     .select('*')
-    .in('status', ['submitted', 'processing'])
+    .in('status', ['submitted', 'processing', 'merging'])
     .limit(20)
 
   if (!shots || shots.length === 0) return
