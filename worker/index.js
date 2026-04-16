@@ -94,6 +94,11 @@ async function pollShots() {
   const readyShots = [...(faceShots ?? []), ...(sceneShots ?? [])]
 
   for (const shot of readyShots) {
+    if (shot.shotstack_render_id) {
+      console.log('[worker] Shot already has render ID, skipping:', shot.shot_index)
+      continue
+    }
+
     console.log('[worker] Ready for shot', shot.shot_index, 'type:', shot.shot_type, '- triggering Shotstack')
     
     const videoSrc = shot.shot_type === 'face' ? shot.omni_video_url : shot.kling_scene_url
@@ -196,6 +201,11 @@ async function pollShots() {
         .single()
       
       if (existingMovie?.status === 'rendering' || existingMovie?.status === 'complete') continue
+
+      if (existingMovie?.shotstack_render_id) {
+        console.log('[worker] Movie already rendering, skipping:', movieId)
+        continue
+      }
       
       console.log('[worker] Assembling movie:', movieId, 'shots:', allShots.length)
       

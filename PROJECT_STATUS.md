@@ -328,3 +328,64 @@
 
 > "大脑没有发育，建成了强大的四肢。今天大脑开始工作了。"
 > "工具只是四肢，NEL才是护城河。目前他们只是猖狂了一时，未来鹿死谁手谁也不知道。"
+
+---
+
+## Day 31 - 2026年4月16日
+
+### 🎯 今日核心里程碑
+
+**"持续活着的大脑上线了"** — Railway Worker正式替代Vercel cron，ScriptFlow获得真正的生产级调度系统
+
+---
+
+### ✅ 今日完成
+
+**Railway Worker上线（最重要）**
+- `worker/index.js` — 持久化Node.js进程，24/7运行
+- 6步完整流水线：OmniHuman轮询→Kling轮询→Shotstack触发→Shot渲染→Movie合并→Movie渲染
+- 5秒轮询间隔，无60秒超时限制
+- 部署在Railway scriptflow-video-merge项目下
+
+**Webhook接入PiAPI**
+- `app/api/webhook/piapi/route.ts` — 接收PiAPI任务完成回调
+- OmniHuman和Kling均配置webhook_config
+- 解决任务完成无通知问题
+
+**状态机统一**
+- 统一状态值：pending→submitted→processing→merging→done→final_complete
+- 清除所有旧的legacy状态（omni_done/kling_done/scene_only/shot_complete）
+- 数据库迁移SQL执行完成
+
+**Cognitive Core优化**
+- Producer+Director从claude-opus-4-6改为claude-haiku（14秒，从60秒降低）
+- Director prompt新增严格规则：face镜头最长3秒，避免嘴部特写
+- 台词验证：自动截断超过20字的台词
+
+**成本预警机制**
+- `app/api/cron/check-costs/route.ts` — 每日9am检查成本
+- Dashboard超$30显示红色警告横幅
+
+**6个Cron拆分为独立步骤**
+- step1-retry到step6-recover独立运行
+- 每2分钟执行，降低单次超时风险
+
+**movies表建立**
+- 新建movies表：id/status/total_shots/final_video_url/shotstack_render_id
+- Worker自动写入合并状态
+
+---
+
+### ❌ 已知问题
+
+1. **Shotstack credits耗尽** — 付款邮箱与账号邮箱不匹配导致credits未到账，等待客服处理
+2. **Vercel cron未禁用** — Railway Worker和Vercel cron双系统并行，导致重复任务生成
+3. **Movie assembly写入失败** — upsert逻辑有bug，movies表未正确写入（已修复待验证）
+4. **单镜头失败卡死整部电影** — 没有自动跳过失败镜头的机制
+5. **并发重复提交** — 多个cron同时运行导致同一shot被提交两次
+
+---
+
+### 💀 今日最大教训：架构选型错误代价极高
+
+**错误决策：**
