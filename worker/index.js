@@ -1,3 +1,6 @@
+console.log('[worker] PIAPI_API_KEY length:', process.env.PIAPI_API_KEY?.length)
+console.log('[worker] PIAPI_API_KEY first 8:', process.env.PIAPI_API_KEY?.slice(0, 8))
+
 const { createClient } = require('@supabase/supabase-js')
 
 const supabase = createClient(
