@@ -167,6 +167,105 @@ async function pollShots() {
       console.error('[worker] Shotstack poll error:', e.message)
     }
   }
+
+  // Stage 5: Assemble complete movies
+  const { data: doneShots } = await supabase
+    .from('movie_shots')
+    .select('movie_id')
+    .eq('status', 'done')
+
+  if (doneShots && doneShots.length > 0) {
+    const movieIds = [...new Set(doneShots.map(s => s.movie_id))]
+    
+    for (const movieId of movieIds) {
+      // Check if all shots for this movie are done
+      const { data: allShots } = await supabase
+        .from('movie_shots')
+        .select('*')
+        .eq('movie_id', movieId)
+        .order('shot_index')
+      
+      const allDone = allShots?.every(s => s.status === 'done')
+      if (!allDone) continue
+      
+      // Check if movie already being assembled
+      const { data: existingMovie } = await supabase
+        .from('movies')
+        .select('*')
+        .eq('id', movieId)
+        .single()
+      
+      if (existingMovie?.status === 'rendering' || existingMovie?.status === 'complete') continue
+      
+      console.log('[worker] Assembling movie:', movieId, 'shots:', allShots.length)
+      
+      // Build Shotstack timeline with all shots in order
+      const clips = allShots.map((shot, i) => ({
+        asset: { type: 'video', src: shot.final_shot_url },
+        start: allShots.slice(0, i).reduce((sum, s) => sum + (s.duration ?? 10), 0),
+        length: shot.duration ?? 10
+      }))
+      
+      const shotstackRes = await fetch('https://api.shotstack.io/v1/render', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.SHOTSTACK_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          timeline: {
+            tracks: [{ clips }]
+          },
+          output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
+        })
+      })
+      
+      const shotstackData = await shotstackRes.json()
+      const renderId = shotstackData?.response?.id
+      
+      if (renderId) {
+        // Upsert movie record
+        await supabase.from('movies').upsert({
+          id: movieId,
+          status: 'rendering',
+          shotstack_render_id: renderId,
+          total_shots: allShots.length
+        })
+        console.log('[worker] Movie render started:', movieId, renderId)
+      }
+    }
+  }
+
+  // Stage 6: Poll movie renders
+  const { data: renderingMovies } = await supabase
+    .from('movies')
+    .select('*')
+    .eq('status', 'rendering')
+
+  for (const movie of renderingMovies ?? []) {
+    try {
+      const res = await fetch('https://api.shotstack.io/v1/render/' + movie.shotstack_render_id, {
+        headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
+      })
+      const data = await res.json()
+      const status = data?.response?.status
+      const url = data?.response?.url
+
+      console.log('[worker] Movie render status:', movie.id, status)
+
+      if (status === 'done' && url) {
+        await supabase.from('movies')
+          .update({ status: 'complete', final_video_url: url })
+          .eq('id', movie.id)
+        await supabase.from('movie_shots')
+          .update({ status: 'final_complete' })
+          .eq('movie_id', movie.id)
+        console.log('[worker] Movie complete:', movie.id, url)
+      }
+    } catch (e) {
+      console.error('[worker] Movie render poll error:', e.message)
+    }
+  }
 }
 
 async function main() {
