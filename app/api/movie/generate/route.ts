@@ -94,19 +94,23 @@ async function submitKling(scenePrompt: string, piApiKey: string, duration = 10)
     const res = await fetch('https://api.piapi.ai/api/v1/task', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
-      body: JSON.stringify({
-        model: 'kling',
-        task_type: 'video_generation',
-        input: {
-          prompt: scenePrompt,
-          negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
-          version: '3.0',
-          mode: 'pro',
-          duration,
-          aspect_ratio: '9:16',
-          enable_audio: true,
-        },
-      }),
+        body: JSON.stringify({
+          model: 'kling',
+          task_type: 'video_generation',
+          input: {
+            prompt: scenePrompt,
+            negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
+            version: '3.0',
+            mode: 'pro',
+            duration,
+            aspect_ratio: '9:16',
+            enable_audio: true,
+          },
+          webhook_config: {
+            endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
+            secret: '',
+          },
+        }),
     })
     if (!res.ok) { console.warn('[movie/generate] Kling submit failed:', res.status, await res.text()); return null }
     const data = await res.json()
@@ -419,6 +423,10 @@ export async function POST(request: NextRequest) {
           image_url: frameUrl,
           audio_url: audioUrl,
           prompt: 'person speaks naturally, cinematic',
+        },
+        webhook_config: {
+          endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
+          secret: '',
         },
       }),
     })
