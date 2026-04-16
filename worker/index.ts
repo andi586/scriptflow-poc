@@ -17,7 +17,8 @@ async function pollShots() {
       const res = await fetch(`https://api.piapi.ai/api/v1/task/${shot.omni_task_id}`, {
         headers: { 'x-api-key': process.env.PIAPI_API_KEY! }
       })
-      const data = await res.json()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = await res.json() as any
       const status = data?.data?.status
       const videoUrl = data?.data?.output?.video
 
