@@ -24,6 +24,7 @@ async function pollShots() {
         headers: { 'x-api-key': process.env.PIAPI_API_KEY }
       })
       const data = await res.json()
+      console.log('[worker] PiAPI raw response:', JSON.stringify(data).slice(0, 500))
       const status = data?.data?.status
       const videoUrl = data?.data?.output?.video
 
