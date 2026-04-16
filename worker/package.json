@@ -1,0 +1,11 @@
+{
+  "name": "scriptflow-worker",
+  "scripts": {
+    "start": "npx ts-node worker/index.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "latest",
+    "ts-node": "latest",
+    "typescript": "latest"
+  }
+}
