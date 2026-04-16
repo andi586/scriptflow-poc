@@ -1,11 +1,16 @@
 {
   "name": "scriptflow-worker",
+  "version": "1.0.0",
+  "main": "index.ts",
   "scripts": {
-    "start": "npx ts-node worker/index.ts"
+    "start": "ts-node index.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest",
-    "ts-node": "latest",
-    "typescript": "latest"
+    "@supabase/supabase-js": "^2.39.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0"
   }
 }
