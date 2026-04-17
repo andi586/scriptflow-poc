@@ -243,6 +243,19 @@ export async function POST(request: NextRequest) {
 
         console.log('[movie/generate] Processing shot', shotIndex, 'type:', shotType)
 
+        // BUG 1: Check if this shot already exists for this movie to prevent duplicate submissions
+        const { data: existingShot } = await supabase
+          .from('movie_shots')
+          .select('id, omni_task_id, kling_task_id, status')
+          .eq('movie_id', jobId)
+          .eq('shot_index', shotIndex)
+          .single()
+
+        if (existingShot) {
+          console.log('[movie/generate] Shot', shotIndex, 'already exists (status:', existingShot.status, '), skipping submission')
+          continue
+        }
+
         if (shotType === 'face') {
           // ── FACE SHOT: TTS + OmniHuman + Kling ──────────────────────────
           let audioUrl: string | null = null
