@@ -1,3 +1,4 @@
+// ScriptFlow Worker v2 - auto-deploy trigger
 console.log('[worker] PIAPI_API_KEY length:', process.env.PIAPI_API_KEY?.length)
 console.log('[worker] PIAPI_API_KEY first 8:', process.env.PIAPI_API_KEY?.slice(0, 8))
 
@@ -116,16 +117,15 @@ async function pollShots() {
     }
 
     // Check if shots are ready, trigger FFmpeg merge
-    // Face shots: need both omni and kling
+    // Face shots: only need omni done
     const { data: faceShots } = await supabase
       .from('movie_shots')
       .select('*')
       .eq('status', 'processing')
       .eq('shot_type', 'face')
       .not('omni_video_url', 'is', null)
-      .not('kling_scene_url', 'is', null)
 
-    // Scene shots: only need kling
+    // Scene shots: only need kling done
     const { data: sceneShots } = await supabase
       .from('movie_shots')
       .select('*')
