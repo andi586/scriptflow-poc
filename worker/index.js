@@ -27,6 +27,58 @@ const fetchWithTimeout = async (url, options = {}, ms = 10000) => {
 }
 
 async function pollShots() {
+  // Stage 1: Submit Kling tasks for pending shots with no kling_task_id
+  const { data: pendingShots } = await supabase
+    .from('movie_shots')
+    .select('*')
+    .in('status', ['pending', 'submitted'])
+    .is('kling_task_id', null)
+    .limit(10)
+
+  if (pendingShots && pendingShots.length > 0) {
+    console.log('[worker] Stage 1: found', pendingShots.length, 'shots missing kling_task_id')
+    for (const shot of pendingShots) {
+      try {
+        const scenePrompt = shot.scene_description || shot.description || shot.scene || 'cinematic empty scene, dramatic lighting, no people, no humans'
+        const klingRes = await fetchWithTimeout('https://api.piapi.ai/api/v1/task', {
+          method: 'POST',
+          headers: {
+            'x-api-key': process.env.PIAPI_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'kling',
+            task_type: 'video_generation',
+            input: {
+              prompt: scenePrompt,
+              negative_prompt: 'people, humans, faces',
+              aspect_ratio: '9:16',
+              duration: shot.duration || 10
+            },
+            config: {
+              webhook_config: {
+                endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
+                secret: ''
+              }
+            }
+          })
+        }, 15000)
+        const klingData = await klingRes.json()
+        const klingTaskId = klingData?.data?.task_id
+        if (klingTaskId) {
+          await supabase.from('movie_shots')
+            .update({ kling_task_id: klingTaskId, status: 'submitted', updated_at: new Date().toISOString() })
+            .eq('id', shot.id)
+          console.log('[worker] Kling submitted for shot:', shot.shot_index, 'task_id:', klingTaskId)
+        } else {
+          console.warn('[worker] Kling submission returned no task_id for shot:', shot.shot_index, JSON.stringify(klingData).slice(0, 200))
+        }
+      } catch (e) {
+        console.error('[worker] Kling submission error for shot:', shot.shot_index, e.message)
+      }
+    }
+  }
+
   // BUG 5: Daily render limit check
   const today = new Date().toISOString().split('T')[0]
   const { count: todayRenders } = await supabase
