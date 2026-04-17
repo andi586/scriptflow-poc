@@ -61,7 +61,7 @@ const client = new Anthropic()
 async function runProducer(userInput: string, template: string): Promise<StoryState> {
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
+    max_tokens: 4096,
     messages: [{
       role: 'user',
       content: `You are a master film producer. Analyze this story and extract deep emotional truth.
@@ -82,7 +82,12 @@ Return ONLY valid JSON (no markdown):
     }]
   })
   const raw = (response.content[0] as { text: string }).text
-  const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  let clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  const start = clean.indexOf('{')
+  const end = clean.lastIndexOf('}')
+  if (start !== -1 && end !== -1) {
+    clean = clean.slice(start, end + 1)
+  }
   return JSON.parse(clean)
 }
 
