@@ -9,6 +9,7 @@ const supabase = createClient(
 )
 
 const MAX_RETRIES = 3
+const RAILWAY_FFMPEG_URL = process.env.RAILWAY_FFMPEG_URL || 'https://scriptflow-video-merge-production.up.railway.app'
 
 // BUG 4: Timeout protection on all API calls
 const fetchWithTimeout = async (url, options = {}, ms = 10000) => {
@@ -34,7 +35,7 @@ async function pollShots() {
     .gte('created_at', today)
 
   if (todayRenders > 100) {
-    console.warn('[worker] Daily render limit reached (100), pausing Shotstack submissions')
+    console.warn('[worker] Daily render limit reached (100), pausing submissions')
     return
   }
 
@@ -114,7 +115,7 @@ async function pollShots() {
       }
     }
 
-    // Check if shots are ready, trigger Shotstack
+    // Check if shots are ready, trigger FFmpeg merge
     // Face shots: need both omni and kling
     const { data: faceShots } = await supabase
       .from('movie_shots')
@@ -135,12 +136,6 @@ async function pollShots() {
     const readyShots = [...(faceShots ?? []), ...(sceneShots ?? [])]
 
     for (const shot of readyShots) {
-      // BUG 1: Idempotency - skip if already has render ID
-      if (shot.shotstack_render_id) {
-        console.log('[worker] Shot already has render ID, skipping:', shot.shot_index)
-        continue
-      }
-
       // BUG 2: Permanently fail shots with too many retries
       if ((shot.retry_count ?? 0) >= MAX_RETRIES) {
         await supabase.from('movie_shots')
@@ -153,7 +148,7 @@ async function pollShots() {
       // BUG 6: Optimistic locking - only proceed if status hasn't changed
       const { data: locked } = await supabase
         .from('movie_shots')
-        .update({ updated_at: new Date().toISOString() })
+        .update({ status: 'merging', updated_at: new Date().toISOString() })
         .eq('id', shot.id)
         .eq('status', shot.status)
         .select()
@@ -163,86 +158,44 @@ async function pollShots() {
         continue
       }
 
-      console.log('[worker] Ready for shot', shot.shot_index, 'type:', shot.shot_type, '- triggering Shotstack')
+      console.log('[worker] Ready for shot', shot.shot_index, 'type:', shot.shot_type, '- triggering FFmpeg merge')
 
-      const videoSrc = shot.shot_type === 'face' ? shot.omni_video_url : shot.kling_scene_url
-
-      // Call Shotstack to render shot
+      // For face shots: merge omni video + kling audio
+      // For scene shots: use kling video directly
       try {
-        const shotstackRes = await fetchWithTimeout('https://api.shotstack.io/v1/render', {
-          method: 'POST',
-          headers: {
-            'x-api-key': process.env.SHOTSTACK_API_KEY,
-            'Content-Type': 'application/json'
+        const mergeRes = await fetchWithTimeout(
+          RAILWAY_FFMPEG_URL + '/merge-videos',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoUrl: shot.shot_type === 'face' ? shot.omni_video_url : shot.kling_scene_url,
+              audioUrl: shot.audio_url ?? null
+            })
           },
-          body: JSON.stringify({
-            timeline: {
-              tracks: [{
-                clips: [{
-                  asset: { type: 'video', src: videoSrc },
-                  start: 0, length: shot.duration ?? 10
-                }]
-              }]
-            },
-            output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
-          })
-        }, 15000)
-        const shotstackData = await shotstackRes.json()
-        console.log('[worker] Shotstack response:', JSON.stringify(shotstackData).slice(0, 300))
-        const renderId = shotstackData?.response?.id
-        if (renderId) {
+          30000
+        )
+        const mergeData = await mergeRes.json()
+        if (mergeData.outputUrl) {
           await supabase.from('movie_shots')
-            .update({ status: 'merging', shotstack_render_id: renderId, updated_at: new Date().toISOString() })
+            .update({ final_shot_url: mergeData.outputUrl, status: 'done', updated_at: new Date().toISOString() })
             .eq('id', shot.id)
-          console.log('[worker] Shotstack render started:', renderId)
+          console.log('[worker] Shot merged via FFmpeg:', shot.shot_index)
         } else {
-          console.error('[worker] Shotstack no renderId:', JSON.stringify(shotstackData))
-        }
-      } catch (e) {
-        console.error('[worker] Shotstack error:', e.message)
-      }
-    }
-
-    // Poll Shotstack for merging shots
-    const { data: mergingShots } = await supabase
-      .from('movie_shots')
-      .select('*')
-      .eq('status', 'merging')
-      .not('shotstack_render_id', 'is', null)
-
-    for (const shot of mergingShots ?? []) {
-      try {
-        const res = await fetchWithTimeout('https://api.shotstack.io/v1/render/' + shot.shotstack_render_id, {
-          headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
-        })
-        const data = await res.json()
-        const status = data?.response?.status
-        const url = data?.response?.url
-
-        console.log('[worker] Shotstack poll shot', shot.shot_index, 'status:', status)
-
-        if (status === 'done' && url) {
-          await supabase.from('movie_shots')
-            .update({ final_shot_url: url, status: 'done', updated_at: new Date().toISOString() })
-            .eq('id', shot.id)
-          console.log('[worker] Shot complete:', shot.shot_index, url)
-        } else if (status === 'failed') {
+          console.error('[worker] FFmpeg merge no outputUrl:', JSON.stringify(mergeData))
+          // Reset to processing so it can be retried
           const newRetryCount = (shot.retry_count ?? 0) + 1
-          if (newRetryCount >= MAX_RETRIES) {
-            // BUG 2: Permanently fail after max retries
-            await supabase.from('movie_shots')
-              .update({ status: 'failed', retry_count: newRetryCount, updated_at: new Date().toISOString() })
-              .eq('id', shot.id)
-            console.log('[worker] Shot permanently failed after retries:', shot.shot_index)
-          } else {
-            await supabase.from('movie_shots')
-              .update({ status: 'pending', retry_count: newRetryCount, shotstack_render_id: null, updated_at: new Date().toISOString() })
-              .eq('id', shot.id)
-            console.log('[worker] Shot failed, resetting for retry:', shot.shot_index, '(attempt', newRetryCount, ')')
-          }
+          await supabase.from('movie_shots')
+            .update({ status: 'processing', retry_count: newRetryCount, updated_at: new Date().toISOString() })
+            .eq('id', shot.id)
         }
       } catch (e) {
-        console.error('[worker] Shotstack poll error:', e.message)
+        console.error('[worker] FFmpeg merge error:', e.message)
+        // Reset to processing so it can be retried
+        const newRetryCount = (shot.retry_count ?? 0) + 1
+        await supabase.from('movie_shots')
+          .update({ status: 'processing', retry_count: newRetryCount, updated_at: new Date().toISOString() })
+          .eq('id', shot.id)
       }
     }
   }
@@ -288,12 +241,6 @@ async function pollShots() {
 
       if (existingMovie?.status === 'rendering' || existingMovie?.status === 'complete') continue
 
-      // BUG 1: Idempotency - skip if movie already has render ID
-      if (existingMovie?.shotstack_render_id) {
-        console.log('[worker] Movie already rendering, skipping:', movieId)
-        continue
-      }
-
       // BUG 3: Only use successful shots in the timeline, skip failed ones
       const successShots = allShots?.filter(s => s.status === 'done')
       const failedCount = allShots?.filter(s => s.status === 'failed').length ?? 0
@@ -305,90 +252,60 @@ async function pollShots() {
 
       console.log('[worker] Assembling movie:', movieId, 'shots:', successShots.length, '(skipping', failedCount, 'failed)')
 
-      // Build Shotstack timeline with successful shots in order
-      let startTime = 0
-      const clips = successShots.map((shot) => {
-        const clip = {
-          asset: { type: 'video', src: shot.final_shot_url },
-          start: startTime,
-          length: shot.duration ?? 10
-        }
-        startTime += shot.duration ?? 10
-        return clip
-      })
+      // Mark movie as rendering before calling FFmpeg
+      const { error: movieError } = await supabase.from('movies').upsert({
+        id: movieId,
+        status: 'rendering',
+        total_shots: allShots.length,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
+
+      if (movieError) {
+        console.error('[worker] Movie upsert error:', movieError.message)
+        continue
+      }
+
+      // Build list of final shot URLs in order
+      const clips = successShots.map((shot) => ({
+        asset: { type: 'video', src: shot.final_shot_url }
+      }))
 
       try {
-        const shotstackRes = await fetchWithTimeout('https://api.shotstack.io/v1/render', {
-          method: 'POST',
-          headers: {
-            'x-api-key': process.env.SHOTSTACK_API_KEY,
-            'Content-Type': 'application/json'
+        const concatRes = await fetchWithTimeout(
+          RAILWAY_FFMPEG_URL + '/concat-videos',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoUrls: clips.map(c => c.asset.src),
+              outputName: `movie_${movieId}`
+            })
           },
-          body: JSON.stringify({
-            timeline: {
-              tracks: [{ clips }]
-            },
-            output: { format: 'mp4', resolution: 'hd', aspectRatio: '9:16' }
-          })
-        }, 15000)
-
-        const shotstackData = await shotstackRes.json()
-        console.log('[worker] Shotstack assembly response:', JSON.stringify(shotstackData).slice(0, 200))
-        const renderId = shotstackData?.response?.id
-
-        if (renderId) {
-          // Upsert movie record
-          const { error: movieError } = await supabase.from('movies').upsert({
-            id: movieId,
-            status: 'rendering',
-            shotstack_render_id: renderId,
-            total_shots: allShots.length,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'id' })
-
-          if (movieError) {
-            console.error('[worker] Movie upsert error:', movieError.message)
-          } else {
-            console.log('[worker] Movie record saved:', movieId)
-          }
-          console.log('[worker] Movie render started:', movieId, renderId)
+          120000
+        )
+        const concatData = await concatRes.json()
+        if (concatData.outputUrl) {
+          await supabase.from('movies')
+            .update({ status: 'complete', final_video_url: concatData.outputUrl })
+            .eq('id', movieId)
+          // Sync movie_shots status after movie completes
+          await supabase.from('movie_shots')
+            .update({ status: 'final_complete' })
+            .eq('movie_id', movieId)
+            .eq('status', 'done')
+          console.log('[worker] Movie complete via FFmpeg:', movieId)
+        } else {
+          console.error('[worker] FFmpeg concat no outputUrl:', JSON.stringify(concatData))
+          await supabase.from('movies')
+            .update({ status: 'failed', updated_at: new Date().toISOString() })
+            .eq('id', movieId)
         }
       } catch (e) {
-        console.error('[worker] Shotstack assembly error:', e.message)
-      }
-    }
-  }
-
-  // Stage 6: Poll movie renders
-  const { data: renderingMovies } = await supabase
-    .from('movies')
-    .select('*')
-    .eq('status', 'rendering')
-
-  for (const movie of renderingMovies ?? []) {
-    try {
-      const res = await fetchWithTimeout('https://api.shotstack.io/v1/render/' + movie.shotstack_render_id, {
-        headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY }
-      })
-      const data = await res.json()
-      const status = data?.response?.status
-      const url = data?.response?.url
-
-      console.log('[worker] Movie render status:', movie.id, status)
-
-      if (status === 'done' && url) {
+        console.error('[worker] FFmpeg concat error:', e.message)
         await supabase.from('movies')
-          .update({ status: 'complete', final_video_url: url })
-          .eq('id', movie.id)
-        // BUG 8: Sync movie_shots status after movie completes
-        await supabase.from('movie_shots')
-          .update({ status: 'final_complete' })
-          .eq('movie_id', movie.id)
-          .eq('status', 'done')
-        console.log('[worker] Movie complete:', movie.id, url)
+          .update({ status: 'failed', updated_at: new Date().toISOString() })
+          .eq('id', movieId)
       }
-    } catch (e) {
-      console.error('[worker] Movie render poll error:', e.message)
     }
   }
 
@@ -441,7 +358,7 @@ async function main() {
   console.log('[worker] Starting ScriptFlow Worker...')
   console.log('[worker] Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 30))
   console.log('[worker] PIAPI key present:', !!process.env.PIAPI_API_KEY)
-  console.log('[worker] Shotstack key present:', !!process.env.SHOTSTACK_API_KEY)
+  console.log('[worker] Railway FFmpeg URL:', RAILWAY_FFMPEG_URL)
 
   while (true) {
     try {
