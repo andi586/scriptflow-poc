@@ -12,10 +12,12 @@ export const maxDuration = 60
  *
  * If shots array provided (NEL Director output):
  *   - For each shot with type === 'face':
- *       ElevenLabs TTS → audioUrl, OmniHuman → omni_task_id, Kling → kling_task_id
+ *       ElevenLabs TTS → audioUrl
+ *       Use twin.frame_url_mid directly as video source (NO OmniHuman)
+ *       Final video = FFmpeg merge of (twin frame image + TTS audio) via Railway FFmpeg service
  *   - For each shot with type === 'scene':
- *       NO OmniHuman, Kling text-to-video only, status = 'scene_only'
- *   - Insert rows into movie_shots and omnihuman_jobs
+ *       Kling text-to-video only
+ *   - Insert rows into movie_shots
  *   - Return { movieId, totalShots }
  *
  * Fallback (no shots): single-video pipeline
@@ -121,40 +123,6 @@ async function submitKling(scenePrompt: string, piApiKey: string, duration = 10)
   }
 }
 
-// ── Helper: Submit OmniHuman ──────────────────────────────────────────────────
-async function submitOmniHuman(frameUrl: string, audioUrl: string, piApiKey: string): Promise<string | null> {
-  try {
-    const res = await fetch('https://api.piapi.ai/api/v1/task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
-      body: JSON.stringify({
-        model: 'omni-human',
-        task_type: 'omni-human-1.5',
-        input: { image_url: frameUrl, audio_url: audioUrl, prompt: 'person speaks naturally, cinematic' },
-        config: {
-          webhook_config: {
-            endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
-            secret: '',
-          },
-        },
-      }),
-    })
-    if (!res.ok) { console.warn('[movie/generate] OmniHuman submit failed:', res.status, await res.text()); return null }
-    const data = await res.json()
-    // Check if task was actually created successfully
-    if (!data?.data?.task_id || data?.data?.status === 'failed') {
-      console.error('[movie/generate] OmniHuman submission failed:', JSON.stringify(data))
-      return null
-    }
-    const omniTaskId = data.data.task_id
-    console.log('[movie/generate] OmniHuman task created:', omniTaskId, 'status:', data.data.status)
-    return omniTaskId
-  } catch (e) {
-    console.warn('[movie/generate] OmniHuman submit error:', e instanceof Error ? e.message : e)
-    return null
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { story, sessionId, template, shots } = await request.json()
@@ -246,7 +214,7 @@ export async function POST(request: NextRequest) {
         // BUG 1: Check if this shot already exists for this movie to prevent duplicate submissions
         const { data: existingShot } = await supabase
           .from('movie_shots')
-          .select('id, omni_task_id, kling_task_id, status')
+          .select('id, kling_task_id, status')
           .eq('movie_id', jobId)
           .eq('shot_index', shotIndex)
           .single()
@@ -257,7 +225,9 @@ export async function POST(request: NextRequest) {
         }
 
         if (shotType === 'face') {
-          // ── FACE SHOT: TTS + OmniHuman + Kling ──────────────────────────
+          // ── FACE SHOT: TTS audio + twin frame image (NO OmniHuman) ──────────
+          // Final video = FFmpeg merge of (twin.frame_url_mid + TTS audio)
+          // handled by Railway FFmpeg service via the worker
           let audioUrl: string | null = null
           if (elevenKey && shotText) {
             audioUrl = await generateAudioUrl(shotText, supabase, elevenKey, voiceId)
@@ -266,49 +236,18 @@ export async function POST(request: NextRequest) {
             console.warn('[movie/generate] Skipping TTS for shot', shotIndex, '- no key or text')
           }
 
-          let omniTaskId: string | null = null
-          if (audioUrl) {
-            omniTaskId = await submitOmniHuman(frameUrl, audioUrl, piApiKey)
-            console.log('[movie/generate] Shot', shotIndex, 'omni_task_id:', omniTaskId)
-          }
-
-          const klingTaskId = await submitKling(shotScene, piApiKey, shotDuration)
-          console.log('[movie/generate] Shot', shotIndex, 'kling_task_id:', klingTaskId)
-
-          // Insert into omnihuman_jobs so cron can poll OmniHuman
-          if (omniTaskId) {
-            try {
-              const { error: omniInsertErr } = await supabase.from('omnihuman_jobs').insert({
-                task_id: omniTaskId,
-                status: 'processing',
-                image_url: frameUrl,
-                audio_url: audioUrl,
-                scene_task_id: klingTaskId,
-                user_id: userId,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              if (omniInsertErr) {
-                console.error('[movie/generate] omnihuman_jobs insert failed for shot', shotIndex, ':', omniInsertErr.message)
-              } else {
-                console.log('[movie/generate] omnihuman_jobs insert SUCCESS for shot', shotIndex)
-              }
-            } catch (omniDbErr) {
-              console.error('[movie/generate] omnihuman_jobs insert FATAL for shot', shotIndex, ':', omniDbErr instanceof Error ? omniDbErr.message : omniDbErr)
-            }
-          }
-
-          // Insert into movie_shots
+          // Insert into movie_shots - store twin frame as kling_scene_url so worker
+          // can merge frame + audio via FFmpeg; start in 'processing' (no task to poll)
           try {
             const { error: insertErr } = await supabase.from('movie_shots').insert({
               movie_id: jobId,
               shot_index: shotIndex,
               shot_type: 'face',
-              omni_task_id: omniTaskId,
-              kling_task_id: klingTaskId,
+              kling_task_id: null,
               audio_url: audioUrl,
+              kling_scene_url: frameUrl,
               narrative: shotNarrative,
-              status: 'submitted',
+              status: 'processing',
               user_id: userId,
               created_at: new Date().toISOString(),
             })
@@ -322,7 +261,7 @@ export async function POST(request: NextRequest) {
           }
 
         } else {
-          // ── SCENE SHOT: Kling only, no OmniHuman ────────────────────────
+          // ── SCENE SHOT: Kling only ───────────────────────────────────────────
           const klingTaskId = await submitKling(shotScene, piApiKey, shotDuration)
           console.log('[movie/generate] Scene shot', shotIndex, 'kling_task_id:', klingTaskId)
 
@@ -331,7 +270,6 @@ export async function POST(request: NextRequest) {
               movie_id: jobId,
               shot_index: shotIndex,
               shot_type: 'scene',
-              omni_task_id: null,
               kling_task_id: klingTaskId,
               audio_url: null,
               narrative: shotNarrative,
@@ -415,77 +353,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to generate dialogue audio' }, { status: 500 })
     }
 
-    // Parallel Kling scene generation
-    let sceneTaskId: string | null = null
-    try {
-      const scenePrompt = (template && scenePrompts[template as string]) ? scenePrompts[template as string] : story
-      console.log('[movie/generate] Submitting parallel Kling scene generation, prompt:', scenePrompt.slice(0, 80))
-      sceneTaskId = await submitKling(scenePrompt, piApiKey)
-      console.log('[movie/generate] Kling scene taskId:', sceneTaskId)
-    } catch (sceneErr) {
-      console.warn('[movie/generate] Kling scene submit error (non-fatal):', sceneErr instanceof Error ? sceneErr.message : sceneErr)
-    }
-
-    // Submit OmniHuman task
-    console.log('[movie/generate] Submitting OmniHuman task...')
-    const omniRes = await fetch('https://api.piapi.ai/api/v1/task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
-      body: JSON.stringify({
-        model: 'omni-human',
-        task_type: 'omni-human-1.5',
-        input: {
-          image_url: frameUrl,
-          audio_url: audioUrl,
-          prompt: 'person speaks naturally, cinematic',
-        },
-        webhook_config: {
-          endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
-          secret: '',
-        },
-      }),
-    })
-
-    if (!omniRes.ok) {
-      const errText = await omniRes.text()
-      console.error('[movie/generate] OmniHuman submit failed:', omniRes.status, errText)
-      return NextResponse.json({ error: `OmniHuman submit failed: ${omniRes.status}` }, { status: 500 })
-    }
-
-    const omniData = await omniRes.json()
-    const taskId: string | null = omniData?.data?.task_id ?? omniData?.task_id ?? null
-    console.log('[movie/generate] OmniHuman taskId:', taskId)
-
-    if (!taskId) {
-      return NextResponse.json({ error: 'OmniHuman did not return a taskId' }, { status: 500 })
-    }
-
-    // Store in omnihuman_jobs
-    console.log('[movie/generate] storing audio_url in DB:', audioUrl)
-    try {
-      const { error: insertErr } = await supabase.from('omnihuman_jobs').insert({
-        task_id: taskId,
-        status: 'processing',
-        image_url: frameUrl,
-        audio_url: audioUrl,
-        scene_task_id: sceneTaskId ?? null,
-        user_id: userId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      if (insertErr) {
-        console.error('[movie/generate] DB insert FAILED:', insertErr.message, JSON.stringify(insertErr))
-      } else {
-        console.log('[movie/generate] DB insert SUCCESS, audio_url:', audioUrl)
-      }
-    } catch (dbErr) {
-      console.error('[movie/generate] DB insert FAILED:', dbErr instanceof Error ? dbErr.message : JSON.stringify(dbErr))
-    }
-
     // suppress unused warning
     void sessionId
 
-    return NextResponse.json({ success: true, taskId, audioUrl, frameUrl })
+    // Single-video fallback: return frame + audio for FFmpeg merge by caller
+    return NextResponse.json({ success: true, audioUrl, frameUrl })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[movie/generate] FATAL:', message)
