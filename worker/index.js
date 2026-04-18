@@ -216,7 +216,7 @@ async function pollShots() {
     for (const shot of shots) {
       const mid = shot.movie_id ?? 'unknown'
       if (!shotsByMovie[mid]) shotsByMovie[mid] = []
-      if (shotsByMovie[mid].length < 3) shotsByMovie[mid].push(shot)
+      if (shotsByMovie[mid].length < 8) shotsByMovie[mid].push(shot)
     }
     const cappedShots = Object.values(shotsByMovie).flat()
 
