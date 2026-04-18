@@ -236,8 +236,9 @@ export async function POST(request: NextRequest) {
             console.warn('[movie/generate] Skipping TTS for shot', shotIndex, '- no key or text')
           }
 
-          // Insert into movie_shots - store twin frame as kling_scene_url so worker
-          // can merge frame + audio via FFmpeg; start in 'processing' (no task to poll)
+          // Insert into movie_shots - store twin frame as twin_frame_url so worker
+          // can merge frame image + audio via Railway FFmpeg /merge-audio
+          // status='submitted' so worker picks it up
           try {
             const { error: insertErr } = await supabase.from('movie_shots').insert({
               movie_id: jobId,
@@ -245,9 +246,9 @@ export async function POST(request: NextRequest) {
               shot_type: 'face',
               kling_task_id: null,
               audio_url: audioUrl,
-              kling_scene_url: frameUrl,
+              twin_frame_url: frameUrl,
               narrative: shotNarrative,
-              status: 'processing',
+              status: 'submitted',
               user_id: userId,
               created_at: new Date().toISOString(),
             })
