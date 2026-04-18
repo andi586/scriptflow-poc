@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     // First try to find twin with voice_id
     let { data: twin } = await supabase
       .from('digital_twins')
-      .select('id, frame_url_mid, voice_id')
+      .select('id, frame_url_mid, source_video_url, voice_id')
       .not('voice_id', 'is', null)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
     if (!twin) {
       const { data: fallback } = await supabase
         .from('digital_twins')
-        .select('id, frame_url_mid, voice_id')
+        .select('id, frame_url_mid, source_video_url, voice_id')
         .eq('is_active', true)
         .not('frame_url_mid', 'is', null)
         .order('created_at', { ascending: false })
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
               shot_type: 'face',
               kling_task_id: null,
               audio_url: audioUrl,
-              twin_frame_url: frameUrl,
+              twin_frame_url: twin.source_video_url || twin.frame_url_mid,
               narrative: shotNarrative,
               status: 'submitted',
               user_id: userId,
