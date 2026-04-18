@@ -27,6 +27,47 @@ const fetchWithTimeout = async (url, options = {}, ms = 10000) => {
 }
 
 async function pollShots() {
+  // Stage: Process face shots that have twin_frame_url + audio_url ready (NO OmniHuman needed)
+  const { data: faceShots } = await supabase
+    .from('movie_shots')
+    .select('*')
+    .eq('shot_type', 'face')
+    .in('status', ['submitted', 'processing', 'failed'])
+    .not('twin_frame_url', 'is', null)
+    .not('audio_url', 'is', null)
+    .is('final_shot_url', null)
+
+  for (const shot of faceShots ?? []) {
+    try {
+      console.log('[worker] Processing face shot with FFmpeg:', shot.shot_index)
+
+      const mergeRes = await fetchWithTimeout(
+        `${RAILWAY_FFMPEG_URL}/merge-audio`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: shot.twin_frame_url,
+            audioUrl: shot.audio_url
+          })
+        },
+        30000
+      )
+
+      const mergeData = await mergeRes.json()
+      console.log('[worker] FFmpeg merge-audio response:', JSON.stringify(mergeData).slice(0, 200))
+
+      if (mergeData.outputUrl) {
+        await supabase.from('movie_shots')
+          .update({ final_shot_url: mergeData.outputUrl, status: 'done' })
+          .eq('id', shot.id)
+        console.log('[worker] Face shot done:', shot.shot_index, mergeData.outputUrl)
+      }
+    } catch (e) {
+      console.error('[worker] Face shot FFmpeg error:', shot.shot_index, e.message)
+    }
+  }
+
   // Stage 0: Submit Kling tasks for strictly pending shots (status='pending' AND kling_task_id IS NULL)
   // Idempotency guaranteed: only picks shots that have never been submitted
   const { data: newPendingShots } = await supabase
