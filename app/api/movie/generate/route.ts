@@ -38,6 +38,17 @@ interface Shot {
   scene?: string
   duration?: number
   narrative?: NarrativeState
+  dialogue?: string
+  description?: string
+  scenePrompt?: string
+}
+
+interface CognitiveShot {
+  type?: 'face' | 'scene'
+  dialogue?: string
+  description?: string
+  scenePrompt?: string
+  duration?: number
 }
 
 const scenePrompts: Record<string, string> = {
@@ -188,6 +199,26 @@ export async function POST(request: NextRequest) {
     const voiceId = twin.voice_id ?? process.env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // Adam - multilingual
     console.log('[movie/generate] Using voiceId:', voiceId, twin.voice_id ? '(cloned)' : '(default)')
 
+    // ── STEP 1: Call Cognitive Core (generate-script) to get direction plan ──
+    const storyInput = story
+    let cognitiveShots: CognitiveShot[] = []
+    try {
+      const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story: storyInput, template: template || 'Dear Mom' }),
+      })
+      if (scriptRes.ok) {
+        const scriptData = await scriptRes.json()
+        cognitiveShots = scriptData?.directionPlan?.shots ?? []
+        console.log('[movie/generate] Cognitive Core shots:', cognitiveShots.length)
+      } else {
+        console.warn('[movie/generate] Cognitive Core call failed:', scriptRes.status, '— proceeding without it')
+      }
+    } catch (cogErr) {
+      console.warn('[movie/generate] Cognitive Core error (non-fatal):', cogErr instanceof Error ? cogErr.message : cogErr)
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // MULTI-SHOT PATH (NEL Director output)
     // ════════════════════════════════════════════════════════════════════════
@@ -209,9 +240,11 @@ export async function POST(request: NextRequest) {
       for (const [idx, shot] of orderedShots.entries()) {
         const shotIndex = shot.shot_index ?? (shot as { shotNumber?: number }).shotNumber ?? (idx + 1)
         const shotType = shot.type ?? 'face'
-        const shotText = shot.text ?? ''
-        const shotScene = shot.scene ?? (template && scenePrompts[template as string] ? scenePrompts[template as string] : story)
-        const shotDuration = shot.duration ?? 10
+        // ── STEP 2: Use Cognitive Core data if available ──────────────────
+        const cogShot: CognitiveShot | undefined = cognitiveShots[shotIndex - 1] ?? cognitiveShots[idx]
+        const shotText = shot.dialogue ?? cogShot?.dialogue ?? shot.text ?? ''
+        const shotScene = shot.scenePrompt ?? cogShot?.scenePrompt ?? shot.description ?? cogShot?.description ?? shot.scene ?? (template && scenePrompts[template as string] ? scenePrompts[template as string] : story)
+        const shotDuration = shot.duration ?? cogShot?.duration ?? 10
         const shotNarrative = shot.narrative ?? null
 
         console.log('[movie/generate] Processing shot', shotIndex, 'type:', shotType)
