@@ -83,6 +83,26 @@ async function pollShots() {
   if (pendingShots && pendingShots.length > 0) {
     console.log('[worker] Stage 1: found', pendingShots.length, 'shots missing kling_task_id')
     for (const shot of pendingShots) {
+      // Check if kling_task_id already exists
+      if (shot.kling_task_id) {
+        console.log('[worker] Shot already has kling_task_id, skipping:', shot.shot_index)
+        continue
+      }
+
+      // Also use atomic lock to prevent race conditions
+      const { data: locked } = await supabase
+        .from('movie_shots')
+        .update({ status: 'submitted' })
+        .eq('id', shot.id)
+        .eq('status', 'pending')
+        .is('kling_task_id', null)
+        .select()
+
+      if (!locked || locked.length === 0) {
+        console.log('[worker] Shot already being processed, skipping:', shot.shot_index)
+        continue
+      }
+
       try {
         const scenePrompt = shot.scene_description || shot.description || shot.scene || 'cinematic empty scene, dramatic lighting, no people, no humans'
         const klingRes = await fetchWithTimeout('https://api.piapi.ai/api/v1/task', {
