@@ -125,7 +125,7 @@ async function submitKling(scenePrompt: string, piApiKey: string, duration = 10)
 
 export async function POST(request: NextRequest) {
   try {
-    const { story, sessionId, template, shots } = await request.json()
+    const { story, sessionId, template, shots, shotCount } = await request.json()
 
     if (!story) {
       return NextResponse.json({ error: 'story is required' }, { status: 400 })
@@ -193,11 +193,16 @@ export async function POST(request: NextRequest) {
     // ════════════════════════════════════════════════════════════════════════
     if (Array.isArray(shots) && shots.length > 0) {
       const jobId = crypto.randomUUID()
-      console.log('[movie/generate] Multi-shot mode, jobId:', jobId, 'shots:', shots.length)
+
+      // Configurable shot count for testing (default 4: face 1,3 + scene 2,4)
+      const maxShots: number = typeof shotCount === 'number' && shotCount > 0 ? shotCount : 4
+      const isTestMode = story.includes('[test]') || maxShots < shots.length
+      const limitedShots = isTestMode ? (shots as Shot[]).slice(0, maxShots) : (shots as Shot[])
+      console.log('[movie/generate] Multi-shot mode, jobId:', jobId, 'shots:', shots.length, 'maxShots:', maxShots, 'testMode:', isTestMode)
 
       // Submit face shots first (critical path), then scene shots
-      const faceShots = (shots as Shot[]).filter(s => (s.type ?? 'face') === 'face')
-      const sceneShots = (shots as Shot[]).filter(s => s.type === 'scene')
+      const faceShots = limitedShots.filter(s => (s.type ?? 'face') === 'face')
+      const sceneShots = limitedShots.filter(s => s.type === 'scene')
       const orderedShots = [...faceShots, ...sceneShots]
       console.log('[movie/generate] Submission order: face shots first:', faceShots.length, 'then scene shots:', sceneShots.length)
 
