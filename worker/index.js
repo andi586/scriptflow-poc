@@ -291,6 +291,8 @@ async function pollShots() {
         const videoUrl = data?.data?.output?.works?.[0]?.resource?.resource
 
         console.log('[worker] shot', shot.shot_index, 'kling status:', status)
+        console.log('[worker] shot', shot.shot_index, 'kling videoUrl:', videoUrl ? videoUrl.slice(0, 50) : 'NULL')
+        console.log('[worker] kling output:', JSON.stringify(data?.data?.output).slice(0, 200))
 
         if ((status === 'completed' || status === 'success') && videoUrl) {
           await supabase.from('movie_shots')
