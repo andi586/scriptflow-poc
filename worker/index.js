@@ -307,7 +307,7 @@ async function pollShots() {
     const { data: sceneShots } = await supabase
       .from('movie_shots')
       .select('*')
-      .eq('status', 'processing')
+      .in('status', ['submitted', 'processing'])
       .eq('shot_type', 'scene')
       .not('kling_scene_url', 'is', null)
 
