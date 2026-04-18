@@ -427,11 +427,15 @@ async function pollShots() {
   }
 
   // BUG 7: Reset shots stuck in 'submitted' for >15 minutes
+  // Only reset shots that have NO task_ids (truly stuck with nothing submitted)
+  // Do NOT reset shots that already have kling_task_id or omni_task_id - those are being processed by PiAPI
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
   const { data: stuckSubmitted, error: stuckSubmittedErr } = await supabase
     .from('movie_shots')
     .select('id, shot_index, retry_count')
     .eq('status', 'submitted')
+    .is('kling_task_id', null)
+    .is('omni_task_id', null)
     .lt('updated_at', fifteenMinutesAgo)
 
   if (stuckSubmitted && stuckSubmitted.length > 0) {
