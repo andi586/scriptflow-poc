@@ -52,6 +52,10 @@ export async function POST(req: NextRequest) {
     const config = tierConfig[tier] ?? tierConfig['60s']
     const selectedShots = shots.slice(0, config.shots)
 
+    // Force override duration — ALWAYS use tier duration, ignore Cognitive Core duration
+    const TIER_DURATION = { '30s': 3, '60s': 2, '90s': 2 }
+    const forcedDuration = TIER_DURATION[tier as keyof typeof TIER_DURATION] || 3
+
     // Build multi_shots prompts from shot plan
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buildPrompt = (shot: any): string => {
@@ -71,10 +75,12 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const multiShots = selectedShots.map((shot: any) => ({
       prompt: buildPrompt(shot),
-      duration: config.duration,
+      duration: forcedDuration, // ALWAYS use this, ignore shot.duration from Cognitive Core
     }))
 
     console.log('[movie/generate] multi_shots:', JSON.stringify(multiShots).slice(0, 300))
+    console.log('[movie/generate] multiShots durations:', multiShots.map((s: { duration: number }) => s.duration))
+    console.log('[movie/generate] total duration:', multiShots.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0))
 
     // Step 3: Create movie record
     const { data: movie, error: movieError } = await supabase
