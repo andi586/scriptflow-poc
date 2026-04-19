@@ -13,6 +13,6 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Deploy Worker
-        run: railway up --service=scriptflow-poc --detach
+        run: railway up --service=worker --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
