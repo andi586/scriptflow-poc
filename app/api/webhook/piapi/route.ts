@@ -33,6 +33,11 @@ export async function POST(req: NextRequest) {
     .update({ kling_scene_url: videoUrl, status: 'processing' })
     .eq('kling_task_id', taskId)
 
+  // Update movies table (new single Kling 3.0 architecture)
+  await supabaseAdmin.from('movies')
+    .update({ final_video_url: videoUrl, status: 'complete' })
+    .eq('kling_task_id', taskId)
+
   console.log('[webhook/piapi] updated task:', taskId)
   return NextResponse.json({ ok: true })
 }
