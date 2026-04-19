@@ -41,7 +41,7 @@ const ScriptFlowHome = () => {
 
         <div className="mt-12 w-full max-w-sm px-4">
           <a
-            href="/app-flow"
+            href="/create"
             className="group relative flex items-center justify-center w-full py-5 bg-[#D4A853] hover:bg-[#e2bc74] transition-all duration-500 rounded-full shadow-[0_0_20px_rgba(212,168,83,0.3)] overflow-hidden"
           >
             <span className="relative z-10 text-black font-bold tracking-[0.2em] text-sm">
