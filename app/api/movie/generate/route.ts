@@ -57,24 +57,46 @@ export async function POST(req: NextRequest) {
     const forcedDuration = TIER_DURATION[tier as keyof typeof TIER_DURATION] || 3
 
     // Build multi_shots prompts from shot plan
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const buildPrompt = (shot: any): string => {
-      const shotType = shot.shotType === 'face' ? 'close-up' : 'wide cinematic'
-      const camera = shot.cameraMovement || 'static'
-      const emotion = shot.emotion || 'contemplative'
-      const dialogue = shot.dialogue ? `character @image_1 says: "${shot.dialogue}"` : ''
-      const scene = shot.scenePrompt || shot.description || ''
-      const lighting = shot.lightingMood || 'cinematic'
-      const silence = shot.silence ? 'moment of silence' : ''
+    const cameraMovements = [
+      'slow dolly in',
+      'gentle push forward',
+      'subtle pull back',
+      'slow pan left',
+      'micro drift right',
+      'static with slight breathing',
+    ]
 
-      return shot.shotType === 'face'
-        ? `${shotType} ${camera} shot, character @image_1 ${shot.description}, ${dialogue}, emotion: ${emotion}, ${silence}, ${lighting} lighting, cinematic 9:16`.trim()
-        : `${shotType} ${camera} shot, ${scene}, emotion: ${emotion}, ${lighting} lighting, no people, cinematic 9:16`.trim()
+    const sceneEnvironments = [
+      'quiet bedroom with morning light through curtains',
+      'kitchen table with two empty chairs',
+      'living room with old photographs on wall',
+      'window with rain drops, blurred city outside',
+      'hallway with single light casting long shadow',
+      'garden bench empty in late afternoon',
+    ]
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buildPrompt = (shot: any, shotIndex: number, _totalShots: number): string => {
+      const movement = cameraMovements[shotIndex % cameraMovements.length]
+      const environment = sceneEnvironments[shotIndex % sceneEnvironments.length]
+
+      if (shot.shotType === 'face') {
+        const emotion = shot.emotion || 'contemplative'
+        const dialogue = shot.dialogue || ''
+
+        const dialogueInstruction = dialogue
+          ? `character speaks quietly with restraint: "${dialogue}", voice barely above whisper, emotion held back`
+          : 'character in silence, emotion visible only in subtle facial movements'
+
+        return `Cinematic 9:16, ${movement}, close-up portrait, character @image_1, ${dialogueInstruction}, emotion: ${emotion} but controlled and understated, soft cinematic lighting, shallow depth of field, smooth dissolve transition`
+      } else {
+        return `Cinematic 9:16, ${movement}, ${environment}, no people, empty space holding memory, emotion: ${shot.emotion || 'melancholic'}, natural light with soft shadows, smooth dissolve transition into next shot`
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const multiShots = selectedShots.map((shot: any) => ({
-      prompt: buildPrompt(shot),
+    const multiShots = selectedShots.map((shot: any, index: number) => ({
+      prompt: buildPrompt(shot, index, selectedShots.length),
       duration: forcedDuration, // ALWAYS use this, ignore shot.duration from Cognitive Core
     }))
 
