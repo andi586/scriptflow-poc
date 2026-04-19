@@ -2088,7 +2088,7 @@ export default function Home() {
                         flushSync(() => setStoryIdea(el.value));
                       }
                     }}
-                    onClick={() => void runDramaPipeline()}
+                    onClick={() => void runHeavenCinemaPipeline(story)}
                   >
                     {pipelineRunning && !directorModeActive ? "Working on it…" : "Make the Movie ✨"}
                   </Button>
