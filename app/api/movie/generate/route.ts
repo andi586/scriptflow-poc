@@ -18,12 +18,13 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] story:', story, 'tier:', tier)
 
-    // Step 1: Get digital twin photo
+    // Step 1: Get digital twin photo (query by id, since frontend passes twinId as userId)
+    console.log('[movie/generate] userId received:', userId)
+    console.log('[movie/generate] looking for twin id:', userId)
     const { data: twin } = await supabase
       .from('digital_twins')
       .select('id, frame_url_mid')
-      .eq('user_id', userId)
-      .eq('is_active', true)
+      .eq('id', userId)
       .single()
 
     if (!twin) {

@@ -129,6 +129,7 @@ export default function AppFlowPage() {
       if (twinErr) throw new Error('Twin creation failed: ' + twinErr.message)
 
       localStorage.setItem(TWIN_ID_KEY, twin.id)
+      localStorage.setItem('twinId', twin.id)
       localStorage.setItem(TWIN_FRAME_KEY, url)
       setTwinId(twin.id)
       setTwinFrameUrl(url)
@@ -291,7 +292,15 @@ export default function AppFlowPage() {
   const [processingMessage, setProcessingMessage] = useState<string | null>(null)
 
   const generateFromTemplate = useCallback(async () => {
-    if (!twinId || !selectedTemplate) return
+    const currentTwinId = twinId || localStorage.getItem(TWIN_ID_KEY) || localStorage.getItem('twinId')
+    console.log('[app-flow] twinId before generate:', twinId)
+    console.log('[app-flow] localStorage twinId:', localStorage.getItem(TWIN_ID_KEY))
+
+    if (!currentTwinId) {
+      alert('Please upload your photo first')
+      return
+    }
+    if (!selectedTemplate) return
     setPhase('movie_processing')
     setProcessingMessage(null)
     setError(null)
