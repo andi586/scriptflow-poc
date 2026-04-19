@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TWIN_ID_KEY = 'sf_twin_id'
@@ -51,9 +52,15 @@ const PROCESSING_STEPS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AppFlowPage() {
+  const router = useRouter()
   const [phase, setPhase] = useState<Phase>('loading')
   const [twinId, setTwinId] = useState<string | null>(null)
   const [twinFrameUrl, setTwinFrameUrl] = useState<string | null>(null)
+
+  // photo upload state
+  const [uploading, setUploading] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // template mode
   const [selectedTemplate, setSelectedTemplate] = useState<typeof TEMPLATES[0] | null>(null)
@@ -418,27 +425,102 @@ export default function AppFlowPage() {
     )
   }
 
+  // ── Upload photo to create digital twin ────────────────────────────────────
+  const handlePhotoUpload = useCallback(async (file: File) => {
+    setUploading(true)
+    setError(null)
+    try {
+      const supabase = createClient()
+      const filePath = `twins/${Date.now()}_${file.name}`
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from('recordings')
+        .upload(filePath, file, { contentType: file.type, upsert: true })
+      if (uploadErr) throw new Error('Photo upload failed: ' + uploadErr.message)
+      const url = supabase.storage.from('recordings').getPublicUrl(uploadData.path).data.publicUrl
+      setPhotoUrl(url)
+
+      // Create digital twin record
+      const userId = crypto.randomUUID()
+      const { data: twin, error: twinErr } = await supabase
+        .from('digital_twins')
+        .insert({
+          user_id: userId,
+          frame_url_mid: url,
+          source_video_url: null,
+          is_active: true,
+        })
+        .select()
+        .single()
+      if (twinErr) throw new Error('Twin creation failed: ' + twinErr.message)
+
+      localStorage.setItem(TWIN_ID_KEY, twin.id)
+      localStorage.setItem(TWIN_FRAME_KEY, url)
+      setTwinId(twin.id)
+      setTwinFrameUrl(url)
+      setPhase('template_select')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }, [])
+
   // ════════════════════════════════════════════════════════════════════════════
-  // PHASE: TWIN INTRO
+  // PHASE: TWIN INTRO — photo upload step
   // ════════════════════════════════════════════════════════════════════════════
   if (phase === 'twin_intro') {
     return (
-      <div style={{ minHeight: '100vh', background: '#000', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0a0a0a', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
         {authButton}
         {myVideosButton}
-        <div style={{ fontSize: '4rem', marginBottom: '1.5rem' }}>🎭</div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>Create Your Digital Twin</h1>
-        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', maxWidth: '320px', marginBottom: '2.5rem', lineHeight: 1.6 }}>
-          Record a short video of yourself. We&apos;ll create a digital version of you that can star in any movie you imagine.
+
+        <h1 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+          First, let&apos;s capture your face
+        </h1>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.95rem', maxWidth: '300px', marginBottom: '40px', lineHeight: 1.6 }}>
+          Upload a clear photo of your face
         </p>
+
+        {/* Photo preview */}
+        {photoUrl && (
+          <img src={photoUrl} alt="Your photo" style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #D4A853', marginBottom: '24px' }} />
+        )}
+
+        {/* Upload button */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          style={{ display: 'none' }}
+          onChange={e => {
+            const file = e.target.files?.[0]
+            if (file) void handlePhotoUpload(file)
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          style={{
+            background: uploading ? 'rgba(212,168,83,0.4)' : '#D4A853',
+            color: '#000', border: 'none', borderRadius: '100px',
+            padding: '18px 48px', fontSize: '1rem', fontWeight: '800',
+            cursor: uploading ? 'not-allowed' : 'pointer', letterSpacing: '0.05em',
+            marginBottom: '16px',
+          }}
+        >
+          {uploading ? 'Uploading...' : '📷 Upload My Photo'}
+        </button>
+
         <button
           type="button"
           onClick={() => { setError(null); setPhase('twin_record') }}
-          style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: '1rem', padding: '1rem 2.5rem', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '1rem' }}
+          style={{ color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
         >
-          📷 Record My Twin
+          Or record a video instead →
         </button>
-        {error && <p style={{ color: '#f87171', fontSize: '0.875rem', marginTop: '1rem' }}>{error}</p>}
+
+        {error && <p style={{ color: '#f87171', fontSize: '0.875rem', marginTop: '16px' }}>{error}</p>}
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
