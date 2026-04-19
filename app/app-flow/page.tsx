@@ -100,6 +100,46 @@ export default function AppFlowPage() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
+  // ── Upload photo to create digital twin ────────────────────────────────────
+  const handlePhotoUpload = useCallback(async (file: File) => {
+    setUploading(true)
+    setError(null)
+    try {
+      const supabase = createClient()
+      const filePath = `twins/${Date.now()}_${file.name}`
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from('recordings')
+        .upload(filePath, file, { contentType: file.type, upsert: true })
+      if (uploadErr) throw new Error('Photo upload failed: ' + uploadErr.message)
+      const url = supabase.storage.from('recordings').getPublicUrl(uploadData.path).data.publicUrl
+      setPhotoUrl(url)
+
+      // Create digital twin record
+      const userId = crypto.randomUUID()
+      const { data: twin, error: twinErr } = await supabase
+        .from('digital_twins')
+        .insert({
+          user_id: userId,
+          frame_url_mid: url,
+          source_video_url: null,
+          is_active: true,
+        })
+        .select()
+        .single()
+      if (twinErr) throw new Error('Twin creation failed: ' + twinErr.message)
+
+      localStorage.setItem(TWIN_ID_KEY, twin.id)
+      localStorage.setItem(TWIN_FRAME_KEY, url)
+      setTwinId(twin.id)
+      setTwinFrameUrl(url)
+      setPhase('template_select')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }, [])
+
   // ── On mount: check for existing twin ─────────────────────────────────────
   useEffect(() => {
     const storedTwinId = localStorage.getItem(TWIN_ID_KEY)
@@ -424,46 +464,6 @@ export default function AppFlowPage() {
       </div>
     )
   }
-
-  // ── Upload photo to create digital twin ────────────────────────────────────
-  const handlePhotoUpload = useCallback(async (file: File) => {
-    setUploading(true)
-    setError(null)
-    try {
-      const supabase = createClient()
-      const filePath = `twins/${Date.now()}_${file.name}`
-      const { data: uploadData, error: uploadErr } = await supabase.storage
-        .from('recordings')
-        .upload(filePath, file, { contentType: file.type, upsert: true })
-      if (uploadErr) throw new Error('Photo upload failed: ' + uploadErr.message)
-      const url = supabase.storage.from('recordings').getPublicUrl(uploadData.path).data.publicUrl
-      setPhotoUrl(url)
-
-      // Create digital twin record
-      const userId = crypto.randomUUID()
-      const { data: twin, error: twinErr } = await supabase
-        .from('digital_twins')
-        .insert({
-          user_id: userId,
-          frame_url_mid: url,
-          source_video_url: null,
-          is_active: true,
-        })
-        .select()
-        .single()
-      if (twinErr) throw new Error('Twin creation failed: ' + twinErr.message)
-
-      localStorage.setItem(TWIN_ID_KEY, twin.id)
-      localStorage.setItem(TWIN_FRAME_KEY, url)
-      setTwinId(twin.id)
-      setTwinFrameUrl(url)
-      setPhase('template_select')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed')
-    } finally {
-      setUploading(false)
-    }
-  }, [])
 
   // ════════════════════════════════════════════════════════════════════════════
   // PHASE: TWIN INTRO — photo upload step
