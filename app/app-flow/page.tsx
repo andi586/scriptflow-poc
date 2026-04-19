@@ -292,9 +292,15 @@ export default function AppFlowPage() {
   const [processingMessage, setProcessingMessage] = useState<string | null>(null)
 
   const generateFromTemplate = useCallback(async () => {
-    const currentTwinId = twinId || localStorage.getItem(TWIN_ID_KEY) || localStorage.getItem('twinId')
-    console.log('[app-flow] twinId before generate:', twinId)
-    console.log('[app-flow] localStorage twinId:', localStorage.getItem(TWIN_ID_KEY))
+    console.log('[app-flow] twinId state:', twinId)
+    console.log('[app-flow] localStorage twinId:', localStorage.getItem('twinId'))
+    console.log('[app-flow] localStorage TWIN_ID_KEY:', localStorage.getItem(TWIN_ID_KEY))
+
+    const currentTwinId = twinId
+      || localStorage.getItem('twinId')
+      || localStorage.getItem(TWIN_ID_KEY)
+
+    console.log('[app-flow] currentTwinId:', currentTwinId)
 
     if (!currentTwinId) {
       alert('Please upload your photo first')
@@ -327,12 +333,12 @@ export default function AppFlowPage() {
       if (!script && !shots) throw new Error('Script generation failed')
 
       // Step 2: Submit to movie/generate
-      console.log('[app-flow] calling movie/generate...')
+      console.log('[app-flow] calling movie/generate with userId:', currentTwinId)
       const sessionId = getOrCreateSessionId()
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story: script, sessionId, template: selectedTemplate.title, shots }),
+        body: JSON.stringify({ story: script, tier: '60s', userId: currentTwinId, sessionId, template: selectedTemplate.title, shots }),
       })
       const data = await res.json()
 
