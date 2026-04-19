@@ -333,12 +333,20 @@ export default function AppFlowPage() {
       if (!script && !shots) throw new Error('Script generation failed')
 
       // Step 2: Submit to movie/generate
-      console.log('[app-flow] calling movie/generate with userId:', currentTwinId)
+      const resolvedTwinId = twinId
+        || localStorage.getItem('twinId')
+        || localStorage.getItem('scriptflow_twin_id')
+        || localStorage.getItem(TWIN_ID_KEY)
+
+      console.log('[app-flow] twinId state:', twinId)
+      console.log('[app-flow] currentTwinId resolved:', resolvedTwinId)
+      console.log('[app-flow] calling movie/generate with userId:', resolvedTwinId)
+
       const sessionId = getOrCreateSessionId()
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story: script, tier: '60s', userId: currentTwinId, sessionId, template: selectedTemplate.title, shots }),
+        body: JSON.stringify({ story: script, tier: '60s', userId: resolvedTwinId, sessionId, template: selectedTemplate.title, shots }),
       })
       const data = await res.json()
 
