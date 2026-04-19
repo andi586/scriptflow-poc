@@ -1465,6 +1465,28 @@ export default function Home() {
 
     console.log('[app-flow] twinId state:', resolvedTwinId);
     console.log('[app-flow] currentTwinId resolved:', resolvedTwinId);
+// Upload first star photo as digital twin if no twinId
+if (!resolvedTwinId && starPhotos.length > 0) {
+  const photo = starPhotos[0];
+  const blob = await fetch(photo.localUrl).then(r => r.blob());
+  const fileName = `twins/${Date.now()}_photo.jpg`;
+  const { data: uploaded } = await supabase.storage
+    .from('recordings')
+    .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
+  if (uploaded) {
+    const { data: pub } = supabase.storage.from('recordings').getPublicUrl(fileName);
+    const photoUrl = pub.publicUrl;
+    const { data: twin } = await supabase.from('digital_twins').insert({
+      user_id: crypto.randomUUID(),
+      frame_url_mid: photoUrl,
+      is_active: true
+    }).select().single();
+    if (twin) {
+      localStorage.setItem('twinId', twin.id);
+      resolvedTwinId = twin.id;
+    }
+  }
+}
 
     if (!resolvedTwinId) {
       setPipelineError('Please upload your photo first');
