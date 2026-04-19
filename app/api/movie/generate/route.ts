@@ -18,10 +18,10 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] story:', story, 'tier:', tier)
 
-    // Step 1: Get digital twin
+    // Step 1: Get digital twin photo
     const { data: twin } = await supabase
       .from('digital_twins')
-      .select('*')
+      .select('id, frame_url_mid')
       .eq('user_id', userId)
       .eq('is_active', true)
       .single()
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] twin found:', twin.id)
 
-    // Step 2: Call Cognitive Core
+    // Step 2: Call Cognitive Core for shot plan
     const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -43,12 +43,11 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] Cognitive Core shots:', shots.length)
 
-    // Step 3: Determine shot count by tier
+    // Determine shot count by tier
     const shotCount = tier === '30s' ? 4 : tier === '60s' ? 6 : 9
     const selectedShots = shots.slice(0, Math.min(shotCount, 6))
 
-    // Step 4: Build multi_shots prompts
-    // NEL translates director language to Kling language
+    // Build multi_shots prompts from shot plan
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const multiShots = selectedShots.map((shot: any) => {
       const shotType = shot.shotType === 'face' ? 'close-up' : 'wide cinematic'
@@ -71,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] multi_shots:', JSON.stringify(multiShots).slice(0, 300))
 
-    // Step 5: Create movie record
+    // Step 3: Create movie record
     const { data: movie, error: movieError } = await supabase
       .from('movies')
       .insert({
@@ -79,8 +78,7 @@ export async function POST(req: NextRequest) {
         status: 'pending',
         tier,
         story_input: story,
-        twin_photo_url: twin.frame_url_mid,
-        twin_video_url: twin.source_video_url
+        twin_photo_url: twin.frame_url_mid
       })
       .select()
       .single()
@@ -89,9 +87,8 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] movie created:', movie.id)
 
-    // Step 6: Call Kling 3.0 Omni - ONE API call
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const klingBody: any = {
+    // Step 4: Call Kling 3.0 Omni - ONE API call with native audio
+    const klingBody = {
       model: 'kling',
       task_type: 'omni_video_generation',
       input: {
@@ -99,6 +96,7 @@ export async function POST(req: NextRequest) {
         resolution: '720p',
         aspect_ratio: '9:16',
         enable_audio: true,
+        images: twin.frame_url_mid ? [twin.frame_url_mid] : undefined,
         multi_shots: multiShots
       },
       config: {
@@ -108,14 +106,6 @@ export async function POST(req: NextRequest) {
           secret: ''
         }
       }
-    }
-
-    // Add digital twin references
-    if (twin.frame_url_mid) {
-      klingBody.input.images = [twin.frame_url_mid]
-    }
-    if (twin.source_video_url) {
-      klingBody.input.video = twin.source_video_url
     }
 
     const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
@@ -136,7 +126,7 @@ export async function POST(req: NextRequest) {
       throw new Error('Kling task creation failed: ' + JSON.stringify(klingData).slice(0, 200))
     }
 
-    // Step 7: Update movie with task_id
+    // Step 5: Update movie with task_id
     await supabase
       .from('movies')
       .update({
