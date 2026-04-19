@@ -1685,7 +1685,10 @@ export default function Home() {
                             flushSync(() => setStoryIdea(el.value));
                           }
                         }}
-                        onClick={() => void runStarModePipeline()}
+                        onClick={() => {
+                          const story = storyIdeaTextareaRef.current?.value || storyIdea;
+                          void runHeavenCinemaPipeline(story);
+                        }}
                         className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {pipelineRunning ? "Working on it…" : "Make the Movie ✨"}
