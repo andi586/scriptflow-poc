@@ -43,13 +43,18 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] Cognitive Core shots:', shots.length)
 
-    // Determine shot count by tier
-    const shotCount = tier === '30s' ? 4 : tier === '60s' ? 6 : 9
-    const selectedShots = shots.slice(0, Math.min(shotCount, 6))
+    // Tier config: total duration must not exceed 15s
+    const tierConfig: Record<string, { shots: number; duration: number }> = {
+      '30s': { shots: 4, duration: 3 }, // 4 × 3 = 12s
+      '60s': { shots: 6, duration: 2 }, // 6 × 2 = 12s
+      '90s': { shots: 6, duration: 2 }, // 6 × 2 = 12s (first call)
+    }
+    const config = tierConfig[tier] ?? tierConfig['60s']
+    const selectedShots = shots.slice(0, config.shots)
 
     // Build multi_shots prompts from shot plan
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const multiShots = selectedShots.map((shot: any) => {
+    const buildPrompt = (shot: any): string => {
       const shotType = shot.shotType === 'face' ? 'close-up' : 'wide cinematic'
       const camera = shot.cameraMovement || 'static'
       const emotion = shot.emotion || 'contemplative'
@@ -58,15 +63,16 @@ export async function POST(req: NextRequest) {
       const lighting = shot.lightingMood || 'cinematic'
       const silence = shot.silence ? 'moment of silence' : ''
 
-      const prompt = shot.shotType === 'face'
-        ? `${shotType} ${camera} shot, character @image_1 ${shot.description}, ${dialogue}, emotion: ${emotion}, ${silence}, ${lighting} lighting, cinematic 9:16`
-        : `${shotType} ${camera} shot, ${scene}, emotion: ${emotion}, ${lighting} lighting, no people, cinematic 9:16`
+      return shot.shotType === 'face'
+        ? `${shotType} ${camera} shot, character @image_1 ${shot.description}, ${dialogue}, emotion: ${emotion}, ${silence}, ${lighting} lighting, cinematic 9:16`.trim()
+        : `${shotType} ${camera} shot, ${scene}, emotion: ${emotion}, ${lighting} lighting, no people, cinematic 9:16`.trim()
+    }
 
-      return {
-        prompt: prompt.trim(),
-        duration: shot.duration || 5
-      }
-    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const multiShots = selectedShots.map((shot: any) => ({
+      prompt: buildPrompt(shot),
+      duration: config.duration,
+    }))
 
     console.log('[movie/generate] multi_shots:', JSON.stringify(multiShots).slice(0, 300))
 
