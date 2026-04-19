@@ -1419,6 +1419,47 @@ export default function Home() {
     }
   }, [storyIdea, starPhotos, inspirationFollowUpAnswers]);
 
+  // ─── New movie/generate API call (Heaven Cinema flow) ─────────────────────
+  const runHeavenCinemaPipeline = useCallback(async (storyText: string) => {
+    const resolvedTwinId = typeof window !== 'undefined'
+      ? (localStorage.getItem('twinId') || localStorage.getItem('scriptflow_twin_id'))
+      : null;
+
+    console.log('[app-flow] twinId state:', resolvedTwinId);
+    console.log('[app-flow] currentTwinId resolved:', resolvedTwinId);
+
+    if (!resolvedTwinId) {
+      setPipelineError('Please upload your photo first');
+      return;
+    }
+
+    setPipelineRunning(true);
+    setPipelineError(null);
+
+    try {
+      const response = await fetch('/api/movie/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          story: storyText,
+          tier: '60s',
+          userId: resolvedTwinId
+        })
+      });
+
+      const data = await response.json();
+      if (data.movieId) {
+        window.location.href = `/movie/${data.movieId}`;
+        return;
+      }
+      if (!response.ok) throw new Error(data.error ?? 'Movie generation failed');
+    } catch (e) {
+      setPipelineError(e instanceof Error ? e.message : 'Generation failed');
+    } finally {
+      setPipelineRunning(false);
+    }
+  }, []);
+
   // ─── Be the Star: check consent then proceed ───────────────────────────────
   const handleBeTheStar = useCallback(() => {
     try {
