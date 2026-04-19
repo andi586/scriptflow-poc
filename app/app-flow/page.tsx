@@ -128,8 +128,10 @@ export default function AppFlowPage() {
         .single()
       if (twinErr) throw new Error('Twin creation failed: ' + twinErr.message)
 
+      console.log('[app-flow] twin created:', twin.id)
       localStorage.setItem(TWIN_ID_KEY, twin.id)
       localStorage.setItem('twinId', twin.id)
+      localStorage.setItem('scriptflow_twin_id', twin.id)
       localStorage.setItem(TWIN_FRAME_KEY, url)
       setTwinId(twin.id)
       setTwinFrameUrl(url)
