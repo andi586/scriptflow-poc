@@ -1,3 +1,8 @@
+const safeFileName = `twins/${Date.now()}_photo.jpg`
+const convertedFile = await convertToJpeg(file)
+const safeFileName = `twins/${Date.now()}_photo.jpg`
+const convertedFile = await convertToJpeg(file)
+const safeFileName = `twins/${Date.now()}_photo.jpg`
 "use client";
 
 import {
