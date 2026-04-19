@@ -10,11 +10,13 @@ export default function CreatePage() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const file = files[0]
+    console.log('[create] photo selected:', file.name, file.size, file.type)
     setPhotoFile(file)
     setPhotoUrl(URL.createObjectURL(file))
-    console.log('[create] photo selected:', file.name)
+    console.log('[create] photoFile set!')
   }
 
   const handleGenerate = async () => {
