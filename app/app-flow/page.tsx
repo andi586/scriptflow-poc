@@ -1419,6 +1419,39 @@ export default function Home() {
     }
   }, [storyIdea, starPhotos, inspirationFollowUpAnswers]);
 
+  // ─── HEIC/HEIF → JPEG conversion ─────────────────────────────────────────
+  const convertToJpeg = useCallback(async (file: File): Promise<File> => {
+    if (
+      !file.name.toLowerCase().endsWith('.heic') &&
+      !file.name.toLowerCase().endsWith('.heif') &&
+      file.type !== 'image/heic' &&
+      file.type !== 'image/heif'
+    ) {
+      return file
+    }
+    return new Promise((resolve) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0)
+        canvas.toBlob((blob) => {
+          const converted = new File(
+            [blob!],
+            file.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg'),
+            { type: 'image/jpeg' }
+          )
+          URL.revokeObjectURL(url)
+          resolve(converted)
+        }, 'image/jpeg', 0.9)
+      }
+      img.src = url
+    })
+  }, [])
+
   // ─── New movie/generate API call (Heaven Cinema flow) ─────────────────────
   const runHeavenCinemaPipeline = useCallback(async (storyText: string) => {
     const resolvedTwinId = typeof window !== 'undefined'
