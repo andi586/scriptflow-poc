@@ -1,405 +1,161 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
-/**
- * POST /api/movie/generate
- * Body: { twinId: string, story: string, sessionId?: string, template?: string, shots?: Shot[] }
- *
- * If shots array provided (NEL Director output):
- *   - For each shot with type === 'face':
- *       ElevenLabs TTS → audioUrl
- *       Use twin.frame_url_mid directly as video source (NO OmniHuman)
- *       Final video = FFmpeg merge of (twin frame image + TTS audio) via Railway FFmpeg service
- *   - For each shot with type === 'scene':
- *       Kling text-to-video only
- *   - Insert rows into movie_shots
- *   - Return { movieId, totalShots }
- *
- * Fallback (no shots): single-video pipeline
- */
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
-interface NarrativeState {
-  tension: number
-  beat: string
-  goal: string
-  emotion: string
-}
-
-interface Shot {
-  shot_index?: number
-  shot?: number
-  type?: 'face' | 'scene'
-  text?: string
-  scene?: string
-  duration?: number
-  narrative?: NarrativeState
-  dialogue?: string
-  description?: string
-  scenePrompt?: string
-}
-
-interface CognitiveShot {
-  type?: 'face' | 'scene'
-  dialogue?: string
-  description?: string
-  scenePrompt?: string
-  duration?: number
-}
-
-const scenePrompts: Record<string, string> = {
-  'Dear Mom': 'Empty room with warm candlelight, flowers on the table, family photos on the wall, golden hour sunlight through curtains, no people, no humans, no figures, cinematic atmosphere, emotional and tender',
-  'Let Them Go': 'Empty rooftop at sunset overlooking the city lights, dramatic cinematic lighting, no people, no humans, no figures, emotional atmosphere, freedom',
-  'Letter to My Younger Self': 'Empty nostalgic childhood bedroom, old photographs on desk, soft warm light, no people, no humans, no figures, emotional and reflective',
-  'I Deserve Better': 'Beautiful empty city street at night, dramatic lighting, empowerment atmosphere, no people, no humans, no figures, cinematic',
-  'Things I Never Said': 'Empty chair by a window at sunset, letters on a table, no people, no humans, no figures, emotional and poetic atmosphere',
-  'I Finally Love Myself': 'Beautiful empty garden at golden hour, flowers blooming, peaceful and joyful atmosphere, no people, no humans, no figures',
-}
-
-// ── Helper: ElevenLabs TTS → upload → public URL ──────────────────────────────
-async function generateAudioUrl(
-  text: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  elevenKey: string,
-  voiceId: string,
-): Promise<string | null> {
+export async function POST(req: NextRequest) {
   try {
-    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: { 'xi-api-key': elevenKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: text.slice(0, 300),
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.75,
-          similarity_boost: 0.85,
-          style: 0.3,
-          use_speaker_boost: true,
-        },
-      }),
-    })
-    if (!ttsRes.ok) {
-      console.warn('[movie/generate] ElevenLabs TTS failed:', ttsRes.status, await ttsRes.text())
-      return null
-    }
-    const audioBuffer = Buffer.from(await ttsRes.arrayBuffer())
-    if (audioBuffer.length < 100) { console.error('[movie/generate] TTS buffer too small'); return null }
-    const audioPath = `tmp/tts_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`
-    const { data: uploadData, error: uploadErr } = await supabase.storage
-      .from('recordings')
-      .upload(audioPath, audioBuffer, { contentType: 'audio/mpeg', upsert: false, cacheControl: '3600' })
-    if (uploadErr || !uploadData) { console.warn('[movie/generate] TTS upload failed:', uploadErr?.message); return null }
-    return supabase.storage.from('recordings').getPublicUrl(uploadData.path).data.publicUrl
-  } catch (e) {
-    console.warn('[movie/generate] TTS error:', e instanceof Error ? e.message : e)
-    return null
-  }
-}
-
-// ── Helper: Submit Kling text-to-video ────────────────────────────────────────
-async function submitKling(scenePrompt: string, piApiKey: string, duration = 10): Promise<string | null> {
-  try {
-    const res = await fetch('https://api.piapi.ai/api/v1/task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': piApiKey },
-        body: JSON.stringify({
-          model: 'kling',
-          task_type: 'video_generation',
-          input: {
-            prompt: scenePrompt,
-            negative_prompt: 'people, humans, figures, person, man, woman, face, body, character',
-            version: '3.0',
-            mode: 'pro',
-            duration,
-            aspect_ratio: '9:16',
-            enable_audio: true,
-          },
-          webhook_config: {
-            endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
-            secret: '',
-          },
-        }),
-    })
-    if (!res.ok) { console.warn('[movie/generate] Kling submit failed:', res.status, await res.text()); return null }
-    const data = await res.json()
-    return data?.data?.task_id ?? null
-  } catch (e) {
-    console.warn('[movie/generate] Kling submit error:', e instanceof Error ? e.message : e)
-    return null
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const { story, sessionId, template, shots, shotCount } = await request.json()
+    const { story, tier = '60s', userId } = await req.json()
 
     if (!story) {
-      return NextResponse.json({ error: 'story is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Story is required' }, { status: 400 })
     }
 
-    // Get current user from auth session
-    const serverSupabase = await createServerClient()
-    const { data: { session } } = await serverSupabase.auth.getSession()
-    const userId = session?.user?.id ?? null
+    console.log('[movie/generate] story:', story, 'tier:', tier)
 
-    // Always use service role key (admin) so RLS doesn't block inserts
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } },
-    )
-
-    // ── Get digital twin frame + voice_id ─────────────────────────────────────
-    // First try to find twin with voice_id
-    let { data: twin } = await supabase
+    // Step 1: Get digital twin
+    const { data: twin } = await supabase
       .from('digital_twins')
-      .select('id, frame_url_mid, source_video_url, voice_id')
-      .not('voice_id', 'is', null)
+      .select('*')
+      .eq('user_id', userId)
       .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
       .single()
 
-    // Fallback: find any active twin with frame_url_mid
     if (!twin) {
-      const { data: fallback } = await supabase
-        .from('digital_twins')
-        .select('id, frame_url_mid, source_video_url, voice_id')
-        .eq('is_active', true)
-        .not('frame_url_mid', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-      twin = fallback
+      return NextResponse.json({ error: 'Digital twin not found. Please create your digital twin first.' }, { status: 400 })
     }
 
-    console.log('[movie/generate] Using twin:', twin?.id, 'voice_id:', twin?.voice_id)
+    console.log('[movie/generate] twin found:', twin.id)
 
-    if (!twin?.frame_url_mid) {
-      console.error('[movie/generate] No active digital twin found')
-      return NextResponse.json({ error: 'Digital twin not found' }, { status: 404 })
-    }
+    // Step 2: Call Cognitive Core
+    const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ story, template: 'Dear Mom' })
+    })
+    const scriptData = await scriptRes.json()
+    const shots = scriptData?.directionPlan?.shots ?? []
 
-    const frameUrl = twin.frame_url_mid
-    console.log('[movie/generate] twin.id:', twin.id, 'frameUrl:', frameUrl)
+    console.log('[movie/generate] Cognitive Core shots:', shots.length)
 
-    const piApiKey = process.env.PIAPI_API_KEY ?? process.env.KLING_API_KEY
-    console.log('[movie/generate] PIAPI_API_KEY present:', !!process.env.PIAPI_API_KEY)
-    if (!piApiKey) {
-      return NextResponse.json({ error: 'PIAPI_API_KEY not configured' }, { status: 500 })
-    }
+    // Step 3: Determine shot count by tier
+    const shotCount = tier === '30s' ? 4 : tier === '60s' ? 6 : 9
+    const selectedShots = shots.slice(0, Math.min(shotCount, 6))
 
-    const elevenKey = process.env.ELEVENLABS_API_KEY
-    // Use cloned voice from digital twin if available, fall back to env or default
-    const voiceId = twin.voice_id ?? process.env.ELEVENLABS_VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // Adam - multilingual
-    console.log('[movie/generate] Using voiceId:', voiceId, twin.voice_id ? '(cloned)' : '(default)')
+    // Step 4: Build multi_shots prompts
+    // NEL translates director language to Kling language
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const multiShots = selectedShots.map((shot: any) => {
+      const shotType = shot.shotType === 'face' ? 'close-up' : 'wide cinematic'
+      const camera = shot.cameraMovement || 'static'
+      const emotion = shot.emotion || 'contemplative'
+      const dialogue = shot.dialogue ? `character @image_1 says: "${shot.dialogue}"` : ''
+      const scene = shot.scenePrompt || shot.description || ''
+      const lighting = shot.lightingMood || 'cinematic'
+      const silence = shot.silence ? 'moment of silence' : ''
 
-    // ── STEP 1: Call Cognitive Core (generate-script) to get direction plan ──
-    const storyInput = story
-    let cognitiveShots: CognitiveShot[] = []
-    try {
-      const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story: storyInput, template: template || 'Dear Mom' }),
+      const prompt = shot.shotType === 'face'
+        ? `${shotType} ${camera} shot, character @image_1 ${shot.description}, ${dialogue}, emotion: ${emotion}, ${silence}, ${lighting} lighting, cinematic 9:16`
+        : `${shotType} ${camera} shot, ${scene}, emotion: ${emotion}, ${lighting} lighting, no people, cinematic 9:16`
+
+      return {
+        prompt: prompt.trim(),
+        duration: shot.duration || 5
+      }
+    })
+
+    console.log('[movie/generate] multi_shots:', JSON.stringify(multiShots).slice(0, 300))
+
+    // Step 5: Create movie record
+    const { data: movie, error: movieError } = await supabase
+      .from('movies')
+      .insert({
+        user_id: userId,
+        status: 'pending',
+        tier,
+        story_input: story,
+        twin_photo_url: twin.frame_url_mid,
+        twin_video_url: twin.source_video_url
       })
-      if (scriptRes.ok) {
-        const scriptData = await scriptRes.json()
-        cognitiveShots = scriptData?.directionPlan?.shots ?? []
-        console.log('[movie/generate] Cognitive Core shots:', cognitiveShots.length)
-      } else {
-        console.warn('[movie/generate] Cognitive Core call failed:', scriptRes.status, '— proceeding without it')
-      }
-    } catch (cogErr) {
-      console.warn('[movie/generate] Cognitive Core error (non-fatal):', cogErr instanceof Error ? cogErr.message : cogErr)
-    }
+      .select()
+      .single()
 
-    // ════════════════════════════════════════════════════════════════════════
-    // MULTI-SHOT PATH (NEL Director output)
-    // ════════════════════════════════════════════════════════════════════════
-    if (Array.isArray(shots) && shots.length > 0) {
-      const jobId = crypto.randomUUID()
+    if (movieError) throw new Error('Failed to create movie: ' + movieError.message)
 
-      // Configurable shot count for testing (default 4: face 1,3 + scene 2,4)
-      const maxShots: number = typeof shotCount === 'number' && shotCount > 0 ? shotCount : 4
-      const isTestMode = story.includes('[test]') || maxShots < shots.length
-      const limitedShots = isTestMode ? (shots as Shot[]).slice(0, maxShots) : (shots as Shot[])
-      console.log('[movie/generate] Multi-shot mode, jobId:', jobId, 'shots:', shots.length, 'maxShots:', maxShots, 'testMode:', isTestMode)
+    console.log('[movie/generate] movie created:', movie.id)
 
-      // Submit face shots first (critical path), then scene shots
-      const faceShots = limitedShots.filter(s => (s.type ?? 'face') === 'face')
-      const sceneShots = limitedShots.filter(s => s.type === 'scene')
-      const orderedShots = [...faceShots, ...sceneShots]
-      console.log('[movie/generate] Submission order: face shots first:', faceShots.length, 'then scene shots:', sceneShots.length)
-
-      for (const [idx, shot] of orderedShots.entries()) {
-        const shotIndex = shot.shot_index ?? (shot as { shotNumber?: number }).shotNumber ?? (idx + 1)
-        const shotType = shot.type ?? 'face'
-        // ── STEP 2: Use Cognitive Core data if available ──────────────────
-        const cogShot: CognitiveShot | undefined = cognitiveShots[shotIndex - 1] ?? cognitiveShots[idx]
-        const shotText = shot.dialogue ?? cogShot?.dialogue ?? shot.text ?? ''
-        const shotScene = shot.scenePrompt ?? cogShot?.scenePrompt ?? shot.description ?? cogShot?.description ?? shot.scene ?? (template && scenePrompts[template as string] ? scenePrompts[template as string] : story)
-        const shotDuration = shot.duration ?? cogShot?.duration ?? 10
-        const shotNarrative = shot.narrative ?? null
-
-        console.log('[movie/generate] Processing shot', shotIndex, 'type:', shotType)
-
-        // BUG 1: Check if this shot already exists for this movie to prevent duplicate submissions
-        const { data: existingShot } = await supabase
-          .from('movie_shots')
-          .select('id, kling_task_id, status')
-          .eq('movie_id', jobId)
-          .eq('shot_index', shotIndex)
-          .single()
-
-        if (existingShot) {
-          console.log('[movie/generate] Shot', shotIndex, 'already exists (status:', existingShot.status, '), skipping submission')
-          continue
-        }
-
-        if (shotType === 'face') {
-          // ── FACE SHOT: TTS audio + twin frame image (NO OmniHuman) ──────────
-          // Final video = FFmpeg merge of (twin.frame_url_mid + TTS audio)
-          // handled by Railway FFmpeg service via the worker
-          let audioUrl: string | null = null
-          if (elevenKey && shotText) {
-            audioUrl = await generateAudioUrl(shotText, supabase, elevenKey, voiceId)
-            console.log('[movie/generate] Shot', shotIndex, 'audioUrl:', audioUrl)
-          } else {
-            console.warn('[movie/generate] Skipping TTS for shot', shotIndex, '- no key or text')
-          }
-
-          // Insert into movie_shots - store twin frame as twin_frame_url so worker
-          // can merge frame image + audio via Railway FFmpeg /merge-audio
-          // status='submitted' so worker picks it up
-          try {
-            const { error: insertErr } = await supabase.from('movie_shots').insert({
-              movie_id: jobId,
-              shot_index: shotIndex,
-              shot_type: 'face',
-              kling_task_id: null,
-              audio_url: audioUrl,
-              twin_frame_url: twin.source_video_url || twin.frame_url_mid,
-              narrative: shotNarrative,
-              status: 'submitted',
-              user_id: userId,
-              created_at: new Date().toISOString(),
-            })
-            if (insertErr) {
-              console.error('[movie/generate] movie_shots insert failed for shot', shotIndex, ':', insertErr.message)
-            } else {
-              console.log('[movie/generate] movie_shots insert SUCCESS for face shot', shotIndex)
-            }
-          } catch (dbErr) {
-            console.error('[movie/generate] movie_shots insert FATAL for shot', shotIndex, ':', dbErr instanceof Error ? dbErr.message : dbErr)
-          }
-
-        } else {
-          // ── SCENE SHOT: Kling only ───────────────────────────────────────────
-          const klingTaskId = await submitKling(shotScene, piApiKey, shotDuration)
-          console.log('[movie/generate] Scene shot', shotIndex, 'kling_task_id:', klingTaskId)
-
-          try {
-            const { error: insertErr } = await supabase.from('movie_shots').insert({
-              movie_id: jobId,
-              shot_index: shotIndex,
-              shot_type: 'scene',
-              kling_task_id: klingTaskId,
-              audio_url: null,
-              narrative: shotNarrative,
-              status: 'submitted',
-              user_id: userId,
-              created_at: new Date().toISOString(),
-            })
-            if (insertErr) {
-              console.error('[movie/generate] movie_shots insert failed for scene shot', shotIndex, ':', insertErr.message)
-            } else {
-              console.log('[movie/generate] movie_shots insert SUCCESS for scene shot', shotIndex)
-            }
-          } catch (dbErr) {
-            console.error('[movie/generate] movie_shots insert FATAL for scene shot', shotIndex, ':', dbErr instanceof Error ? dbErr.message : dbErr)
-          }
+    // Step 6: Call Kling 3.0 Omni - ONE API call
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const klingBody: any = {
+      model: 'kling',
+      task_type: 'omni_video_generation',
+      input: {
+        version: '3.0',
+        resolution: '720p',
+        aspect_ratio: '9:16',
+        enable_audio: true,
+        multi_shots: multiShots
+      },
+      config: {
+        service_mode: 'public',
+        webhook_config: {
+          endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
+          secret: ''
         }
       }
-
-      return NextResponse.json({ movieId: jobId, totalShots: (shots as Shot[]).length })
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // SINGLE-VIDEO FALLBACK (original logic)
-    // ════════════════════════════════════════════════════════════════════════
-    console.log('[movie/generate] Single-video fallback mode')
-
-    // ElevenLabs TTS — first sentence of story
-    const firstSentence = story.split(/[.!?]/)[0].trim().slice(0, 300) || story.slice(0, 300)
-    console.log('[movie/generate] TTS text:', firstSentence)
-
-    let audioUrl: string | null = null
-    try {
-      if (elevenKey) {
-        const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: 'POST',
-          headers: { 'xi-api-key': elevenKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: firstSentence,
-            model_id: 'eleven_turbo_v2_5',
-            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-          }),
-        })
-
-        if (ttsRes.ok) {
-          console.log('[movie/generate] ElevenLabs response headers:', Object.fromEntries(ttsRes.headers.entries()))
-          const audioBuffer = Buffer.from(await ttsRes.arrayBuffer())
-          console.log('[movie/generate] TTS audio buffer size:', audioBuffer.length, 'bytes')
-          if (audioBuffer.length < 100) {
-            console.error('[movie/generate] TTS audio buffer too small, likely invalid')
-            throw new Error('TTS audio buffer invalid')
-          }
-          const audioPath = `tmp/tts_${Date.now()}.mp3`
-          const { data: uploadData, error: uploadErr } = await supabase.storage
-            .from('recordings')
-            .upload(audioPath, audioBuffer, {
-              contentType: 'audio/mpeg',
-              upsert: false,
-              cacheControl: '3600',
-            })
-
-          if (!uploadErr && uploadData) {
-            audioUrl = supabase.storage.from('recordings').getPublicUrl(uploadData.path).data.publicUrl
-            console.log('[movie/generate] TTS audioUrl:', audioUrl)
-          } else {
-            console.warn('[movie/generate] TTS upload failed:', uploadErr?.message)
-            console.error('[movie/generate] TTS upload full error:', JSON.stringify(uploadErr, null, 2))
-            console.log('[movie/generate] TTS upload bucket: recordings, path:', audioPath)
-          }
-        } else {
-          const errText = await ttsRes.text()
-          console.warn('[movie/generate] ElevenLabs TTS failed:', ttsRes.status, errText)
-        }
-      } else {
-        console.warn('[movie/generate] ELEVENLABS_API_KEY not set')
-      }
-    } catch (ttsErr) {
-      console.warn('[movie/generate] TTS error (non-fatal):', ttsErr instanceof Error ? ttsErr.message : ttsErr)
+    // Add digital twin references
+    if (twin.frame_url_mid) {
+      klingBody.input.images = [twin.frame_url_mid]
+    }
+    if (twin.source_video_url) {
+      klingBody.input.video = twin.source_video_url
     }
 
-    if (!audioUrl) {
-      return NextResponse.json({ error: 'Failed to generate dialogue audio' }, { status: 500 })
+    const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.PIAPI_API_KEY!,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(klingBody)
+    })
+
+    const klingData = await klingRes.json()
+    const taskId = klingData?.data?.task_id
+
+    console.log('[movie/generate] Kling task_id:', taskId)
+
+    if (!taskId) {
+      throw new Error('Kling task creation failed: ' + JSON.stringify(klingData).slice(0, 200))
     }
 
-    // suppress unused warning
-    void sessionId
+    // Step 7: Update movie with task_id
+    await supabase
+      .from('movies')
+      .update({
+        kling_task_id: taskId,
+        status: 'processing'
+      })
+      .eq('id', movie.id)
 
-    // Single-video fallback: return frame + audio for FFmpeg merge by caller
-    return NextResponse.json({ success: true, audioUrl, frameUrl })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[movie/generate] FATAL:', message)
+    return NextResponse.json({
+      success: true,
+      movieId: movie.id,
+      taskId,
+      tier,
+      message: 'Your movie is being created. This takes 2-5 minutes.'
+    })
+
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[movie/generate] ERROR:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
