@@ -1253,6 +1253,171 @@ export const NEW_ARCHETYPES = [
       { shot: 7, emotion: "peace", intensity: 5, type: "scene" },
       { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
     ]
+  },
+  {
+    archetype: "pet_daily",
+    keywords: ["猫", "狗", "宠物", "cute", "cat", "dog"],
+    category: "funny",
+    description: "宠物日常的可爱与治愈瞬间",
+    blueprint: ["平静日常", "宠物行为", "互动", "反应", "高潮", "余韵"],
+    symbolObjects: ["宠物", "玩具", "零食", "主人表情"],
+    forbiddenElements: ["沉重情绪", "哲学抽象"],
+    musicArc: "轻→温暖→明亮",
+    dialogueStyle: "轻松+温柔",
+    klingPrompts: {
+      hookShot: "ECU, cute pet face or paw, bright natural light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, warm smile watching pet, natural light, cinematic 9:16",
+      sceneShot: "cozy home environment with pet toys, warm light, cinematic 9:16",
+      peakShot: "ECU, @image_1, pure joy and affection, cinematic 9:16",
+      endingShot: "WS, @image_1 and pet together, music fade, cinematic 9:16",
+      buildShot: "MS, pet doing cute behavior, natural light, cinematic 9:16",
+      conflictShot: "ECU, @image_1, amused reaction, cinematic 9:16",
+      silenceShot: "WS, pet resting peacefully, static, cinematic 9:16",
+      symbolShot: "ECU, pet face close-up, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1 playing with pet, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "calm", intensity: 3, type: "scene" },
+      { shot: 2, emotion: "delight", intensity: 6, type: "face" },
+      { shot: 3, emotion: "warmth", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "joy", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_cuteness", intensity: 10, type: "face" },
+      { shot: 6, emotion: "affection", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "warmth", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "food_explore",
+    keywords: ["美食", "food", "restaurant", "吃"],
+    category: "lifestyle",
+    description: "探索美食的惊喜与满足感",
+    blueprint: ["期待", "发现", "品尝", "惊喜", "高潮", "余韵"],
+    symbolObjects: ["食物特写", "餐厅环境", "表情", "筷子/叉子"],
+    forbiddenElements: ["沉重情绪", "哲学抽象"],
+    musicArc: "轻→渐强→满足",
+    dialogueStyle: "轻松+真实",
+    klingPrompts: {
+      hookShot: "ECU, beautiful food dish, warm appetizing light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, anticipation and hunger, warm light, cinematic 9:16",
+      sceneShot: "restaurant or food environment, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, first bite reaction, pure satisfaction, cinematic 9:16",
+      endingShot: "ECU, food close-up hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, approaching food or ordering, cinematic 9:16",
+      conflictShot: "ECU, @image_1, deciding what to eat, cinematic 9:16",
+      silenceShot: "WS, empty restaurant or food stall, static, cinematic 9:16",
+      symbolShot: "ECU, signature dish or ingredient, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, enjoying meal, natural light, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "anticipation", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "curiosity", intensity: 6, type: "face" },
+      { shot: 3, emotion: "discovery", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "delight", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_satisfaction", intensity: 10, type: "face" },
+      { shot: 6, emotion: "contentment", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "warmth", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "quick_emotion_hit",
+    keywords: ["感动", "泪目", "emotional"],
+    category: "emotional",
+    description: "快速触动情绪的瞬间感动",
+    blueprint: ["平静", "触发", "情绪涌动", "高潮", "余韵"],
+    symbolObjects: ["细节物件", "眼神", "手势", "光线"],
+    forbiddenElements: ["拖沓叙事", "过度解释"],
+    musicArc: "低→快速渐强→情绪爆发→余韵",
+    dialogueStyle: "极简+有力",
+    klingPrompts: {
+      hookShot: "ECU, emotionally charged object or gesture, dramatic light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, sudden emotional wave, cinematic 9:16",
+      sceneShot: "meaningful environment detail, soft light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, tears or overwhelmed expression, cinematic 9:16",
+      endingShot: "ECU, symbolic object hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, receiving or witnessing moment, cinematic 9:16",
+      conflictShot: "ECU, @image_1, trying to hold back emotion, cinematic 9:16",
+      silenceShot: "WS, quiet meaningful space, static, cinematic 9:16",
+      symbolShot: "ECU, key emotional object, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, emotional release, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "calm", intensity: 2, type: "scene" },
+      { shot: 2, emotion: "trigger", intensity: 6, type: "face" },
+      { shot: 3, emotion: "emotion_rising", intensity: 8, type: "face" },
+      { shot: 4, emotion: "peak_emotion", intensity: 10, type: "face" },
+      { shot: 5, emotion: "release", intensity: 9, type: "face" },
+      { shot: 6, emotion: "warmth", intensity: 7, type: "scene" },
+      { shot: 7, emotion: "stillness", intensity: 4, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 2, type: "scene" }
+    ]
+  },
+  {
+    archetype: "viral_loop_prank",
+    keywords: ["整蛊", "viral", "prank"],
+    category: "funny",
+    description: "病毒式传播的整蛊与搞笑循环",
+    blueprint: ["设局", "触发", "反应爆发", "循环升级", "高潮", "笑场"],
+    symbolObjects: ["道具", "受害者表情", "循环动作", "旁观者"],
+    forbiddenElements: ["严肃处理", "无笑点"],
+    musicArc: "轻→增强→爆发→循环",
+    dialogueStyle: "简短+爆笑",
+    klingPrompts: {
+      hookShot: "ECU, prank setup with viral potential, bright light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, mischievous anticipation, natural light, cinematic 9:16",
+      sceneShot: "prank environment ready, bright light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, explosive laughter reaction, cinematic 9:16",
+      endingShot: "WS, everyone laughing, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, setting up the loop, cinematic 9:16",
+      conflictShot: "ECU, victim's shocked face, cinematic 9:16",
+      silenceShot: "WS, calm before the prank, static, cinematic 9:16",
+      symbolShot: "ECU, prank prop or trigger object, cinematic 9:16",
+      transitionShot: "MS, reaction chain shot, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "mischief", intensity: 7, type: "scene" },
+      { shot: 2, emotion: "anticipation", intensity: 8, type: "face" },
+      { shot: 3, emotion: "trigger", intensity: 9, type: "scene" },
+      { shot: 4, emotion: "shock", intensity: 10, type: "face" },
+      { shot: 5, emotion: "chaos", intensity: 10, type: "scene" },
+      { shot: 6, emotion: "laughter", intensity: 9, type: "face" },
+      { shot: 7, emotion: "playful", intensity: 7, type: "scene" },
+      { shot: 8, emotion: "joy", intensity: 5, type: "face" }
+    ]
+  },
+  {
+    archetype: "relatable_micro_drama",
+    keywords: ["共鸣", "日常", "relationship", "drama"],
+    category: "drama",
+    description: "日常关系中的微小戏剧与共鸣瞬间",
+    blueprint: ["日常场景", "小摩擦", "情绪升温", "转折", "共鸣高潮", "余韵"],
+    symbolObjects: ["日常物件", "眼神交流", "沉默", "小动作"],
+    forbiddenElements: ["过度戏剧化", "无共鸣感"],
+    musicArc: "低→渐强→共鸣高潮→余韵",
+    dialogueStyle: "真实+简短",
+    klingPrompts: {
+      hookShot: "ECU, everyday relatable object or situation, natural light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, relatable mixed emotion, natural light, cinematic 9:16",
+      sceneShot: "familiar everyday environment, natural light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak relatable emotion, cinematic 9:16",
+      endingShot: "WS, everyday scene hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, in relatable situation, cinematic 9:16",
+      conflictShot: "ECU, @image_1, small tension expression, cinematic 9:16",
+      silenceShot: "WS, quiet everyday space, static, cinematic 9:16",
+      symbolShot: "ECU, relatable everyday object, natural light, cinematic 9:16",
+      transitionShot: "MS, @image_1, moment of realization, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "familiar", intensity: 3, type: "scene" },
+      { shot: 2, emotion: "recognition", intensity: 5, type: "face" },
+      { shot: 3, emotion: "tension", intensity: 6, type: "scene" },
+      { shot: 4, emotion: "relatability", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_resonance", intensity: 10, type: "face" },
+      { shot: 6, emotion: "understanding", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "warmth", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
   }
 ]
 
@@ -1326,6 +1491,13 @@ export function matchArchetypeExtended(story: string): string {
   if (["异地", "思念"].some(k => s.includes(k))) return "longing_distance"
   if (["自我", "觉醒"].some(k => s.includes(k))) return "self_discovery"
   if (["放下", "释怀"].some(k => s.includes(k))) return "letting_go"
+
+  // Entry layer archetypes
+  if (["猫", "狗", "宠物", "cute", "cat", "dog"].some(k => s.includes(k))) return "pet_daily"
+  if (["美食", "food", "restaurant", "吃"].some(k => s.includes(k))) return "food_explore"
+  if (["感动", "泪目", "emotional"].some(k => s.includes(k))) return "quick_emotion_hit"
+  if (["整蛊", "viral", "prank"].some(k => s.includes(k))) return "viral_loop_prank"
+  if (["共鸣", "日常", "relationship", "drama"].some(k => s.includes(k))) return "relatable_micro_drama"
 
   // Original archetypes
   const triggers = [
