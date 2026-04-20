@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { DIRECTOR_BRAIN } from './director-brain'
 import { EMOTION_ARCHETYPES, DURATION_FORMULAS, matchArchetype } from './emotion-archetypes'
 import { SYMBOL_OBJECTS, SUBTEXT_TEMPLATES, EMOTION_TRANSITIONS, HOOK_FORMULAS, ENDING_FORMULAS } from './director-knowledge'
+import { getKlingTemplate, getEmotionProgression, DIRECTOR_SELF_CHECK } from './film-os'
 
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
@@ -169,7 +170,14 @@ OUTPUT FORMAT (strict JSON, no other text):
   return JSON.parse(clean)
 }
 
-async function runDirector(producerOutput: ProducerOutput, template: string, archetypeName: string, shotDurations: number[]): Promise<DirectionPlan> {
+async function runDirector(
+  producerOutput: ProducerOutput,
+  template: string,
+  archetypeName: string,
+  shotDurations: number[],
+  klingTemplate: ReturnType<typeof getKlingTemplate>,
+  emotionCurve: ReturnType<typeof getEmotionProgression>
+): Promise<DirectionPlan> {
   const { visual_constraints, emotion_profile } = producerOutput
   const abstractionLevel = emotion_profile.abstraction_level
 
@@ -218,6 +226,19 @@ ${ENDING_FORMULAS.map(e => `${e.type}: ${e.description} | music: ${e.music} | ex
 
 EMOTION TRANSITIONS (use when shifting between emotions):
 ${EMOTION_TRANSITIONS.map(t => `${t.from}→${t.to}: ${t.transition} | camera: ${t.camera} | ${t.duration}`).join('\n')}
+
+EMOTION PROGRESSION (follow this curve exactly):
+${emotionCurve.map(s => `Shot ${s.shot}: ${s.emotion} intensity:${s.intensity} type:${s.type}`).join('\n')}
+
+KLING PROMPT TEMPLATES (use these for each shot):
+hookShot: ${klingTemplate.hookShot}
+faceShot: ${klingTemplate.faceShot}
+sceneShot: ${klingTemplate.sceneShot}
+peakShot: ${klingTemplate.peakShot}
+endingShot: ${klingTemplate.endingShot}
+
+DIRECTOR SELF-CHECK (avoid these errors):
+${DIRECTOR_SELF_CHECK.map(c => `ERROR: ${c.error} | FIX: ${c.fix} | WRONG: "${c.example.wrong}" → CORRECT: "${c.example.correct}"`).join('\n')}
 
 ProducerOutput: ${JSON.stringify(producerOutput)}
 Template: "${template}"
@@ -446,10 +467,13 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const tier = '60s' // default tier; can be parameterized later
   const durationFormula = DURATION_FORMULAS[tier] || DURATION_FORMULAS['60s']
   const shotDurations = durationFormula.distribution
+  const klingTemplate = getKlingTemplate(archetypeName)
+  const emotionCurve = getEmotionProgression(archetypeName)
   console.log('[CognitiveCore] archetype:', archetypeName, '| shotDurations:', shotDurations)
+  console.log('[CognitiveCore] klingTemplate hookShot:', klingTemplate.hookShot.slice(0, 60))
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations)
+  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve)
 
   console.log('[CognitiveCore] Checking reality anchors...')
   checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)

@@ -1,0 +1,426 @@
+export const KLING_PROMPT_TEMPLATES = [
+  {
+    archetype: "late_regret",
+    klingPrompts: {
+      hookShot: "ECU, slow push-in, cold dinner plate or empty chair, cold blue light, no people, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, restrained grief, trembling breath, cold side light, cinematic 9:16",
+      sceneShot: "empty chair, static camera, cold blue light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, tears forming but held back, minimal movement, cinematic 9:16",
+      endingShot: "WS or ECU, empty chair hold 5s, music fade, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "playful_chaos",
+    klingPrompts: {
+      hookShot: "ECU, fast motion, object falling mid-air, bright light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, amused frustration, slight smile, natural light, cinematic 9:16",
+      sceneShot: "messy floor with scattered objects, static camera, bright light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, sudden reaction, raised eyebrow, cinematic 9:16",
+      endingShot: "WS, messy room frozen, music fade, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "unspoken_love",
+    klingPrompts: {
+      hookShot: "ECU, two hands almost touching, warm soft light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, hesitant eyes, soft breath, warm light, cinematic 9:16",
+      sceneShot: "empty space between two chairs, static, warm dim light, cinematic 9:16",
+      peakShot: "ECU, @image_1, eye contact breaking, subtle tension, cinematic 9:16",
+      endingShot: "WS, empty seat, fade out, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "lonely_reflection",
+    klingPrompts: {
+      hookShot: "WS, single figure small in frame, dim light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, distant gaze, neutral expression, cinematic 9:16",
+      sceneShot: "empty room, static camera, desaturated light, cinematic 9:16",
+      peakShot: "ECU, @image_1, eyes unfocused, slight breath, cinematic 9:16",
+      endingShot: "WS, figure fades into space, music fade, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "heartbreak",
+    klingPrompts: {
+      hookShot: "ECU, phone dropped, sharp sound, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, silent crying, cinematic 9:16",
+      sceneShot: "empty room, static, cold light, cinematic 9:16",
+      peakShot: "ECU, @image_1, tear falls, cinematic 9:16",
+      endingShot: "WS, empty room hold, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "hope",
+    klingPrompts: {
+      hookShot: "WS, light entering dark space, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, subtle uplift, cinematic 9:16",
+      sceneShot: "window light beam, static, warm tone, cinematic 9:16",
+      peakShot: "ECU, @image_1, eyes reflect light, cinematic 9:16",
+      endingShot: "WS, bright space, fade, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "nostalgia",
+    klingPrompts: {
+      hookShot: "ECU, old photo with dust, warm faded light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, soft smile with sadness, cinematic 9:16",
+      sceneShot: "old object on table, slow pan feel, warm light, cinematic 9:16",
+      peakShot: "ECU, @image_1, eyes soften, cinematic 9:16",
+      endingShot: "ECU, object hold, music fade, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "betrayal",
+    klingPrompts: {
+      hookShot: "ECU, eyes widen suddenly, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, shocked expression, cinematic 9:16",
+      sceneShot: "cold empty environment, cinematic 9:16",
+      peakShot: "ECU, @image_1, disbelief freeze, cinematic 9:16",
+      endingShot: "WS, distance grows, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "growth",
+    klingPrompts: {
+      hookShot: "WS, standing still before movement, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, determined gaze, cinematic 9:16",
+      sceneShot: "path forward, cinematic 9:16",
+      peakShot: "ECU, @image_1, focused intensity, cinematic 9:16",
+      endingShot: "WS, moving forward, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "bittersweet",
+    klingPrompts: {
+      hookShot: "ECU, faint smile with tension, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, mixed emotion, cinematic 9:16",
+      sceneShot: "fading light scene, cinematic 9:16",
+      peakShot: "ECU, @image_1, smile fades, cinematic 9:16",
+      endingShot: "WS, lingering light, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "acceptance",
+    klingPrompts: {
+      hookShot: "ECU, object placed down slowly, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, calm expression, cinematic 9:16",
+      sceneShot: "still environment, cinematic 9:16",
+      peakShot: "ECU, @image_1, quiet exhale, cinematic 9:16",
+      endingShot: "WS, peaceful frame, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "tension",
+    klingPrompts: {
+      hookShot: "ECU, still face with slight twitch, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, intense stare, cinematic 9:16",
+      sceneShot: "dark static space, cinematic 9:16",
+      peakShot: "ECU, @image_1, breath held, cinematic 9:16",
+      endingShot: "WS, silence hold, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "comfort",
+    klingPrompts: {
+      hookShot: "ECU, hand resting gently, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, relaxed face, cinematic 9:16",
+      sceneShot: "soft environment, cinematic 9:16",
+      peakShot: "ECU, @image_1, relief exhale, cinematic 9:16",
+      endingShot: "WS, calm space, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "reconciliation",
+    klingPrompts: {
+      hookShot: "ECU, two hands close but not touching, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, soft emotional release, cinematic 9:16",
+      sceneShot: "shared space, warm light, cinematic 9:16",
+      peakShot: "ECU, @image_1, slight smile through emotion, cinematic 9:16",
+      endingShot: "WS, calm shared frame, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "sacrifice",
+    klingPrompts: {
+      hookShot: "ECU, object in hand, hesitation, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, quiet resolve, cinematic 9:16",
+      sceneShot: "object left behind, cinematic 9:16",
+      peakShot: "ECU, @image_1, decision moment, cinematic 9:16",
+      endingShot: "WS, empty space, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "despair",
+    klingPrompts: {
+      hookShot: "black frame then faint object, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, empty expression, cinematic 9:16",
+      sceneShot: "dark room, static, cinematic 9:16",
+      peakShot: "ECU, @image_1, frozen face, cinematic 9:16",
+      endingShot: "black frame hold, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "revenge",
+    klingPrompts: {
+      hookShot: "ECU, intense eye, hard shadow light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, cold stare, minimal emotion, cinematic 9:16",
+      sceneShot: "dark environment, sharp contrast lighting, cinematic 9:16",
+      peakShot: "ECU, @image_1, micro expression shift, cinematic 9:16",
+      endingShot: "WS, subject walks away into darkness, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "panic",
+    klingPrompts: {
+      hookShot: "ECU, rapid eye movement, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, panic expression, cinematic 9:16",
+      sceneShot: "chaotic blur, cinematic 9:16",
+      peakShot: "ECU, @image_1, breaking point, cinematic 9:16",
+      endingShot: "WS, collapse, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "curiosity",
+    klingPrompts: {
+      hookShot: "ECU, mysterious object, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, focused eyes, cinematic 9:16",
+      sceneShot: "object reveal, cinematic 9:16",
+      peakShot: "ECU, @image_1, realization, cinematic 9:16",
+      endingShot: "ECU, object hold, cinematic 9:16"
+    }
+  },
+  {
+    archetype: "awkward_silence",
+    klingPrompts: {
+      hookShot: "ECU, slight eye movement, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, hesitation, cinematic 9:16",
+      sceneShot: "empty table, cinematic 9:16",
+      peakShot: "ECU, @image_1, awkward pause, cinematic 9:16",
+      endingShot: "WS, unresolved silence, cinematic 9:16"
+    }
+  }
+]
+
+export const EMOTION_PROGRESSIONS = [
+  { archetype: "late_regret", emotionCurve: [
+    { shot: 1, emotion: "calm", intensity: 2, type: "scene" },
+    { shot: 2, emotion: "unease", intensity: 4, type: "face" },
+    { shot: 3, emotion: "grief", intensity: 6, type: "scene" },
+    { shot: 4, emotion: "grief", intensity: 8, type: "face" },
+    { shot: 5, emotion: "grief", intensity: 10, type: "face" },
+    { shot: 6, emotion: "release", intensity: 5, type: "scene" },
+    { shot: 7, emotion: "silence", intensity: 3, type: "scene" },
+    { shot: 8, emotion: "silence", intensity: 1, type: "scene" }
+  ]},
+  { archetype: "playful_chaos", emotionCurve: [
+    { shot: 1, emotion: "surprise", intensity: 7, type: "scene" },
+    { shot: 2, emotion: "chaos", intensity: 8, type: "scene" },
+    { shot: 3, emotion: "reaction", intensity: 6, type: "face" },
+    { shot: 4, emotion: "confrontation", intensity: 9, type: "face" },
+    { shot: 5, emotion: "amusement", intensity: 10, type: "face" },
+    { shot: 6, emotion: "playful", intensity: 7, type: "scene" },
+    { shot: 7, emotion: "calm", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "smile", intensity: 3, type: "face" }
+  ]},
+  { archetype: "unspoken_love", emotionCurve: [
+    { shot: 1, emotion: "tension", intensity: 3, type: "scene" },
+    { shot: 2, emotion: "longing", intensity: 5, type: "face" },
+    { shot: 3, emotion: "hesitation", intensity: 7, type: "face" },
+    { shot: 4, emotion: "yearning", intensity: 9, type: "scene" },
+    { shot: 5, emotion: "peak_longing", intensity: 10, type: "face" },
+    { shot: 6, emotion: "withdrawal", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "silence", intensity: 3, type: "scene" },
+    { shot: 8, emotion: "absence", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "lonely_reflection", emotionCurve: [
+    { shot: 1, emotion: "isolation", intensity: 4, type: "scene" },
+    { shot: 2, emotion: "emptiness", intensity: 5, type: "face" },
+    { shot: 3, emotion: "loneliness", intensity: 7, type: "scene" },
+    { shot: 4, emotion: "introspection", intensity: 8, type: "face" },
+    { shot: 5, emotion: "peak_loneliness", intensity: 10, type: "face" },
+    { shot: 6, emotion: "acceptance", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "stillness", intensity: 3, type: "scene" },
+    { shot: 8, emotion: "void", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "heartbreak", emotionCurve: [
+    { shot: 1, emotion: "shock", intensity: 8, type: "scene" },
+    { shot: 2, emotion: "disbelief", intensity: 7, type: "face" },
+    { shot: 3, emotion: "pain", intensity: 9, type: "face" },
+    { shot: 4, emotion: "grief", intensity: 10, type: "face" },
+    { shot: 5, emotion: "collapse", intensity: 9, type: "scene" },
+    { shot: 6, emotion: "emptiness", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "silence", intensity: 3, type: "scene" },
+    { shot: 8, emotion: "void", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "hope", emotionCurve: [
+    { shot: 1, emotion: "darkness", intensity: 3, type: "scene" },
+    { shot: 2, emotion: "stirring", intensity: 5, type: "face" },
+    { shot: 3, emotion: "discovery", intensity: 6, type: "scene" },
+    { shot: 4, emotion: "determination", intensity: 8, type: "face" },
+    { shot: 5, emotion: "breakthrough", intensity: 10, type: "face" },
+    { shot: 6, emotion: "light", intensity: 8, type: "scene" },
+    { shot: 7, emotion: "calm_hope", intensity: 5, type: "scene" },
+    { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+  ]},
+  { archetype: "nostalgia", emotionCurve: [
+    { shot: 1, emotion: "trigger", intensity: 4, type: "scene" },
+    { shot: 2, emotion: "recognition", intensity: 5, type: "face" },
+    { shot: 3, emotion: "memory", intensity: 7, type: "scene" },
+    { shot: 4, emotion: "longing", intensity: 8, type: "face" },
+    { shot: 5, emotion: "peak_nostalgia", intensity: 10, type: "face" },
+    { shot: 6, emotion: "bittersweet", intensity: 7, type: "scene" },
+    { shot: 7, emotion: "return", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "betrayal", emotionCurve: [
+    { shot: 1, emotion: "shock", intensity: 9, type: "face" },
+    { shot: 2, emotion: "disbelief", intensity: 8, type: "face" },
+    { shot: 3, emotion: "realization", intensity: 10, type: "scene" },
+    { shot: 4, emotion: "pain", intensity: 9, type: "face" },
+    { shot: 5, emotion: "cold", intensity: 7, type: "scene" },
+    { shot: 6, emotion: "distance", intensity: 5, type: "scene" },
+    { shot: 7, emotion: "silence", intensity: 3, type: "scene" },
+    { shot: 8, emotion: "void", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "growth", emotionCurve: [
+    { shot: 1, emotion: "struggle", intensity: 4, type: "scene" },
+    { shot: 2, emotion: "effort", intensity: 6, type: "face" },
+    { shot: 3, emotion: "setback", intensity: 5, type: "scene" },
+    { shot: 4, emotion: "resolve", intensity: 8, type: "face" },
+    { shot: 5, emotion: "breakthrough", intensity: 10, type: "face" },
+    { shot: 6, emotion: "stability", intensity: 7, type: "scene" },
+    { shot: 7, emotion: "calm", intensity: 5, type: "scene" },
+    { shot: 8, emotion: "forward", intensity: 4, type: "scene" }
+  ]},
+  { archetype: "bittersweet", emotionCurve: [
+    { shot: 1, emotion: "joy", intensity: 6, type: "face" },
+    { shot: 2, emotion: "warmth", intensity: 7, type: "scene" },
+    { shot: 3, emotion: "shadow", intensity: 5, type: "scene" },
+    { shot: 4, emotion: "mixed", intensity: 8, type: "face" },
+    { shot: 5, emotion: "peak_mixed", intensity: 10, type: "face" },
+    { shot: 6, emotion: "fading", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "linger", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "acceptance", emotionCurve: [
+    { shot: 1, emotion: "resistance", intensity: 6, type: "face" },
+    { shot: 2, emotion: "exhaustion", intensity: 7, type: "scene" },
+    { shot: 3, emotion: "pause", intensity: 5, type: "face" },
+    { shot: 4, emotion: "surrender", intensity: 8, type: "face" },
+    { shot: 5, emotion: "release", intensity: 10, type: "face" },
+    { shot: 6, emotion: "calm", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "peace", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "tension", emotionCurve: [
+    { shot: 1, emotion: "unease", intensity: 4, type: "scene" },
+    { shot: 2, emotion: "tension", intensity: 6, type: "face" },
+    { shot: 3, emotion: "buildup", intensity: 8, type: "scene" },
+    { shot: 4, emotion: "confrontation", intensity: 9, type: "face" },
+    { shot: 5, emotion: "peak_tension", intensity: 10, type: "face" },
+    { shot: 6, emotion: "explosion", intensity: 9, type: "scene" },
+    { shot: 7, emotion: "aftermath", intensity: 5, type: "scene" },
+    { shot: 8, emotion: "silence", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "comfort", emotionCurve: [
+    { shot: 1, emotion: "pain", intensity: 7, type: "face" },
+    { shot: 2, emotion: "contact", intensity: 6, type: "scene" },
+    { shot: 3, emotion: "understanding", intensity: 7, type: "face" },
+    { shot: 4, emotion: "warmth", intensity: 8, type: "scene" },
+    { shot: 5, emotion: "relief", intensity: 10, type: "face" },
+    { shot: 6, emotion: "calm", intensity: 7, type: "scene" },
+    { shot: 7, emotion: "peace", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "reconciliation", emotionCurve: [
+    { shot: 1, emotion: "distance", intensity: 5, type: "scene" },
+    { shot: 2, emotion: "approach", intensity: 6, type: "face" },
+    { shot: 3, emotion: "hesitation", intensity: 7, type: "face" },
+    { shot: 4, emotion: "expression", intensity: 9, type: "face" },
+    { shot: 5, emotion: "acceptance", intensity: 10, type: "face" },
+    { shot: 6, emotion: "warmth", intensity: 8, type: "scene" },
+    { shot: 7, emotion: "calm", intensity: 5, type: "scene" },
+    { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+  ]},
+  { archetype: "sacrifice", emotionCurve: [
+    { shot: 1, emotion: "weight", intensity: 5, type: "scene" },
+    { shot: 2, emotion: "conflict", intensity: 7, type: "face" },
+    { shot: 3, emotion: "decision", intensity: 9, type: "face" },
+    { shot: 4, emotion: "action", intensity: 10, type: "scene" },
+    { shot: 5, emotion: "cost", intensity: 8, type: "face" },
+    { shot: 6, emotion: "aftermath", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "silence", intensity: 3, type: "scene" },
+    { shot: 8, emotion: "void", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "despair", emotionCurve: [
+    { shot: 1, emotion: "darkness", intensity: 5, type: "scene" },
+    { shot: 2, emotion: "sinking", intensity: 6, type: "face" },
+    { shot: 3, emotion: "stagnation", intensity: 7, type: "scene" },
+    { shot: 4, emotion: "collapse", intensity: 9, type: "face" },
+    { shot: 5, emotion: "peak_despair", intensity: 10, type: "face" },
+    { shot: 6, emotion: "void", intensity: 8, type: "scene" },
+    { shot: 7, emotion: "stillness", intensity: 5, type: "scene" },
+    { shot: 8, emotion: "black", intensity: 1, type: "scene" }
+  ]},
+  { archetype: "revenge", emotionCurve: [
+    { shot: 1, emotion: "cold", intensity: 5, type: "face" },
+    { shot: 2, emotion: "buildup", intensity: 7, type: "scene" },
+    { shot: 3, emotion: "preparation", intensity: 8, type: "face" },
+    { shot: 4, emotion: "execution", intensity: 10, type: "scene" },
+    { shot: 5, emotion: "peak_cold", intensity: 9, type: "face" },
+    { shot: 6, emotion: "aftermath", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "withdrawal", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "darkness", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "panic", emotionCurve: [
+    { shot: 1, emotion: "trigger", intensity: 7, type: "scene" },
+    { shot: 2, emotion: "acceleration", intensity: 8, type: "face" },
+    { shot: 3, emotion: "chaos", intensity: 9, type: "scene" },
+    { shot: 4, emotion: "explosion", intensity: 10, type: "face" },
+    { shot: 5, emotion: "collapse", intensity: 9, type: "face" },
+    { shot: 6, emotion: "aftermath", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "stillness", intensity: 3, type: "scene" },
+    { shot: 8, emotion: "void", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "curiosity", emotionCurve: [
+    { shot: 1, emotion: "discovery", intensity: 4, type: "scene" },
+    { shot: 2, emotion: "approach", intensity: 5, type: "face" },
+    { shot: 3, emotion: "observation", intensity: 6, type: "scene" },
+    { shot: 4, emotion: "engagement", intensity: 8, type: "face" },
+    { shot: 5, emotion: "realization", intensity: 10, type: "face" },
+    { shot: 6, emotion: "understanding", intensity: 7, type: "scene" },
+    { shot: 7, emotion: "pause", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+  ]},
+  { archetype: "awkward_silence", emotionCurve: [
+    { shot: 1, emotion: "tension", intensity: 4, type: "face" },
+    { shot: 2, emotion: "pause", intensity: 5, type: "scene" },
+    { shot: 3, emotion: "avoidance", intensity: 6, type: "face" },
+    { shot: 4, emotion: "peak_awkward", intensity: 8, type: "face" },
+    { shot: 5, emotion: "freeze", intensity: 10, type: "face" },
+    { shot: 6, emotion: "retreat", intensity: 6, type: "scene" },
+    { shot: 7, emotion: "unresolved", intensity: 4, type: "scene" },
+    { shot: 8, emotion: "void", intensity: 2, type: "scene" }
+  ]}
+]
+
+export const DIRECTOR_SELF_CHECK = [
+  { error: "台词解释了画面内容", detection: "dialogue contains description of visible action", fix: "replace with subtext template", example: { wrong: "猫咪把杯子打翻了", correct: "又是你。" } },
+  { error: "没有情绪递进", detection: "emotion intensity flat across shots", fix: "apply emotion progression curve", example: { wrong: "所有镜头情绪一致", correct: "从平静到爆发" } },
+  { error: "缺少视觉焦点", detection: "no clear subject in frame", fix: "force close-up shot", example: { wrong: "杂乱场景", correct: "特写物件" } },
+  { error: "开场无吸引力", detection: "first 2 seconds lack motion or contrast", fix: "replace with hook formula", example: { wrong: "普通开场", correct: "突发动作" } },
+  { error: "结尾太快", detection: "last shot duration < 3s", fix: "extend hold to 5s", example: { wrong: "瞬间结束", correct: "物件停留" } },
+  { error: "镜头重复", detection: "same framing repeated 3 times", fix: "alternate shot types", example: { wrong: "连续特写", correct: "特写+远景" } },
+  { error: "没有象征物", detection: "no symbol object present", fix: "inject symbol object shot", example: { wrong: "纯人物", correct: "加入物件" } },
+  { error: "节奏单一", detection: "all shots same duration", fix: "apply rhythm variation", example: { wrong: "平均切换", correct: "长短结合" } },
+  { error: "情绪过度解释", detection: "dialogue states emotion explicitly", fix: "convert to subtext", example: { wrong: "我很难过", correct: "算了" } },
+  { error: "缺少沉默", detection: "continuous dialogue without pause", fix: "insert silent shot", example: { wrong: "全程说话", correct: "停顿镜头" } }
+]
+
+export function getKlingTemplate(archetype: string) {
+  return KLING_PROMPT_TEMPLATES.find(t => t.archetype === archetype)?.klingPrompts || KLING_PROMPT_TEMPLATES[1].klingPrompts
+}
+
+export function getEmotionProgression(archetype: string) {
+  return EMOTION_PROGRESSIONS.find(p => p.archetype === archetype)?.emotionCurve || EMOTION_PROGRESSIONS[0].emotionCurve
+}
