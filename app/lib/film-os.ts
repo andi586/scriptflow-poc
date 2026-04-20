@@ -1058,6 +1058,8 @@ export const NEW_ARCHETYPES = [
   },
   {
     archetype: "unexpected_reunion",
+    keywords: ["重逢", "reunion"],
+    category: "drama",
     description: "意外重逢的惊喜与情绪涌动",
     blueprint: ["平静日常", "意外相遇", "认出瞬间", "情绪涌动", "高潮", "余韵"],
     symbolObjects: ["熟悉面孔", "旧物", "眼神交汇", "停顿"],
@@ -1089,6 +1091,8 @@ export const NEW_ARCHETYPES = [
   },
   {
     archetype: "fate_turning",
+    keywords: ["命运", "转折"],
+    category: "drama",
     description: "命运转折点的震撼与觉醒",
     blueprint: ["平静", "预兆", "转折触发", "冲击", "觉醒", "新方向"],
     symbolObjects: ["路口", "信件", "电话", "光线变化"],
@@ -1120,6 +1124,8 @@ export const NEW_ARCHETYPES = [
   },
   {
     archetype: "awkward_daily",
+    keywords: ["尴尬", "awkward"],
+    category: "funny",
     description: "日常生活中的尴尬与搞笑瞬间",
     blueprint: ["正常日常", "意外触发", "尴尬升级", "反应", "高潮", "自嘲收场"],
     symbolObjects: ["日常物件", "表情", "旁观者", "失误"],
@@ -1151,6 +1157,8 @@ export const NEW_ARCHETYPES = [
   },
   {
     archetype: "longing_distance",
+    keywords: ["异地", "思念"],
+    category: "emotional",
     description: "远距离思念与跨越距离的爱",
     blueprint: ["分离", "日常思念", "触发回忆", "情绪高潮", "连接瞬间", "余韵"],
     symbolObjects: ["手机", "照片", "窗户", "空椅子"],
@@ -1182,6 +1190,8 @@ export const NEW_ARCHETYPES = [
   },
   {
     archetype: "self_discovery",
+    keywords: ["自我", "觉醒"],
+    category: "emotional",
     description: "自我发现与内心觉醒的旅程",
     blueprint: ["迷失", "触发", "探索", "挣扎", "顿悟", "新生"],
     symbolObjects: ["镜子", "日记", "空旷空间", "光线"],
@@ -1213,6 +1223,8 @@ export const NEW_ARCHETYPES = [
   },
   {
     archetype: "letting_go",
+    keywords: ["放下", "释怀"],
+    category: "emotional",
     description: "放手与告别的释然与成长",
     blueprint: ["执念", "挣扎", "触发", "决定", "放手", "释然"],
     symbolObjects: ["旧物", "信件", "空手", "远去背影"],
@@ -1306,6 +1318,14 @@ export function matchArchetypeExtended(story: string): string {
   if (["圣诞", "christmas"].some(k => s.includes(k))) return "christmas"
   if (["误会", "和解", "误解"].some(k => s.includes(k))) return "misunderstanding_resolved"
   if (["秘密", "揭露", "secret"].some(k => s.includes(k))) return "secret_revealed"
+
+  // Final 6 archetypes
+  if (["重逢", "reunion"].some(k => s.includes(k))) return "unexpected_reunion"
+  if (["命运", "转折"].some(k => s.includes(k))) return "fate_turning"
+  if (["尴尬", "awkward"].some(k => s.includes(k))) return "awkward_daily"
+  if (["异地", "思念"].some(k => s.includes(k))) return "longing_distance"
+  if (["自我", "觉醒"].some(k => s.includes(k))) return "self_discovery"
+  if (["放下", "释怀"].some(k => s.includes(k))) return "letting_go"
 
   // Original archetypes
   const triggers = [
