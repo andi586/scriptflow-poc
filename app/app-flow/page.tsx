@@ -1,8 +1,3 @@
-const safeFileName = `twins/${Date.now()}_photo.jpg`
-const convertedFile = await convertToJpeg(file)
-const safeFileName = `twins/${Date.now()}_photo.jpg`
-const convertedFile = await convertToJpeg(file)
-const safeFileName = `twins/${Date.now()}_photo.jpg`
 "use client";
 
 import {
@@ -1459,34 +1454,13 @@ export default function Home() {
 
   // ─── New movie/generate API call (Heaven Cinema flow) ─────────────────────
   const runHeavenCinemaPipeline = useCallback(async (storyText: string) => {
-    const resolvedTwinId = typeof window !== 'undefined'
+    let resolvedTwinId = typeof window !== 'undefined'
       ? (localStorage.getItem('twinId') || localStorage.getItem('scriptflow_twin_id'))
       : null;
 
     console.log('[app-flow] twinId state:', resolvedTwinId);
     console.log('[app-flow] currentTwinId resolved:', resolvedTwinId);
-// Upload first star photo as digital twin if no twinId
-if (!resolvedTwinId && starPhotos.length > 0) {
-  const photo = starPhotos[0];
-  const blob = await fetch(photo.localUrl).then(r => r.blob());
-  const fileName = `twins/${Date.now()}_photo.jpg`;
-  const { data: uploaded } = await supabase.storage
-    .from('recordings')
-    .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
-  if (uploaded) {
-    const { data: pub } = supabase.storage.from('recordings').getPublicUrl(fileName);
-    const photoUrl = pub.publicUrl;
-    const { data: twin } = await supabase.from('digital_twins').insert({
-      user_id: crypto.randomUUID(),
-      frame_url_mid: photoUrl,
-      is_active: true
-    }).select().single();
-    if (twin) {
-      localStorage.setItem('twinId', twin.id);
-      resolvedTwinId = twin.id;
-    }
-  }
-}
+
 
     if (!resolvedTwinId) {
       setPipelineError('Please upload your photo first');
@@ -1747,7 +1721,7 @@ if (!resolvedTwinId && starPhotos.length > 0) {
                         }}
                         onClick={() => {
                           const story = storyIdeaTextareaRef.current?.value || storyIdea;
-                          void runHeavenCinemaPipeline(story);
+                          void runHeavenCinemaPipeline(storyIdea);
                         }}
                         className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold text-base hover:from-amber-400 hover:to-yellow-300 shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -2110,7 +2084,7 @@ if (!resolvedTwinId && starPhotos.length > 0) {
                         flushSync(() => setStoryIdea(el.value));
                       }
                     }}
-                    onClick={() => void runHeavenCinemaPipeline(story)}
+                    onClick={() => void runHeavenCinemaPipeline(storyIdea)}
                   >
                     {pipelineRunning && !directorModeActive ? "Working on it…" : "Make the Movie ✨"}
                   </Button>
