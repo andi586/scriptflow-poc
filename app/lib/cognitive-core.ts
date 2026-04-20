@@ -1,6 +1,33 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-export interface CinematicEmotion {
+export interface ProducerOutput {
+  mode: 'social' | 'emotional' | 'artistic'
+  story_category: 'pet' | 'grief' | 'love' | 'family' | 'prank' | 'achievement' | 'nostalgia' | 'hope'
+  core_elements: {
+    subject: string
+    action: string
+    characters: string[]
+    tone: 'playful' | 'sad' | 'warm' | 'funny' | 'epic'
+  }
+  visual_constraints: {
+    must_show: string[]
+    forbidden_concepts: string[]
+  }
+  emotion_profile: {
+    primary: string
+    secondary: string
+    abstraction_level: number
+  }
+  narrative_strategy: {
+    structure: string
+    hook: string
+  }
+  music_mood: string
+  dialogue_style: string
+}
+
+// Keep CinematicEmotion as alias for backward compatibility
+export type CinematicEmotion = ProducerOutput & {
   core_emotion: string
   visual_truth: string
   conflict: string
@@ -9,10 +36,8 @@ export interface CinematicEmotion {
   what_film_feels: string
   scene_symbols: string[]
   dialogue_subtext: string
-  music_mood: string
   forbidden_words: string[]
   character_arc: string
-  story_category: 'grief' | 'love' | 'family' | 'pet' | 'prank' | 'achievement' | 'nostalgia' | 'hope'
 }
 
 export interface StoryState {
@@ -69,87 +94,65 @@ export interface CognitiveCoreOutput {
   storyState: StoryState
   directionPlan: DirectionPlan
   executionPlan: ExecutionPlan
-  story_category: CinematicEmotion['story_category']
+  story_category: ProducerOutput['story_category']
 }
 
 const client = new Anthropic()
 
-async function runProducer(userInput: string): Promise<CinematicEmotion> {
+async function runProducer(userInput: string): Promise<ProducerOutput> {
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 4096,
     messages: [{
       role: 'user',
-      content: `You are a master film producer. Your ONLY job is to translate everyday human language into pure cinematic emotion structure.
+      content: `You are a grounded story producer for short-form social video (30-60 seconds).
 
-You are a TRANSLATOR between:
-- What users SAY (everyday language)  
-- What films FEEL (pure emotion, conflict, visual truth)
+Your job is NOT to philosophize or poeticize.
+Your job is to PRESERVE the user's reality and add just enough emotion.
 
-TRANSLATION RULES:
+IRON RULES (violating any = invalid output):
+1. Every entity user mentions MUST appear in output (cat → cat must be in video)
+2. NEVER replace concrete with abstract (cat ≠ "being needed", naughty ≠ "existence")
+3. NO philosophical statements, NO poetic lines, NO narration
+4. Default mode is ALWAYS "social" unless user explicitly requests artistic style
 
-CURRENT MODE: SOCIAL VIDEO (30-60 seconds, TikTok/Instagram style)
+AUTO MODE DETECTION:
+- Input ≤ 15 words + concrete nouns (cat/mom/friend) = mode: "social"
+- Input contains relationship words (miss/years/remember) = mode: "emotional"  
+- Input contains abstract concepts = mode: "artistic"
+- DEFAULT = "social"
 
-MOST IMPORTANT RULE: Keep the user's story LITERAL first.
-- User says 'cat' → CAT must appear in the video
-- User says 'mom' → MOM's presence must be felt
-- User says 'prank' → PRANK must be the focus
-NEVER lose the original subject. NEVER over-philosophize.
-
-Step 1: Understand LITERALLY what happened first.
-Examples:
-- "我的猫咪今天很调皮" → NOT about a cat. ABOUT: warmth, chaos as love, being needed by another living thing
-- "妈妈我想你" → NOT about missing mom. ABOUT: time's cruelty, unfinished conversations, love outlasting death
-- "失恋了" → NOT about a breakup. ABOUT: the version of yourself that no longer exists
-- "儿子今天上学了" → NOT about school. ABOUT: time moving without permission, pride mixed with loss
-
-Step 2: Find the UNIVERSAL HUMAN TRUTH.
-Every story maps to one of these:
-- grief: love and loss, missing someone
-- love: romantic connection, tenderness
-- family: belonging, roots, generational bonds
-- pet: unconditional love, chaos as joy
-- prank: friendship, laughter, inside jokes
-- achievement: triumph, growth, pride
-- nostalgia: time passing, memory, home
-- hope: new beginnings, possibility
-
-Step 3: Find the VISUAL METAPHORS (3-5 physical objects that carry the emotion).
-Examples:
-- longing → empty chair, cold cup of tea, stopped clock
-- cat mischief as love → broken cup, spreading water, cat tail swaying
-- grief → fallen photo frame, wilting flower, rain on window
-- hope → morning light through curtain, open door, sprouting plant
-
-Step 4: Define what must NOT be said (forbidden words/phrases for dialogue).
-These are things too obvious to say - the subtext lives in what's unsaid.
-
-CRITICAL RULE: Never lose the concrete story elements.
-If user mentions a CAT → cat must appear in the film
-If user mentions MOM → mom's presence must be felt in scenes
-If user mentions RAIN → rain must be in the visuals
-
-You can find deeper meaning BUT you cannot erase the original subject.
-
-BAD: User says 'my cat is naughty' → Producer outputs abstract philosophy with no cat
-GOOD: User says 'my cat is naughty' → Producer outputs cat-centered story with deeper meaning (chaos as love, being needed)
+STEP 1: Extract core elements (what user literally said)
+STEP 2: Detect mode (social/emotional/artistic)
+STEP 3: Output ONLY structured JSON
 
 User Input: "${userInput}"
 
-Return ONLY valid JSON matching this interface. No markdown:
+OUTPUT FORMAT (strict JSON, no other text):
 {
-  "core_emotion": "string",
-  "visual_truth": "string",
-  "conflict": "string",
-  "visual_metaphor": ["string", "string", "string"],
-  "what_is_not_said": "string",
-  "what_film_feels": "string",
-  "scene_symbols": ["string", "string", "string"],
-  "dialogue_subtext": "string",
-  "music_mood": "string",
-  "forbidden_words": ["string", "string"],
-  "character_arc": "string",
-  "story_category": "grief|love|family|pet|prank|achievement|nostalgia|hope"
+  "mode": "social",
+  "story_category": "pet|grief|love|family|prank|achievement|nostalgia|hope",
+  "core_elements": {
+    "subject": "the main subject (e.g. cat)",
+    "action": "what happens (e.g. knocks things over)",
+    "characters": ["user", "cat"],
+    "tone": "playful|sad|warm|funny|epic"
+  },
+  "visual_constraints": {
+    "must_show": ["cat", "knocked over objects", "user reaction"],
+    "forbidden_concepts": ["philosophy", "existence", "abstract metaphors"]
+  },
+  "emotion_profile": {
+    "primary": "mischief",
+    "secondary": "affection",
+    "abstraction_level": 0.1
+  },
+  "narrative_strategy": {
+    "structure": "setup → chaos → reaction → smile",
+    "hook": "first 3 seconds must grab attention"
+  },
+  "music_mood": "playful|sad|warm|epic|funny",
+  "dialogue_style": "casual and natural, max 10 words per line"
 }`
     }]
   })
@@ -163,19 +166,36 @@ Return ONLY valid JSON matching this interface. No markdown:
   return JSON.parse(clean)
 }
 
-async function runDirector(cinematicEmotion: CinematicEmotion, template: string): Promise<DirectionPlan> {
+async function runDirector(producerOutput: ProducerOutput, template: string): Promise<DirectionPlan> {
+  const { visual_constraints, emotion_profile } = producerOutput
+  const abstractionLevel = emotion_profile.abstraction_level
+
+  const abstractionGuide = abstractionLevel <= 0.2
+    ? 'abstraction_level is LOW (0.1-0.2): Show REAL objects literally. No symbolism. Cat = actual cat on screen.'
+    : abstractionLevel <= 0.5
+    ? 'abstraction_level is MEDIUM (0.3-0.5): Show real objects with some emotional framing. Cat can be shown with warm lighting.'
+    : 'abstraction_level is HIGH (0.6+): Artistic metaphors allowed. Objects can represent emotions.'
+
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 4096,
     messages: [{
       role: 'user',
       content: `You are a film director trained by Wong Kar-wai, Hirokazu Kore-eda, and Christopher Nolan.
-You receive a CinematicEmotion structure from the Producer and translate it into a shot list.
+You receive a structured ProducerOutput and translate it into a shot list.
 
-You NEVER receive raw user text. You only work with cinematic emotion structures.
-
-CinematicEmotion: ${JSON.stringify(cinematicEmotion)}
+ProducerOutput: ${JSON.stringify(producerOutput)}
 Template: "${template}"
+
+REALITY ANCHOR RULES (MANDATORY):
+- must_show items: ${JSON.stringify(visual_constraints.must_show)}
+  → Every item in must_show MUST appear in at least 1 shot description or scenePrompt
+  → If "cat" is in must_show, cat MUST appear in at least 2 shots
+- forbidden_concepts: ${JSON.stringify(visual_constraints.forbidden_concepts)}
+  → NEVER use these concepts in any shot
+
+ABSTRACTION GUIDE:
+${abstractionGuide}
 
 STRICT CINEMATIC PROTOCOL:
 
@@ -189,30 +209,27 @@ FORBIDDEN in any output:
 - Explaining emotions with words
 - "he feels", "she thinks", "as if", "seems like"
 - Dialogue that describes what is visible on screen
+- Any concept from forbidden_concepts list
 
 DIALOGUE RULES:
 - Maximum 8 words
 - Must have subtext (surface meaning ≠ real meaning)
 - Incomplete sentences preferred
-- Use the visual_metaphors from Producer output
-- Use the scene_symbols from Producer output
-- NEVER use forbidden_words from Producer output
+- Style: ${producerOutput.dialogue_style}
+- NEVER use forbidden_concepts
 
-SCENE SHOT RULES (no people):
-- Use scene_symbols from Producer output as visual anchors
-- Each scene shot = one emotional symbol
-- Camera movement must match emotion (slow push = grief, static = emptiness, drift = confusion)
+SCENE SHOT RULES:
+- Must include must_show items
+- Camera movement must match tone: ${producerOutput.core_elements.tone}
+- Each scene shot = one concrete visual moment
 
 Output ALL text in English only.
-Dialogue must be in English (or the language that fits the character).
 Scene descriptions must be in English with specific physical objects.
 
-EXAMPLE for cat story:
+EXAMPLE for cat story (must_show: cat):
 - Scene shot: 'Overturned glass on white floor, water spreading, cat's paw print at the edge'
 - Dialogue: 'Again... really?' (with a hidden smile)
 - Scene shot: 'Sunlight through window, cat sitting perfectly still, pretending innocence'
-
-Keep the cat/dog/pet VISIBLE in scene shots when story is about pets.
 
 Create 6 shots alternating: face, scene, face, scene, face, scene
 Each shot duration: 2-3 seconds
@@ -230,21 +247,21 @@ Return ONLY valid JSON (no markdown):
       "description": "person speaking",
       "emotion": "tender",
       "shotType": "face",
-      "dialogue": "妈妈... 我想你。"
+      "dialogue": "Again... really?"
     },
     {
       "shotNumber": 2,
       "type": "wide",
       "cameraMovement": "push",
       "duration": 2,
-      "description": "empty room",
-      "emotion": "lonely",
+      "description": "cat next to overturned glass",
+      "emotion": "mischief",
       "shotType": "scene",
-      "scenePrompt": "empty room with warm candlelight, no people, no humans"
+      "scenePrompt": "overturned glass on white floor, water spreading, cat sitting nearby looking innocent, no people"
     }
   ],
-  "pacing": "slow",
-  "emotionalBeats": ["setup", "build", "peak", "release"]
+  "pacing": "fast",
+  "emotionalBeats": ["setup", "chaos", "reaction", "smile"]
 }`
     }]
   })
@@ -258,6 +275,21 @@ Return ONLY valid JSON (no markdown):
   return JSON.parse(clean)
 }
 
+function checkRealityAnchors(plan: DirectionPlan, mustShow: string[]): void {
+  const allText = plan.shots
+    .map(s => `${s.description || ''} ${s.scenePrompt || ''} ${s.dialogue || ''}`)
+    .join(' ')
+    .toLowerCase()
+
+  for (const item of mustShow) {
+    if (!allText.includes(item.toLowerCase())) {
+      console.warn(`[CognitiveCore] Reality anchor MISSING: "${item}" not found in any shot`)
+    } else {
+      console.log(`[CognitiveCore] Reality anchor OK: "${item}" ✓`)
+    }
+  }
+}
+
 const MAX_FACE_CHARS = 20
 
 function validateAndFixFaceShots(plan: DirectionPlan): { plan: DirectionPlan; violations: string[] } {
@@ -267,7 +299,6 @@ function validateAndFixFaceShots(plan: DirectionPlan): { plan: DirectionPlan; vi
     const charCount = shot.dialogue.replace(/\s/g, '').length
     if (charCount > MAX_FACE_CHARS) {
       violations.push(`Shot ${shot.shotNumber}: "${shot.dialogue}" (${charCount} chars > ${MAX_FACE_CHARS} limit)`)
-      // Truncate to first sentence or first MAX_FACE_CHARS chars
       const firstSentence = shot.dialogue.split(/[。！？.!?]/)[0]
       const truncated = firstSentence.length <= MAX_FACE_CHARS
         ? firstSentence + (shot.dialogue.includes('...') ? '...' : '。')
@@ -303,21 +334,27 @@ async function runNEL(directionPlan: DirectionPlan): Promise<ExecutionPlan> {
 
 export async function runCognitiveCore(userInput: string, template: string): Promise<CognitiveCoreOutput> {
   console.log('[CognitiveCore] Starting Producer...')
-  const cinematicEmotion = await runProducer(userInput)
-  console.log('[CognitiveCore] story_category:', cinematicEmotion.story_category)
+  const producerOutput = await runProducer(userInput)
+  console.log('[CognitiveCore] mode:', producerOutput.mode, 'story_category:', producerOutput.story_category)
+  console.log('[CognitiveCore] must_show:', producerOutput.visual_constraints.must_show)
 
-  // Build a StoryState-compatible object from CinematicEmotion for backward compatibility
+  // Build a StoryState-compatible object from ProducerOutput for backward compatibility
   const storyState: StoryState = {
-    world: cinematicEmotion.visual_truth,
-    characters: [{ name: 'protagonist', role: 'main', goal: cinematicEmotion.character_arc, state: cinematicEmotion.core_emotion }],
-    relationships: cinematicEmotion.dialogue_subtext,
-    coreConflict: cinematicEmotion.conflict,
-    narrativeGoal: cinematicEmotion.what_film_feels,
+    world: producerOutput.core_elements.subject,
+    characters: producerOutput.core_elements.characters.map(c => ({
+      name: c, role: c, goal: producerOutput.narrative_strategy.structure, state: producerOutput.emotion_profile.primary
+    })),
+    relationships: producerOutput.dialogue_style,
+    coreConflict: producerOutput.core_elements.action,
+    narrativeGoal: producerOutput.narrative_strategy.hook,
     tensionCurve: ['low', 'medium', 'high', 'peak']
   }
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(cinematicEmotion, template)
+  const rawDirectionPlan = await runDirector(producerOutput, template)
+
+  console.log('[CognitiveCore] Checking reality anchors...')
+  checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
 
   console.log('[CognitiveCore] Validating face shot lengths...')
   const { plan: directionPlan, violations } = validateAndFixFaceShots(rawDirectionPlan)
@@ -331,5 +368,5 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const executionPlan = await runNEL(directionPlan)
 
   console.log('[CognitiveCore] Complete. Total shots:', executionPlan.pipeline.length)
-  return { storyState, directionPlan, executionPlan, story_category: cinematicEmotion.story_category }
+  return { storyState, directionPlan, executionPlan, story_category: producerOutput.story_category }
 }
