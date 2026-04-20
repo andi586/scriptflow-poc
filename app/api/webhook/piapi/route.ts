@@ -46,7 +46,17 @@ export async function POST(req: NextRequest) {
   // Add BGM to video
   let finalVideoUrl = videoUrl
   if (movie) {
-    const emotion = movie.story_input ? 'grief' : 'warm'
+    const detectEmotion = (story: string): string => {
+      const s = story.toLowerCase()
+      if (s.includes('妈') || s.includes('mama') || s.includes('mom') || s.includes('miss') || s.includes('想你') || s.includes('思念')) return 'grief'
+      if (s.includes('爱') || s.includes('love') || s.includes('情') || s.includes('心')) return 'love'
+      if (s.includes('哈') || s.includes('笑') || s.includes('prank') || s.includes('funny') || s.includes('搞笑')) return 'happy'
+      if (s.includes('猫') || s.includes('狗') || s.includes('pet') || s.includes('dog') || s.includes('cat')) return 'pet'
+      if (s.includes('家') || s.includes('family') || s.includes('父') || s.includes('father')) return 'family'
+      if (s.includes('成功') || s.includes('success') || s.includes('victory') || s.includes('achieve')) return 'epic'
+      return 'warm' // default
+    }
+    const emotion = detectEmotion(movie.story_input || '')
     const bgmUrl = await selectBGM(emotion)
     try {
       const mergeRes = await fetch(`${FFMPEG_URL}/merge`, {

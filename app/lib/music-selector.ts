@@ -12,19 +12,52 @@ export async function selectBGM(emotion: string): Promise<string> {
   try {
     // Map emotion to tags
     const emotionMap: Record<string, string[]> = {
+      // 悲伤系列
       'grief': ['grief', 'sad', 'longing'],
-      'longing': ['longing', 'grief', 'sad'],
+      'longing': ['longing', 'grief', 'missing'],
       'regret': ['regret', 'grief', 'sad'],
+      'sad': ['sad', 'grief', 'longing'],
+      'missing': ['missing', 'longing', 'grief'],
+      'lonely': ['lonely', 'grief', 'sad'],
+      'memory': ['memory', 'nostalgic', 'longing'],
+
+      // 温暖系列
       'love': ['love', 'romantic', 'warm'],
       'tender': ['tender', 'warm', 'love'],
-      'happy': ['happy', 'fun', 'celebration'],
-      'fun': ['fun', 'happy', 'playful'],
-      'prank': ['prank', 'fun', 'happy'],
-      'pet': ['pet', 'cute', 'playful'],
-      'epic': ['epic', 'triumph', 'strong'],
-      'dramatic': ['dramatic', 'tension', 'intense'],
+      'warm': ['warm', 'family', 'tender'],
       'family': ['family', 'warm', 'nostalgic'],
       'nostalgic': ['nostalgic', 'family', 'warm'],
+      'home': ['home', 'family', 'warm'],
+
+      // 欢乐系列
+      'happy': ['happy', 'fun', 'cheerful'],
+      'fun': ['fun', 'happy', 'playful'],
+      'prank': ['prank', 'fun', 'happy'],
+      'celebration': ['celebration', 'happy', 'cheerful'],
+      'cheerful': ['cheerful', 'happy', 'fun'],
+
+      // 萌宠系列
+      'pet': ['pet', 'cute', 'playful'],
+      'cute': ['cute', 'pet', 'playful'],
+      'playful': ['playful', 'pet', 'cute'],
+      'animal': ['animal', 'pet', 'cute'],
+
+      // 励志系列
+      'epic': ['epic', 'triumph', 'strong'],
+      'triumph': ['triumph', 'epic', 'achievement'],
+      'achievement': ['achievement', 'epic', 'motivation'],
+      'strong': ['strong', 'epic', 'motivation'],
+      'motivation': ['motivation', 'epic', 'strong'],
+
+      // 戏剧系列
+      'dramatic': ['dramatic', 'tension', 'intense'],
+      'tension': ['tension', 'dramatic', 'intense'],
+      'intense': ['intense', 'dramatic', 'tension'],
+      'suspense': ['suspense', 'tension', 'dramatic'],
+
+      // 爱情系列
+      'romantic': ['romantic', 'love', 'tender'],
+      'couple': ['couple', 'romantic', 'love'],
     }
 
     const tags = emotionMap[emotion.toLowerCase()] || ['warm']
