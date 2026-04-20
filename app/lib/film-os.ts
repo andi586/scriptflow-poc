@@ -1418,6 +1418,171 @@ export const NEW_ARCHETYPES = [
       { shot: 7, emotion: "warmth", intensity: 5, type: "scene" },
       { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
     ]
+  },
+  {
+    archetype: "martial_arts",
+    keywords: ["武打", "功夫", "martial arts", "fight"],
+    category: "action",
+    description: "武打功夫的力量与技艺展示",
+    blueprint: ["对峙", "试探", "交锋", "高潮", "决胜", "余韵"],
+    symbolObjects: ["拳头", "武器", "眼神", "动作"],
+    forbiddenElements: ["慢节奏", "无力量感"],
+    musicArc: "低→渐强→爆发→余韵",
+    dialogueStyle: "极简+有力",
+    klingPrompts: {
+      hookShot: "ECU, fist or weapon ready, hard dramatic light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, fierce focused warrior expression, hard light, cinematic 9:16",
+      sceneShot: "martial arts training ground or arena, dramatic light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak combat intensity, cinematic 9:16",
+      endingShot: "WS, @image_1 standing victorious, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, combat stance or movement, cinematic 9:16",
+      conflictShot: "ECU, @image_1, clash moment, cinematic 9:16",
+      silenceShot: "WS, empty arena, static, cinematic 9:16",
+      symbolShot: "ECU, weapon or fist close-up, dramatic light, cinematic 9:16",
+      transitionShot: "MS, @image_1, post-fight composure, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "focus", intensity: 5, type: "face" },
+      { shot: 2, emotion: "tension", intensity: 6, type: "scene" },
+      { shot: 3, emotion: "clash", intensity: 8, type: "scene" },
+      { shot: 4, emotion: "intensity", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_combat", intensity: 10, type: "face" },
+      { shot: 6, emotion: "triumph", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "calm_strength", intensity: 5, type: "face" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "war_sacrifice",
+    keywords: ["战争", "牺牲", "war"],
+    category: "action",
+    description: "战争中的牺牲与英雄主义",
+    blueprint: ["出征", "战场", "危机", "牺牲", "高潮", "余韵"],
+    symbolObjects: ["军装", "战场", "旗帜", "战友"],
+    forbiddenElements: ["轻浮处理", "无情绪重量"],
+    musicArc: "低→渐强→爆发→沉静",
+    dialogueStyle: "简短+有力",
+    klingPrompts: {
+      hookShot: "ECU, military gear or flag, dramatic harsh light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, determined sacrifice expression, dramatic light, cinematic 9:16",
+      sceneShot: "battlefield or war environment, harsh light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak sacrifice moment, cinematic 9:16",
+      endingShot: "WS, battlefield silence hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, advancing under fire, cinematic 9:16",
+      conflictShot: "ECU, @image_1, protecting comrade, cinematic 9:16",
+      silenceShot: "WS, empty battlefield, static, cinematic 9:16",
+      symbolShot: "ECU, dog tag or flag, dramatic light, cinematic 9:16",
+      transitionShot: "MS, @image_1, final stand, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "resolve", intensity: 5, type: "face" },
+      { shot: 2, emotion: "danger", intensity: 7, type: "scene" },
+      { shot: 3, emotion: "crisis", intensity: 8, type: "scene" },
+      { shot: 4, emotion: "sacrifice", intensity: 10, type: "face" },
+      { shot: 5, emotion: "peak_heroism", intensity: 10, type: "face" },
+      { shot: 6, emotion: "aftermath", intensity: 7, type: "scene" },
+      { shot: 7, emotion: "silence", intensity: 4, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+    ]
+  },
+  {
+    archetype: "street_fight",
+    keywords: ["街头", "打架"],
+    category: "action",
+    description: "街头冲突与对抗的紧张瞬间",
+    blueprint: ["对峙", "挑衅", "爆发", "混战", "高潮", "结局"],
+    symbolObjects: ["街道", "拳头", "人群", "眼神"],
+    forbiddenElements: ["慢节奏", "无紧张感"],
+    musicArc: "低→快速渐强→爆发→余韵",
+    dialogueStyle: "极简+爆发",
+    klingPrompts: {
+      hookShot: "ECU, clenched fist or tense hands, harsh street light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, aggressive confrontation expression, harsh light, cinematic 9:16",
+      sceneShot: "urban street or alley, harsh light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak fight intensity, cinematic 9:16",
+      endingShot: "WS, street aftermath, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, confrontation stance, cinematic 9:16",
+      conflictShot: "ECU, @image_1, first strike moment, cinematic 9:16",
+      silenceShot: "WS, empty street, static, cinematic 9:16",
+      symbolShot: "ECU, street detail or fist, harsh light, cinematic 9:16",
+      transitionShot: "MS, @image_1, post-fight standing, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "tension", intensity: 6, type: "scene" },
+      { shot: 2, emotion: "aggression", intensity: 7, type: "face" },
+      { shot: 3, emotion: "clash", intensity: 9, type: "scene" },
+      { shot: 4, emotion: "peak_fight", intensity: 10, type: "face" },
+      { shot: 5, emotion: "chaos", intensity: 9, type: "scene" },
+      { shot: 6, emotion: "dominance", intensity: 8, type: "face" },
+      { shot: 7, emotion: "aftermath", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "hero_moment",
+    keywords: ["英雄", "hero"],
+    category: "action",
+    description: "英雄时刻的崛起与荣耀",
+    blueprint: ["危机", "召唤", "崛起", "行动", "高潮", "荣耀"],
+    symbolObjects: ["英雄姿态", "光线", "人群", "象征物"],
+    forbiddenElements: ["软弱", "无力量感"],
+    musicArc: "低→渐强→爆发→荣耀",
+    dialogueStyle: "简短+有力",
+    klingPrompts: {
+      hookShot: "ECU, heroic symbol or object, dramatic backlight, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, heroic determined expression, dramatic backlight, cinematic 9:16",
+      sceneShot: "dramatic environment or crisis scene, strong light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak heroic moment, cinematic 9:16",
+      endingShot: "WS, @image_1 heroic silhouette, music swell fade, cinematic 9:16",
+      buildShot: "MS, @image_1, rising to the challenge, cinematic 9:16",
+      conflictShot: "ECU, @image_1, facing the impossible, cinematic 9:16",
+      silenceShot: "WS, dramatic empty environment, static, cinematic 9:16",
+      symbolShot: "ECU, heroic emblem or object, dramatic light, cinematic 9:16",
+      transitionShot: "WS, @image_1 standing tall, dramatic light, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "crisis", intensity: 6, type: "scene" },
+      { shot: 2, emotion: "resolve", intensity: 7, type: "face" },
+      { shot: 3, emotion: "rising", intensity: 8, type: "scene" },
+      { shot: 4, emotion: "action", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_heroism", intensity: 10, type: "face" },
+      { shot: 6, emotion: "triumph", intensity: 9, type: "scene" },
+      { shot: 7, emotion: "glory", intensity: 7, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 4, type: "scene" }
+    ]
+  },
+  {
+    archetype: "chase_escape",
+    keywords: ["追逐", "逃跑", "chase"],
+    category: "action",
+    description: "追逐与逃跑的紧张刺激",
+    blueprint: ["触发", "逃跑", "追逐", "危机", "高潮", "结局"],
+    symbolObjects: ["奔跑", "障碍", "回头看", "出口"],
+    forbiddenElements: ["慢节奏", "无紧张感"],
+    musicArc: "低→快速渐强→爆发→余韵",
+    dialogueStyle: "极简+紧张",
+    klingPrompts: {
+      hookShot: "ECU, running feet or obstacle, harsh motion light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, fear and adrenaline expression, harsh light, cinematic 9:16",
+      sceneShot: "urban chase environment or corridor, harsh light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak fear and desperation, cinematic 9:16",
+      endingShot: "WS, escape or capture moment, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, running at full speed, cinematic 9:16",
+      conflictShot: "ECU, @image_1, looking back in terror, cinematic 9:16",
+      silenceShot: "WS, empty chase environment, static, cinematic 9:16",
+      symbolShot: "ECU, exit or obstacle close-up, harsh light, cinematic 9:16",
+      transitionShot: "MS, @image_1, split-second decision, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "trigger", intensity: 7, type: "scene" },
+      { shot: 2, emotion: "fear", intensity: 8, type: "face" },
+      { shot: 3, emotion: "adrenaline", intensity: 9, type: "scene" },
+      { shot: 4, emotion: "desperation", intensity: 10, type: "face" },
+      { shot: 5, emotion: "peak_chase", intensity: 10, type: "scene" },
+      { shot: 6, emotion: "crisis", intensity: 9, type: "face" },
+      { shot: 7, emotion: "resolution", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
   }
 ]
 
@@ -1498,6 +1663,13 @@ export function matchArchetypeExtended(story: string): string {
   if (["感动", "泪目", "emotional"].some(k => s.includes(k))) return "quick_emotion_hit"
   if (["整蛊", "viral", "prank"].some(k => s.includes(k))) return "viral_loop_prank"
   if (["共鸣", "日常", "relationship", "drama"].some(k => s.includes(k))) return "relatable_micro_drama"
+
+  // Action archetypes
+  if (["武打", "功夫", "martial arts", "fight"].some(k => s.includes(k))) return "martial_arts"
+  if (["战争", "牺牲", "war"].some(k => s.includes(k))) return "war_sacrifice"
+  if (["街头", "打架"].some(k => s.includes(k))) return "street_fight"
+  if (["英雄", "hero"].some(k => s.includes(k))) return "hero_moment"
+  if (["追逐", "逃跑", "chase"].some(k => s.includes(k))) return "chase_escape"
 
   // Original archetypes
   const triggers = [
