@@ -123,11 +123,23 @@ STRICT RULES for scene shots:
 - Must match emotional tone of adjacent face shots
 - Use cinematic language: lighting, texture, movement
 
-BAD example face shot (too long, too formal):
+CRITICAL RULES for dialogue:
+- Maximum 8 words per shot
+- Use "..." for emotional pauses
+- Less is more. Silence carries more emotion than words.
+- Never explain. Let the feeling breathe.
+
+BAD examples (too long, too explanatory):
+'妈，我回来啦8年啦！你没等我，我以为..我有时间'
 '这是你离开后的第十五个母亲节，我也渐渐老去'
 
-GOOD example face shot (short, intimate, with pause):
-'妈妈... 十五年了。'
+GOOD examples (short, intimate, devastating):
+'妈妈... 我回来了。'
+'八年了...'
+'你呢？'
+'Mom... I made it.'
+'Eight years...'
+'I thought we had time.'
 
 Create 8 shots alternating: face, scene, face, scene, face, scene, face, scene
 Each shot 8-12 seconds.
