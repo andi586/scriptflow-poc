@@ -1055,6 +1055,192 @@ export const NEW_ARCHETYPES = [
       { shot: 7, emotion: "aftermath", intensity: 5, type: "scene" },
       { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
     ]
+  },
+  {
+    archetype: "unexpected_reunion",
+    description: "意外重逢的惊喜与情绪涌动",
+    blueprint: ["平静日常", "意外相遇", "认出瞬间", "情绪涌动", "高潮", "余韵"],
+    symbolObjects: ["熟悉面孔", "旧物", "眼神交汇", "停顿"],
+    forbiddenElements: ["刻意安排", "无情绪冲击"],
+    musicArc: "低→渐强→情绪爆发→余韵",
+    dialogueStyle: "简短+真实",
+    klingPrompts: {
+      hookShot: "ECU, familiar object or face glimpsed in crowd, natural light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, sudden recognition and shock, natural light, cinematic 9:16",
+      sceneShot: "public space or familiar environment, natural light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, overwhelmed with emotion at reunion, cinematic 9:16",
+      endingShot: "WS, two figures facing each other, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, frozen in disbelief, cinematic 9:16",
+      conflictShot: "ECU, @image_1, mixed emotions of joy and pain, cinematic 9:16",
+      silenceShot: "WS, quiet space between two people, static, cinematic 9:16",
+      symbolShot: "ECU, shared memory object, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, taking a step forward, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "calm", intensity: 2, type: "scene" },
+      { shot: 2, emotion: "recognition", intensity: 6, type: "face" },
+      { shot: 3, emotion: "shock", intensity: 8, type: "face" },
+      { shot: 4, emotion: "mixed_emotion", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_reunion", intensity: 10, type: "face" },
+      { shot: 6, emotion: "warmth", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "tenderness", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "fate_turning",
+    description: "命运转折点的震撼与觉醒",
+    blueprint: ["平静", "预兆", "转折触发", "冲击", "觉醒", "新方向"],
+    symbolObjects: ["路口", "信件", "电话", "光线变化"],
+    forbiddenElements: ["轻浮处理", "无情绪重量"],
+    musicArc: "低→渐强→爆发→沉静",
+    dialogueStyle: "简短+有力",
+    klingPrompts: {
+      hookShot: "ECU, symbolic object at crossroads, dramatic light shift, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, moment of realization, dramatic side light, cinematic 9:16",
+      sceneShot: "empty crossroads or threshold, dramatic light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, fate-turning expression, eyes wide, cinematic 9:16",
+      endingShot: "WS, figure at threshold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, receiving news or sign, cinematic 9:16",
+      conflictShot: "ECU, @image_1, internal conflict peak, cinematic 9:16",
+      silenceShot: "WS, empty road or space, static, cinematic 9:16",
+      symbolShot: "ECU, turning point object, dramatic light, cinematic 9:16",
+      transitionShot: "MS, @image_1, making the decision, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "calm", intensity: 3, type: "scene" },
+      { shot: 2, emotion: "unease", intensity: 5, type: "face" },
+      { shot: 3, emotion: "trigger", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "shock", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_realization", intensity: 10, type: "face" },
+      { shot: 6, emotion: "resolve", intensity: 8, type: "face" },
+      { shot: 7, emotion: "forward", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "awkward_daily",
+    description: "日常生活中的尴尬与搞笑瞬间",
+    blueprint: ["正常日常", "意外触发", "尴尬升级", "反应", "高潮", "自嘲收场"],
+    symbolObjects: ["日常物件", "表情", "旁观者", "失误"],
+    forbiddenElements: ["严肃处理", "哲学抽象"],
+    musicArc: "轻→增强→断→轻收",
+    dialogueStyle: "简短+自嘲",
+    klingPrompts: {
+      hookShot: "ECU, everyday object in awkward situation, bright natural light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, awkward embarrassed expression, natural light, cinematic 9:16",
+      sceneShot: "everyday environment with awkward detail, bright light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak embarrassment face, cinematic 9:16",
+      endingShot: "WS, @image_1 laughing it off, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, realizing the awkward situation, cinematic 9:16",
+      conflictShot: "ECU, @image_1, trying to recover, cinematic 9:16",
+      silenceShot: "WS, frozen awkward moment, static, cinematic 9:16",
+      symbolShot: "ECU, cause of awkwardness close-up, cinematic 9:16",
+      transitionShot: "MS, @image_1, self-deprecating smile, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "normal", intensity: 2, type: "scene" },
+      { shot: 2, emotion: "surprise", intensity: 6, type: "face" },
+      { shot: 3, emotion: "awkward", intensity: 8, type: "face" },
+      { shot: 4, emotion: "peak_embarrassment", intensity: 10, type: "face" },
+      { shot: 5, emotion: "recovery", intensity: 7, type: "face" },
+      { shot: 6, emotion: "self_laugh", intensity: 6, type: "face" },
+      { shot: 7, emotion: "playful", intensity: 4, type: "scene" },
+      { shot: 8, emotion: "joy", intensity: 3, type: "face" }
+    ]
+  },
+  {
+    archetype: "longing_distance",
+    description: "远距离思念与跨越距离的爱",
+    blueprint: ["分离", "日常思念", "触发回忆", "情绪高潮", "连接瞬间", "余韵"],
+    symbolObjects: ["手机", "照片", "窗户", "空椅子"],
+    forbiddenElements: ["轻浮处理", "无情绪深度"],
+    musicArc: "低→渐强→情绪高潮→余韵",
+    dialogueStyle: "简短+真诚",
+    klingPrompts: {
+      hookShot: "ECU, phone screen or photo, cold blue light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, quiet longing expression, soft light, cinematic 9:16",
+      sceneShot: "empty space or window view, cold light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak longing and emotion, cinematic 9:16",
+      endingShot: "WS, empty space hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, looking at photo or message, cinematic 9:16",
+      conflictShot: "ECU, @image_1, suppressed tears, cinematic 9:16",
+      silenceShot: "WS, quiet room with absent presence, static, cinematic 9:16",
+      symbolShot: "ECU, shared object or photo, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, reaching toward screen or photo, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "quiet", intensity: 3, type: "scene" },
+      { shot: 2, emotion: "longing", intensity: 5, type: "face" },
+      { shot: 3, emotion: "memory", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "ache", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_longing", intensity: 10, type: "face" },
+      { shot: 6, emotion: "connection", intensity: 7, type: "scene" },
+      { shot: 7, emotion: "acceptance", intensity: 4, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+    ]
+  },
+  {
+    archetype: "self_discovery",
+    description: "自我发现与内心觉醒的旅程",
+    blueprint: ["迷失", "触发", "探索", "挣扎", "顿悟", "新生"],
+    symbolObjects: ["镜子", "日记", "空旷空间", "光线"],
+    forbiddenElements: ["外部冲突主导", "轻浮处理"],
+    musicArc: "低→渐强→顿悟→平静",
+    dialogueStyle: "内省+简短",
+    klingPrompts: {
+      hookShot: "ECU, mirror reflection or journal, soft introspective light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, searching introspective gaze, soft light, cinematic 9:16",
+      sceneShot: "open empty space or nature, soft light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, moment of inner awakening, cinematic 9:16",
+      endingShot: "WS, figure in open space, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, in quiet contemplation, cinematic 9:16",
+      conflictShot: "ECU, @image_1, inner struggle expression, cinematic 9:16",
+      silenceShot: "WS, vast empty environment, static, cinematic 9:16",
+      symbolShot: "ECU, mirror or personal object, soft light, cinematic 9:16",
+      transitionShot: "MS, @image_1, turning toward light, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "lost", intensity: 4, type: "scene" },
+      { shot: 2, emotion: "searching", intensity: 5, type: "face" },
+      { shot: 3, emotion: "confusion", intensity: 6, type: "scene" },
+      { shot: 4, emotion: "struggle", intensity: 8, type: "face" },
+      { shot: 5, emotion: "awakening", intensity: 10, type: "face" },
+      { shot: 6, emotion: "clarity", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "peace", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "letting_go",
+    description: "放手与告别的释然与成长",
+    blueprint: ["执念", "挣扎", "触发", "决定", "放手", "释然"],
+    symbolObjects: ["旧物", "信件", "空手", "远去背影"],
+    forbiddenElements: ["强行快乐", "无情绪重量"],
+    musicArc: "低→渐强→释放→平静",
+    dialogueStyle: "简短+内省",
+    klingPrompts: {
+      hookShot: "ECU, object being held then released, soft light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, quiet resolve mixed with sadness, soft light, cinematic 9:16",
+      sceneShot: "empty space after departure, soft light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, moment of letting go, tears and calm, cinematic 9:16",
+      endingShot: "WS, empty space hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, holding on one last time, cinematic 9:16",
+      conflictShot: "ECU, @image_1, internal battle expression, cinematic 9:16",
+      silenceShot: "WS, quiet empty environment, static, cinematic 9:16",
+      symbolShot: "ECU, released object or open hand, soft light, cinematic 9:16",
+      transitionShot: "MS, @image_1, turning away slowly, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "attachment", intensity: 5, type: "face" },
+      { shot: 2, emotion: "struggle", intensity: 7, type: "scene" },
+      { shot: 3, emotion: "pain", intensity: 8, type: "face" },
+      { shot: 4, emotion: "decision", intensity: 9, type: "face" },
+      { shot: 5, emotion: "release", intensity: 10, type: "face" },
+      { shot: 6, emotion: "relief", intensity: 7, type: "scene" },
+      { shot: 7, emotion: "peace", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
   }
 ]
 
