@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { DIRECTOR_BRAIN } from './director-brain'
 import { EMOTION_ARCHETYPES, DURATION_FORMULAS, matchArchetype } from './emotion-archetypes'
+import { SYMBOL_OBJECTS, SUBTEXT_TEMPLATES, EMOTION_TRANSITIONS, HOOK_FORMULAS, ENDING_FORMULAS } from './director-knowledge'
 
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
@@ -202,6 +203,21 @@ ${DIRECTOR_BRAIN.triggers.map(t =>
   `[${t.keywords.join('/')}] → archetype: ${t.archetype} → inject: ${t.autoInject.join(', ')}`
 ).join('\n')}
 
+SYMBOL OBJECTS (use these for scene shots based on emotion):
+${SYMBOL_OBJECTS.map(s => `${s.emotion}: [${s.objects.join(', ')}] | camera: ${s.cameraRule} | light: ${s.lightingRule}`).join('\n')}
+
+SUBTEXT TEMPLATES (dialogue must follow these patterns):
+NEVER say the forbidden phrase. Always use the surface phrase instead.
+${SUBTEXT_TEMPLATES.map(t => `${t.situation}: say "${t.surface}" (means: ${t.subtext}) | NEVER: "${t.forbidden}"`).join('\n')}
+
+HOOK FORMULAS (shot 1 must use one of these):
+${HOOK_FORMULAS.map(h => `${h.type}: ${h.description} | example: ${h.example}`).join('\n')}
+
+ENDING FORMULAS (final shot must use one of these):
+${ENDING_FORMULAS.map(e => `${e.type}: ${e.description} | music: ${e.music} | example: ${e.example}`).join('\n')}
+
+EMOTION TRANSITIONS (use when shifting between emotions):
+${EMOTION_TRANSITIONS.map(t => `${t.from}→${t.to}: ${t.transition} | camera: ${t.camera} | ${t.duration}`).join('\n')}
 
 ProducerOutput: ${JSON.stringify(producerOutput)}
 Template: "${template}"
