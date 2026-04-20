@@ -8,8 +8,23 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Simple in-memory rate limit (resets on redeploy)
+const ipLimits = new Map<string, number>()
+
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 1 movie per IP per day
+    const ip = req.headers.get('x-forwarded-for') || 'unknown'
+    const today = new Date().toDateString()
+    const key = `${ip}_${today}`
+    const count = ipLimits.get(key) || 0
+    if (count >= 1) {
+      return NextResponse.json({ 
+        error: 'Daily limit reached. Contact us to generate more movies.' 
+      }, { status: 429 })
+    }
+    ipLimits.set(key, count + 1)
+
     const form = await req.formData()
     const photo = form.get('photo') as File
     const story = form.get('story') as string
