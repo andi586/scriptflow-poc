@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { selectBGM } from '@/app/lib/music-selector'
+import { selectBGMv2 } from '@/app/lib/bgm-selector-v2'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,18 +46,36 @@ export async function POST(req: NextRequest) {
   // Add BGM to video
   let finalVideoUrl = videoUrl
   if (movie) {
-    const detectEmotion = (story: string): string => {
-      const s = story.toLowerCase()
-      if (s.includes('妈') || s.includes('mama') || s.includes('mom') || s.includes('miss') || s.includes('想你') || s.includes('思念')) return 'grief'
-      if (s.includes('爱') || s.includes('love') || s.includes('情') || s.includes('心')) return 'love'
-      if (s.includes('哈') || s.includes('笑') || s.includes('prank') || s.includes('funny') || s.includes('搞笑')) return 'happy'
-      if (s.includes('猫') || s.includes('狗') || s.includes('pet') || s.includes('dog') || s.includes('cat')) return 'pet'
-      if (s.includes('家') || s.includes('family') || s.includes('父') || s.includes('father')) return 'family'
-      if (s.includes('成功') || s.includes('success') || s.includes('victory') || s.includes('achieve')) return 'epic'
-      return 'warm' // default
+    // Get story profile from movie or detect from story_input
+    const story = movie.story_input || ''
+    const s = story.toLowerCase()
+
+    // Build basic story profile
+    const storyProfile = {
+      primaryEmotion: s.includes('猫') || s.includes('dog') || s.includes('cat') || s.includes('pet') ? 'playful' :
+                      s.includes('妈') || s.includes('mom') || s.includes('miss') || s.includes('想你') ? 'grief' :
+                      s.includes('爱') || s.includes('love') ? 'romantic' :
+                      s.includes('哈') || s.includes('prank') || s.includes('funny') ? 'playful' :
+                      s.includes('家') || s.includes('family') ? 'warm' : 'warm',
+      valence: s.includes('妈') || s.includes('miss') || s.includes('想你') ? -0.6 :
+               s.includes('猫') || s.includes('cat') || s.includes('happy') || s.includes('哈') ? 0.8 :
+               s.includes('爱') || s.includes('love') ? 0.7 : 0.5,
+      arousal: s.includes('猫') || s.includes('cat') || s.includes('prank') || s.includes('哈') ? 0.7 :
+               s.includes('妈') || s.includes('miss') ? 0.2 :
+               s.includes('爱') || s.includes('love') ? 0.4 : 0.5,
+      protagonistType: s.includes('猫') || s.includes('dog') || s.includes('cat') || s.includes('pet') ? 'pet' :
+                       s.includes('家') || s.includes('family') || s.includes('妈') || s.includes('爸') ? 'family' :
+                       s.includes('爱') || s.includes('love') ? 'couple' : 'human',
+      setting: s.includes('outdoor') || s.includes('park') || s.includes('nature') ? 'outdoor' : 'indoor',
+      bannedDirections: 
+        s.includes('猫') || s.includes('cat') || s.includes('pet') ? ['grief', 'horror', 'drama'] :
+        s.includes('妈') || s.includes('miss') || s.includes('想你') ? ['comedy', 'prank', 'horror'] :
+        s.includes('哈') || s.includes('prank') ? ['grief', 'horror'] : []
     }
-    const emotion = detectEmotion(movie.story_input || '')
-    const bgmUrl = await selectBGM(emotion)
+
+    console.log('[webhook] story profile:', storyProfile.primaryEmotion, storyProfile.valence, storyProfile.arousal)
+    const bgmUrl = await selectBGMv2(storyProfile)
+    console.log('[webhook] BGM selected:', bgmUrl)
     try {
       const mergeRes = await fetch(`${FFMPEG_URL}/merge`, {
         method: 'POST',
