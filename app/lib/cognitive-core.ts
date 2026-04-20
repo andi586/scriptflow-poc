@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { DIRECTOR_BRAIN } from './director-brain'
+import { EMOTION_ARCHETYPES, DURATION_FORMULAS, matchArchetype } from './emotion-archetypes'
 
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
@@ -167,7 +168,7 @@ OUTPUT FORMAT (strict JSON, no other text):
   return JSON.parse(clean)
 }
 
-async function runDirector(producerOutput: ProducerOutput, template: string): Promise<DirectionPlan> {
+async function runDirector(producerOutput: ProducerOutput, template: string, archetypeName: string, shotDurations: number[]): Promise<DirectionPlan> {
   const { visual_constraints, emotion_profile } = producerOutput
   const abstractionLevel = emotion_profile.abstraction_level
 
@@ -204,6 +205,18 @@ ${DIRECTOR_BRAIN.triggers.map(t =>
 
 ProducerOutput: ${JSON.stringify(producerOutput)}
 Template: "${template}"
+
+${(() => {
+  const archetype = EMOTION_ARCHETYPES.find(a => a.archetype === archetypeName) || EMOTION_ARCHETYPES.find(a => a.archetype === 'bittersweet')!
+  return `ARCHETYPE: ${archetype.archetype} - ${archetype.description}
+BLUEPRINT (follow this structure strictly): ${archetype.blueprint.join(' → ')}
+SYMBOL OBJECTS (must appear): ${archetype.symbolObjects.join(', ')}
+FORBIDDEN: ${archetype.forbiddenElements.join(', ')}
+MUSIC ARC: ${archetype.musicArc}
+DIALOGUE STYLE: ${archetype.dialogueStyle}
+SHOT DURATIONS: ${shotDurations.join('s, ')}s`
+})()}
+
 
 REALITY ANCHOR RULES (MANDATORY):
 - must_show items: ${JSON.stringify(visual_constraints.must_show)}
@@ -413,8 +426,14 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
     tensionCurve: ['low', 'medium', 'high', 'peak']
   }
 
+  const archetypeName = matchArchetype(userInput)
+  const tier = '60s' // default tier; can be parameterized later
+  const durationFormula = DURATION_FORMULAS[tier] || DURATION_FORMULAS['60s']
+  const shotDurations = durationFormula.distribution
+  console.log('[CognitiveCore] archetype:', archetypeName, '| shotDurations:', shotDurations)
+
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(producerOutput, template)
+  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations)
 
   console.log('[CognitiveCore] Checking reality anchors...')
   checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
