@@ -83,7 +83,14 @@ export default function CreatePage() {
           body: JSON.stringify({ story, tier: '60s', userId: savedTwinId })
         })
         const data = await res.json()
+        console.log('[create] response data:', data)
+        console.log('[create] movieId:', data.movieId)
         if (!res.ok) throw new Error(data.error || 'Failed')
+        if (!data.movieId) {
+          setError('Movie creation failed: ' + (data.error || 'No movie ID returned'))
+          setLoading(false)
+          return
+        }
         movieId = data.movieId
       } else {
         const form = new FormData()
@@ -93,7 +100,14 @@ export default function CreatePage() {
         cast.forEach((c, i) => form.append(`cast_${i}`, c.file))
         const res = await fetch('/api/create-movie', { method: 'POST', body: form })
         const data = await res.json()
+        console.log('[create] response data:', data)
+        console.log('[create] movieId:', data.movieId)
         if (!res.ok) throw new Error(data.error || 'Failed')
+        if (!data.movieId) {
+          setError('Movie creation failed: ' + (data.error || 'No movie ID returned'))
+          setLoading(false)
+          return
+        }
         movieId = data.movieId
         if (data.twinId) localStorage.setItem('sf_twin_id', data.twinId)
         if (data.photoUrl) localStorage.setItem('sf_photo_url', data.photoUrl)
