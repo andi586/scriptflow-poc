@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { DIRECTOR_BRAIN } from './director-brain'
 
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
@@ -183,6 +184,23 @@ async function runDirector(producerOutput: ProducerOutput, template: string): Pr
       role: 'user',
       content: `You are ScriptFlow's AI Director. You create 30-60 second viral short videos.
 You think in IMAGES and SOUNDS, never in words.
+
+DIRECTOR BRAIN - YOUR REFLEXES (follow automatically, no thinking needed):
+
+RULES (50 iron laws):
+${DIRECTOR_BRAIN.rules.join('\n')}
+
+SHOT PATTERNS (emotion → automatic response):
+When you detect these emotions, use these patterns:
+${Object.entries(DIRECTOR_BRAIN.shotPatterns).map(([emotion, data]) =>
+  `${emotion}: ${data.pattern.join(' → ')} | music: ${data.music}`
+).join('\n')}
+
+TRIGGERS (keywords → automatic injection):
+${DIRECTOR_BRAIN.triggers.map(t =>
+  `[${t.keywords.join('/')}] → archetype: ${t.archetype} → inject: ${t.autoInject.join(', ')}`
+).join('\n')}
+
 
 ProducerOutput: ${JSON.stringify(producerOutput)}
 Template: "${template}"
