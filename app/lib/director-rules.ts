@@ -208,6 +208,196 @@ export const DIRECTOR_RULES = [
     pacingDirective: "fast",
     dialogueDirective: "short",
     musicDirective: "build"
+  },
+  {
+    archetype: "exam_victory",
+    directorRules: ["开场必须是紧张细节（笔/手）", "必须有等待结果镜头", "必须有情绪压抑阶段", "高潮是结果揭示", "结尾必须释放呼吸"],
+    shotSequence: "scene→face→face→scene→face→scene",
+    cameraStyle: "tight focus",
+    lightingDirective: "neutral cool",
+    pacingDirective: "build tension then release",
+    dialogueDirective: "minimal",
+    musicDirective: "build then drop"
+  },
+  {
+    archetype: "brotherhood",
+    directorRules: ["开场必须并肩画面", "必须有冲突瞬间", "必须有信任建立", "高潮是互相支持", "结尾必须共同离开"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "steady",
+    lightingDirective: "contrast warm",
+    pacingDirective: "medium",
+    dialogueDirective: "short direct",
+    musicDirective: "strong emotional"
+  },
+  {
+    archetype: "teacher_student",
+    directorRules: ["开场必须教学环境", "必须有困惑表情", "必须有指导动作", "高潮是顿悟", "结尾必须点头或眼神"],
+    shotSequence: "scene→face→face→scene→scene→face",
+    cameraStyle: "stable",
+    lightingDirective: "soft neutral",
+    pacingDirective: "slow build",
+    dialogueDirective: "clear short",
+    musicDirective: "inspiring rise"
+  },
+  {
+    archetype: "colleague_story",
+    directorRules: ["开场必须工作场景", "必须有分歧镜头", "必须有压力镜头", "高潮是问题解决", "结尾必须回归平静"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "natural",
+    lightingDirective: "office neutral",
+    pacingDirective: "medium",
+    dialogueDirective: "realistic",
+    musicDirective: "neutral build"
+  },
+  {
+    archetype: "valentines_day",
+    directorRules: ["开场必须浪漫细节", "必须有等待情绪", "必须有靠近过程", "高潮是情感表达", "结尾必须温柔留白"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "slow",
+    lightingDirective: "warm romantic",
+    pacingDirective: "slow",
+    dialogueDirective: "soft",
+    musicDirective: "romantic swell"
+  },
+  {
+    archetype: "mothers_day",
+    directorRules: ["开场必须日常细节", "必须有回忆触发", "必须有情绪压抑", "高潮是情感释放", "结尾必须留空镜"],
+    shotSequence: "scene→face→face→scene→face→scene",
+    cameraStyle: "slow",
+    lightingDirective: "warm soft",
+    pacingDirective: "slow emotional",
+    dialogueDirective: "minimal",
+    musicDirective: "emotional swell"
+  },
+  {
+    archetype: "fathers_day",
+    directorRules: ["开场必须手或工具", "必须有沉默互动", "必须有距离感", "高潮是理解", "结尾必须平静"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "static",
+    lightingDirective: "neutral warm",
+    pacingDirective: "slow",
+    dialogueDirective: "minimal",
+    musicDirective: "subtle"
+  },
+  {
+    archetype: "christmas",
+    directorRules: ["开场必须灯光细节", "必须有装饰镜头", "必须有互动", "高潮是礼物或笑声", "结尾必须温暖定格"],
+    shotSequence: "scene→scene→face→scene→scene→scene",
+    cameraStyle: "smooth",
+    lightingDirective: "warm festive",
+    pacingDirective: "medium",
+    dialogueDirective: "light",
+    musicDirective: "festive"
+  },
+  {
+    archetype: "secret_revealed",
+    directorRules: ["开场必须隐藏信息", "必须有暗示镜头", "必须延迟揭示", "高潮是震惊", "结尾必须余波"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "tight",
+    lightingDirective: "low key",
+    pacingDirective: "build suspense",
+    dialogueDirective: "short",
+    musicDirective: "tension peak"
+  },
+  {
+    archetype: "unexpected_reunion",
+    directorRules: ["开场必须人群或环境", "必须有识别瞬间", "必须有停顿", "高潮是靠近或拥抱", "结尾必须延长停留"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "slow push",
+    lightingDirective: "soft warm",
+    pacingDirective: "slow emotional",
+    dialogueDirective: "broken phrases",
+    musicDirective: "emotional swell"
+  },
+  {
+    archetype: "fate_turning",
+    directorRules: ["开场必须平静", "必须有预兆", "必须有触发点", "高潮是转折", "结尾必须不稳定"],
+    shotSequence: "scene→scene→face→scene→scene→scene",
+    cameraStyle: "sharp cuts",
+    lightingDirective: "contrast",
+    pacingDirective: "sudden shift",
+    dialogueDirective: "minimal",
+    musicDirective: "dramatic hit"
+  },
+  {
+    archetype: "longing_distance",
+    directorRules: ["开场必须空镜", "必须有独处", "必须有思念触发", "高潮是情绪爆发", "结尾必须静止"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "slow static",
+    lightingDirective: "low soft",
+    pacingDirective: "slow",
+    dialogueDirective: "minimal",
+    musicDirective: "soft emotional"
+  },
+  {
+    archetype: "self_discovery",
+    directorRules: ["开场必须迷茫状态", "必须有探索镜头", "必须有冲突", "高潮是顿悟", "结尾必须稳定"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "introspective",
+    lightingDirective: "soft contrast",
+    pacingDirective: "medium",
+    dialogueDirective: "minimal",
+    musicDirective: "introspective"
+  },
+  {
+    archetype: "letting_go",
+    directorRules: ["开场必须执念物件", "必须有回忆", "必须有犹豫", "高潮是放手", "结尾必须空"],
+    shotSequence: "scene→face→face→scene→scene→scene",
+    cameraStyle: "slow",
+    lightingDirective: "soft",
+    pacingDirective: "slow release",
+    dialogueDirective: "minimal",
+    musicDirective: "fade out"
+  },
+  {
+    archetype: "war_sacrifice",
+    directorRules: ["开场必须混乱", "必须有危险", "必须有选择", "高潮是牺牲", "结尾必须静止"],
+    shotSequence: "scene→face→scene→scene→scene→scene",
+    cameraStyle: "shaky",
+    lightingDirective: "desaturated",
+    pacingDirective: "fast then stop",
+    dialogueDirective: "minimal",
+    musicDirective: "epic tragic"
+  },
+  {
+    archetype: "street_fight",
+    directorRules: ["开场必须对峙", "必须有挑衅", "必须突然爆发", "高潮是打击", "结尾必须离场"],
+    shotSequence: "scene→face→scene→scene→scene→scene",
+    cameraStyle: "handheld",
+    lightingDirective: "gritty",
+    pacingDirective: "very fast",
+    dialogueDirective: "short",
+    musicDirective: "aggressive"
+  },
+  {
+    archetype: "hero_moment",
+    directorRules: ["开场必须危机", "必须有绝望", "必须延迟英雄", "高潮是出现", "结尾必须定格"],
+    shotSequence: "scene→face→scene→scene→scene→scene",
+    cameraStyle: "dramatic",
+    lightingDirective: "high contrast",
+    pacingDirective: "build then explode",
+    dialogueDirective: "minimal",
+    musicDirective: "epic"
+  },
+  {
+    archetype: "chase_escape",
+    directorRules: ["开场必须触发", "必须持续运动", "必须有危险接近", "高潮是逃脱", "结尾必须喘息"],
+    shotSequence: "scene→face→scene→scene→scene→scene",
+    cameraStyle: "tracking",
+    lightingDirective: "dynamic",
+    pacingDirective: "very fast",
+    dialogueDirective: "none",
+    musicDirective: "fast tension"
+  },
+  {
+    archetype: "relatable_micro_drama",
+    directorRules: ["开场必须是日常细节", "必须快速进入冲突（第2镜）", "必须有沉默停顿", "高潮是情绪爆点或一句话", "结尾必须留未说完的感觉"],
+    shotSequence: "scene→face→face→face→scene→scene",
+    cameraStyle: "tight close-up",
+    lightingDirective: "natural neutral",
+    pacingDirective: "fast emotional spike",
+    dialogueDirective: "max 8 words",
+    musicDirective: "subtle then drop"
   }
 ]
 
