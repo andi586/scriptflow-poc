@@ -1,132 +1,117 @@
 'use client'
-
+import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
 
-interface Movie {
-  id: string
-  final_video_url: string | null
-  status: string
-  tier: string
-  story_input: string
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-export default function MoviePage() {
-  const params = useParams()
-  const movieId = params?.movieId as string
-
-  const [movie, setMovie] = useState<Movie | null>(null)
+export default function MoviePage({ params }: { params: { movieId: string } }) {
+  const [movie, setMovie] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    if (!movieId) return
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
-    const fetchMovie = async () => {
+    const fetch = async () => {
       const { data } = await supabase
         .from('movies')
         .select('*')
-        .eq('id', movieId)
+        .eq('id', params.movieId)
         .single()
       setMovie(data)
       setLoading(false)
     }
+    fetch()
 
-    fetchMovie()
-
-    // Poll every 5s if not complete yet
+    // Poll every 5 seconds until complete
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from('movies')
         .select('*')
-        .eq('id', movieId)
+        .eq('id', params.movieId)
         .single()
-      setMovie(data)
-      if (data?.final_video_url) clearInterval(interval)
+      if (data?.final_video_url) {
+        setMovie(data)
+        clearInterval(interval)
+      }
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [movieId])
+  }, [params.movieId])
 
-  const handleCopyLink = () => {
+  const handleCopy = () => {
     navigator.clipboard.writeText(window.location.href)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
-        <p className="text-white text-lg">Loading...</p>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'white'}}>
+      <p>Loading...</p>
+    </div>
+  )
 
-  if (!movie || !movie.final_video_url) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-black gap-4">
-        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
-        <p className="text-white text-lg">Your movie is being created...</p>
-        <p className="text-gray-400 text-sm">This takes 2–5 minutes. This page will update automatically.</p>
-      </div>
-    )
-  }
+  if (!movie?.final_video_url) return (
+    <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'white',padding:'20px',textAlign:'center'}}>
+      <div style={{fontSize:'3rem',marginBottom:'24px'}}>🎬</div>
+      <h2 style={{color:'#D4A853',marginBottom:'12px'}}>Creating your movie...</h2>
+      <p style={{color:'#888',marginBottom:'8px'}}>This takes 2-5 minutes</p>
+      <p style={{color:'#555',fontSize:'0.85rem'}}>You can close this page and come back</p>
+      <div style={{marginTop:'32px',width:'40px',height:'40px',border:'3px solid #D4A853',borderTop:'3px solid transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black p-4">
-      <h1 className="text-white text-2xl mb-6">Your Movie</h1>
+    <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',padding:'48px 20px 120px',color:'white',fontFamily:'system-ui'}}>
+      
+      <h1 style={{color:'#D4A853',fontSize:'1.5rem',marginBottom:'4px'}}>Your Movie is Ready! 🎬</h1>
+      <p style={{color:'#555',fontSize:'0.85rem',marginBottom:'32px'}}>Share it with the world</p>
 
-      <div style={{position:'relative', display:'inline-block'}}>
+      {/* Video with watermark */}
+      <div style={{position:'relative',display:'inline-block',marginBottom:'32px'}}>
         <video
           src={movie.final_video_url}
           controls
           autoPlay
           playsInline
-          className="max-h-[80vh] rounded-lg shadow-2xl"
-          style={{ maxWidth: '400px' }}
+          style={{maxHeight:'70vh',maxWidth:'360px',borderRadius:'16px',boxShadow:'0 0 60px rgba(212,168,83,0.2)'}}
         />
         <a
           href="https://getscriptflow.com"
           target="_blank"
-          style={{
-            position:'absolute',
-            bottom:'12px',
-            right:'12px',
-            color:'rgba(255,255,255,0.5)',
-            fontSize:'0.7rem',
-            textDecoration:'none',
-            background:'rgba(0,0,0,0.25)',
-            padding:'3px 8px',
-            borderRadius:'20px',
-            backdropFilter:'blur(4px)',
-            letterSpacing:'0.5px'
-          }}
+          style={{position:'absolute',bottom:'12px',right:'12px',color:'rgba(255,255,255,0.5)',fontSize:'0.65rem',textDecoration:'none',background:'rgba(0,0,0,0.3)',padding:'3px 8px',borderRadius:'20px',backdropFilter:'blur(4px)'}}
         >
           getscriptflow.com
         </a>
       </div>
 
-      <div className="flex gap-4 mt-6">
+      {/* Buttons */}
+      <div style={{display:'flex',flexDirection:'column',gap:'12px',width:'100%',maxWidth:'360px'}}>
         <a
           href={movie.final_video_url}
-          download="my-movie.mp4"
-          className="bg-white text-black px-6 py-3 rounded-full font-bold hover:bg-gray-200 transition-colors"
+          download="my-scriptflow-movie.mp4"
+          style={{display:'block',background:'#D4A853',color:'#000',padding:'16px',borderRadius:'100px',fontWeight:'800',fontSize:'1rem',textDecoration:'none',textAlign:'center',boxShadow:'0 0 20px rgba(212,168,83,0.3)'}}
         >
-          Download
+          ⬇️ Download My Movie
         </a>
+
         <button
-          onClick={handleCopyLink}
-          className="bg-gray-700 text-white px-6 py-3 rounded-full font-bold hover:bg-gray-600 transition-colors"
+          onClick={handleCopy}
+          style={{background:'#1a1a1a',color:'white',border:'1px solid #333',padding:'16px',borderRadius:'100px',fontWeight:'700',fontSize:'1rem',cursor:'pointer'}}
         >
-          {copied ? 'Copied!' : 'Copy Link'}
+          {copied ? '✅ Link Copied!' : '🔗 Copy Share Link'}
         </button>
+
+        <a
+          href="/create"
+          style={{display:'block',background:'transparent',color:'#555',padding:'16px',borderRadius:'100px',fontWeight:'600',fontSize:'0.9rem',textDecoration:'none',textAlign:'center',border:'1px solid #222'}}
+        >
+          🎬 Make Another Movie
+        </a>
       </div>
+
     </div>
   )
 }
