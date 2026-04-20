@@ -82,14 +82,35 @@ export default function MoviePage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-black p-4">
       <h1 className="text-white text-2xl mb-6">Your Movie</h1>
 
-      <video
-        src={movie.final_video_url}
-        controls
-        autoPlay
-        playsInline
-        className="max-h-[80vh] rounded-lg shadow-2xl"
-        style={{ maxWidth: '400px' }}
-      />
+      <div style={{position:'relative', display:'inline-block'}}>
+        <video
+          src={movie.final_video_url}
+          controls
+          autoPlay
+          playsInline
+          className="max-h-[80vh] rounded-lg shadow-2xl"
+          style={{ maxWidth: '400px' }}
+        />
+        <a
+          href="https://getscriptflow.com"
+          target="_blank"
+          style={{
+            position:'absolute',
+            bottom:'12px',
+            right:'12px',
+            color:'rgba(255,255,255,0.5)',
+            fontSize:'0.7rem',
+            textDecoration:'none',
+            background:'rgba(0,0,0,0.25)',
+            padding:'3px 8px',
+            borderRadius:'20px',
+            backdropFilter:'blur(4px)',
+            letterSpacing:'0.5px'
+          }}
+        >
+          getscriptflow.com
+        </a>
+      </div>
 
       <div className="flex gap-4 mt-6">
         <a
