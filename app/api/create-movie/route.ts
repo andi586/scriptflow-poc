@@ -33,6 +33,18 @@ export async function POST(req: NextRequest) {
     if (!photo) return NextResponse.json({ error: 'No photo' }, { status: 400 })
     if (!story) return NextResponse.json({ error: 'No story' }, { status: 400 })
 
+    const castPhotos = []
+    let i = 0
+    while (form.get(`cast_${i}`)) {
+      castPhotos.push(form.get(`cast_${i}`) as File)
+      i++
+    }
+
+    const totalPhotos = 1 + castPhotos.length // 1 for main photo
+    if (totalPhotos > 7) {
+      return NextResponse.json({ error: 'Maximum 7 photos allowed' }, { status: 400 })
+    }
+
     // 1. Upload photo
     const bytes = await photo.arrayBuffer()
     const buffer = Buffer.from(bytes)

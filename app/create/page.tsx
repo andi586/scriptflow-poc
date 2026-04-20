@@ -176,6 +176,15 @@ export default function CreatePage() {
         )}
       </div>
 
+      {totalPhotos > 0 && (
+        <p style={{ color: remaining === 0 ? '#ff4444' : '#555', fontSize: '0.75rem', marginBottom: '16px', textAlign: 'center' }}>
+          {remaining === 0 
+            ? '✕ Maximum 7 photos reached' 
+            : `${totalPhotos}/7 photos used · ${remaining} slots remaining`
+          }
+        </p>
+      )}
+
       {/* Story input */}
       <div style={{ width: '100%', maxWidth: '400px', marginBottom: '24px' }}>
         <label style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>
