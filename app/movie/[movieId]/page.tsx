@@ -8,6 +8,8 @@ const supabase = createClient(
 )
 
 export default function MoviePage({ params }: { params: { movieId: string } }) {
+  const movieId = params.movieId
+  console.log('[movie page] movieId:', movieId)
   const [movie, setMovie] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -17,7 +19,7 @@ export default function MoviePage({ params }: { params: { movieId: string } }) {
       const { data } = await supabase
         .from('movies')
         .select('*')
-        .eq('id', params.movieId)
+        .eq('id', movieId)
         .single()
       setMovie(data)
       setLoading(false)
@@ -29,7 +31,7 @@ export default function MoviePage({ params }: { params: { movieId: string } }) {
       const { data } = await supabase
         .from('movies')
         .select('*')
-        .eq('id', params.movieId)
+        .eq('id', movieId)
         .single()
       if (data?.final_video_url) {
         setMovie(data)
@@ -38,7 +40,7 @@ export default function MoviePage({ params }: { params: { movieId: string } }) {
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [params.movieId])
+  }, [movieId])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(window.location.href)
