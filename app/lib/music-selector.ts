@@ -6,8 +6,8 @@ const supabase = createClient(
 )
 
 export async function selectBGM(emotion: string): Promise<string> {
-  // Default fallback BGM
-  const DEFAULT_BGM = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+  // Default fallback BGM (Song-6 = playful)
+  const DEFAULT_BGM = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3'
   
   try {
     // Map emotion to tags
@@ -61,7 +61,9 @@ export async function selectBGM(emotion: string): Promise<string> {
     }
 
     const tags = emotionMap[emotion.toLowerCase()] || ['warm']
-    
+    console.log('[music-selector] emotion:', emotion)
+    console.log('[music-selector] tags:', tags)
+
     // Find matching music
     const { data } = await supabase
       .from('music_assets')
@@ -70,11 +72,17 @@ export async function selectBGM(emotion: string): Promise<string> {
       .eq('approved', true)
       .contains('emotion_tags', [tags[0]])
       .limit(5)
-    
-    if (!data || data.length === 0) return DEFAULT_BGM
-    
+
+    console.log('[music-selector] found:', data?.length, 'tracks')
+
+    if (!data || data.length === 0) {
+      console.log('[music-selector] no match found, using default BGM')
+      return DEFAULT_BGM
+    }
+
     // Pick randomly from matches
     const random = data[Math.floor(Math.random() * data.length)]
+    console.log('[music-selector] selected:', random?.url)
     return random.url
     
   } catch (e) {
