@@ -23,11 +23,12 @@ export async function POST(request: NextRequest) {
 
     const output = await runCognitiveCore(story, template)
 
-    console.log('[generate-script] CognitiveCore complete. Shots:', output.executionPlan.pipeline.length)
+    console.log('[generate-script] CognitiveCore complete. Shots:', output.executionPlan.pipeline.length, 'category:', output.story_category)
     return NextResponse.json({
       shots: output.executionPlan.pipeline,
       storyState: output.storyState,
       directionPlan: output.directionPlan,
+      story_category: output.story_category,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

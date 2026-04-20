@@ -1,5 +1,20 @@
 import Anthropic from '@anthropic-ai/sdk'
 
+export interface CinematicEmotion {
+  core_emotion: string
+  visual_truth: string
+  conflict: string
+  visual_metaphor: string[]
+  what_is_not_said: string
+  what_film_feels: string
+  scene_symbols: string[]
+  dialogue_subtext: string
+  music_mood: string
+  forbidden_words: string[]
+  character_arc: string
+  story_category: 'grief' | 'love' | 'family' | 'pet' | 'prank' | 'achievement' | 'nostalgia' | 'hope'
+}
+
 export interface StoryState {
   world: string
   characters: Array<{
@@ -54,38 +69,69 @@ export interface CognitiveCoreOutput {
   storyState: StoryState
   directionPlan: DirectionPlan
   executionPlan: ExecutionPlan
+  story_category: CinematicEmotion['story_category']
 }
 
 const client = new Anthropic()
 
-async function runProducer(userInput: string, template: string): Promise<StoryState> {
+async function runProducer(userInput: string): Promise<CinematicEmotion> {
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 4096,
     messages: [{
       role: 'user',
-      content: `You are a master film producer with a gift for transforming even the simplest input into emotionally explosive cinema.
+      content: `You are a master film producer. Your ONLY job is to translate everyday human language into pure cinematic emotion structure.
 
-CRITICAL RULE: If the user input is short (under 20 words), you MUST expand it into a full emotional story.
-- "妈妈我想你" → expand into a rich story about longing, regret, love across time
-- "失恋了" → expand into a story about heartbreak, memories, moving on
-- "儿子上学了" → expand into a story about parental pride, time passing, love
+You are a TRANSLATOR between:
+- What users SAY (everyday language)  
+- What films FEEL (pure emotion, conflict, visual truth)
 
-Your job: Take the user's raw feeling and transform it into the most emotionally powerful story possible.
-Find the UNIVERSAL human truth underneath their words.
-Make it specific, cinematic, and deeply moving.
+TRANSLATION RULES:
+
+Step 1: IGNORE the literal words. Find the REAL emotion underneath.
+Examples:
+- "我的猫咪今天很调皮" → NOT about a cat. ABOUT: warmth, chaos as love, being needed by another living thing
+- "妈妈我想你" → NOT about missing mom. ABOUT: time's cruelty, unfinished conversations, love outlasting death
+- "失恋了" → NOT about a breakup. ABOUT: the version of yourself that no longer exists
+- "儿子今天上学了" → NOT about school. ABOUT: time moving without permission, pride mixed with loss
+
+Step 2: Find the UNIVERSAL HUMAN TRUTH.
+Every story maps to one of these:
+- grief: love and loss, missing someone
+- love: romantic connection, tenderness
+- family: belonging, roots, generational bonds
+- pet: unconditional love, chaos as joy
+- prank: friendship, laughter, inside jokes
+- achievement: triumph, growth, pride
+- nostalgia: time passing, memory, home
+- hope: new beginnings, possibility
+
+Step 3: Find the VISUAL METAPHORS (3-5 physical objects that carry the emotion).
+Examples:
+- longing → empty chair, cold cup of tea, stopped clock
+- cat mischief as love → broken cup, spreading water, cat tail swaying
+- grief → fallen photo frame, wilting flower, rain on window
+- hope → morning light through curtain, open door, sprouting plant
+
+Step 4: Define what must NOT be said (forbidden words/phrases for dialogue).
+These are things too obvious to say - the subtext lives in what's unsaid.
 
 User Input: "${userInput}"
-Template: "${template}"
 
-Return ONLY valid JSON (no markdown):
+Return ONLY valid JSON matching this interface. No markdown:
 {
-  "world": "brief world description",
-  "characters": [{"name": "string", "role": "string", "goal": "string", "state": "string"}],
-  "relationships": "string",
-  "coreConflict": "string",
-  "narrativeGoal": "string",
-  "tensionCurve": ["low","medium","high","peak"]
+  "core_emotion": "string",
+  "visual_truth": "string",
+  "conflict": "string",
+  "visual_metaphor": ["string", "string", "string"],
+  "what_is_not_said": "string",
+  "what_film_feels": "string",
+  "scene_symbols": ["string", "string", "string"],
+  "dialogue_subtext": "string",
+  "music_mood": "string",
+  "forbidden_words": ["string", "string"],
+  "character_arc": "string",
+  "story_category": "grief|love|family|pet|prank|achievement|nostalgia|hope"
 }`
     }]
   })
@@ -99,50 +145,48 @@ Return ONLY valid JSON (no markdown):
   return JSON.parse(clean)
 }
 
-async function runDirector(storyState: StoryState, template: string): Promise<DirectionPlan> {
+async function runDirector(cinematicEmotion: CinematicEmotion, template: string): Promise<DirectionPlan> {
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 4096,
     messages: [{
       role: 'user',
-      content: `You are an award-winning film director specializing in emotional short films.
+      content: `You are a film director trained by Wong Kar-wai, Hirokazu Kore-eda, and Christopher Nolan.
+You receive a CinematicEmotion structure from the Producer and translate it into a shot list.
 
-Story State: ${JSON.stringify(storyState)}
+You NEVER receive raw user text. You only work with cinematic emotion structures.
+
+CinematicEmotion: ${JSON.stringify(cinematicEmotion)}
 Template: "${template}"
 
-STRICT RULES for face shots:
-- Maximum 2 sentences, maximum 10 Chinese characters each
-- MUST use '...' for natural pauses (at least one per shot)
-- Sentences must feel like real spoken words, not written text
-- Emotion must ESCALATE across shots following tensionCurve
-- First shot MUST hook in 3 seconds: start with '妈妈...' or similar intimate address
+STRICT CINEMATIC PROTOCOL:
 
-STRICT RULES for scene shots:
-- Describe EMPTY cinematic environment only
-- NO people, NO humans, NO figures
-- Must match emotional tone of adjacent face shots
-- Use cinematic language: lighting, texture, movement
+Every shot is categorized as ONE of:
+- SHOT: purely visual, no people allowed in scene shots
+- DIALOGUE: spoken words only, max 8 words, must have subtext
+- SOUND: non-verbal audio only
 
-CRITICAL RULES for dialogue:
-- Maximum 8 words per shot
-- Use "..." for emotional pauses
-- Less is more. Silence carries more emotion than words.
-- Never explain. Let the feeling breathe.
+FORBIDDEN in any output:
+- Narration or voiceover
+- Explaining emotions with words
+- "he feels", "she thinks", "as if", "seems like"
+- Dialogue that describes what is visible on screen
 
-BAD examples (too long, too explanatory):
-'妈，我回来啦8年啦！你没等我，我以为..我有时间'
-'这是你离开后的第十五个母亲节，我也渐渐老去'
+DIALOGUE RULES:
+- Maximum 8 words
+- Must have subtext (surface meaning ≠ real meaning)
+- Incomplete sentences preferred
+- Use the visual_metaphors from Producer output
+- Use the scene_symbols from Producer output
+- NEVER use forbidden_words from Producer output
 
-GOOD examples (short, intimate, devastating):
-'妈妈... 我回来了。'
-'八年了...'
-'你呢？'
-'Mom... I made it.'
-'Eight years...'
-'I thought we had time.'
+SCENE SHOT RULES (no people):
+- Use scene_symbols from Producer output as visual anchors
+- Each scene shot = one emotional symbol
+- Camera movement must match emotion (slow push = grief, static = emptiness, drift = confusion)
 
-Create 8 shots alternating: face, scene, face, scene, face, scene, face, scene
-Each shot 8-12 seconds.
+Create 6 shots alternating: face, scene, face, scene, face, scene
+Each shot duration: 2-3 seconds
 
 Return ONLY valid JSON (no markdown):
 {
@@ -153,7 +197,7 @@ Return ONLY valid JSON (no markdown):
       "shotNumber": 1,
       "type": "close-up",
       "cameraMovement": "static",
-      "duration": 10,
+      "duration": 3,
       "description": "person speaking",
       "emotion": "tender",
       "shotType": "face",
@@ -163,7 +207,7 @@ Return ONLY valid JSON (no markdown):
       "shotNumber": 2,
       "type": "wide",
       "cameraMovement": "push",
-      "duration": 8,
+      "duration": 2,
       "description": "empty room",
       "emotion": "lonely",
       "shotType": "scene",
@@ -230,10 +274,21 @@ async function runNEL(directionPlan: DirectionPlan): Promise<ExecutionPlan> {
 
 export async function runCognitiveCore(userInput: string, template: string): Promise<CognitiveCoreOutput> {
   console.log('[CognitiveCore] Starting Producer...')
-  const storyState = await runProducer(userInput, template)
+  const cinematicEmotion = await runProducer(userInput)
+  console.log('[CognitiveCore] story_category:', cinematicEmotion.story_category)
+
+  // Build a StoryState-compatible object from CinematicEmotion for backward compatibility
+  const storyState: StoryState = {
+    world: cinematicEmotion.visual_truth,
+    characters: [{ name: 'protagonist', role: 'main', goal: cinematicEmotion.character_arc, state: cinematicEmotion.core_emotion }],
+    relationships: cinematicEmotion.dialogue_subtext,
+    coreConflict: cinematicEmotion.conflict,
+    narrativeGoal: cinematicEmotion.what_film_feels,
+    tensionCurve: ['low', 'medium', 'high', 'peak']
+  }
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(storyState, template)
+  const rawDirectionPlan = await runDirector(cinematicEmotion, template)
 
   console.log('[CognitiveCore] Validating face shot lengths...')
   const { plan: directionPlan, violations } = validateAndFixFaceShots(rawDirectionPlan)
@@ -247,5 +302,5 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const executionPlan = await runNEL(directionPlan)
 
   console.log('[CognitiveCore] Complete. Total shots:', executionPlan.pipeline.length)
-  return { storyState, directionPlan, executionPlan }
+  return { storyState, directionPlan, executionPlan, story_category: cinematicEmotion.story_category }
 }
