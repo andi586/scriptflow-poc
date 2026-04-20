@@ -10,7 +10,7 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { story, tier = '60s', userId, additional_images } = await req.json()
+    const { story, tier = '60s', userId, additional_images, story_category } = await req.json()
 
     if (!story) {
       return NextResponse.json({ error: 'Story is required' }, { status: 400 })
@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
       'garden bench empty in late afternoon',
     ]
 
+    const hasCastPhotos = Array.isArray(additional_images) && additional_images.length > 0
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buildPrompt = (shot: any, shotIndex: number, _totalShots: number): string => {
       const movement = cameraMovements[shotIndex % cameraMovements.length]
@@ -84,14 +86,25 @@ export async function POST(req: NextRequest) {
       if (shot.shotType === 'face') {
         const emotion = shot.emotion || 'contemplative'
         const dialogue = shot.dialogue || ''
+        const frameType = shot.frameType || shot.type || 'close-up'
+        const cameraMovement = shot.cameraMovement || movement
+        const lighting = shot.lighting || 'soft cinematic'
+        const visualDesc = shot.visualDescription || shot.description || ''
 
         const dialogueInstruction = dialogue
           ? `character speaks quietly with restraint: "${dialogue}", voice barely above whisper, emotion held back`
           : 'character in silence, emotion visible only in subtle facial movements'
 
-        return `Cinematic 9:16, ${movement}, close-up portrait, character @image_1, ${dialogueInstruction}, emotion: ${emotion} but controlled and understated, soft cinematic lighting, shallow depth of field, smooth dissolve transition`
+        return `Cinematic 9:16, ${frameType}, ${cameraMovement}, character @image_1, ${visualDesc ? visualDesc + ', ' : ''}${dialogueInstruction}, emotion: ${emotion} but controlled and understated, ${lighting} lighting, shallow depth of field, smooth dissolve transition`
       } else {
-        return `Cinematic 9:16, ${movement}, ${environment}, no people, empty space holding memory, emotion: ${shot.emotion || 'melancholic'}, natural light with soft shadows, smooth dissolve transition into next shot`
+        // Scene shot
+        const petRef = (story_category === 'pet' && hasCastPhotos) ? '@image_2 ' : ''
+        const frameType = shot.frameType || shot.type || 'wide'
+        const cameraMovement = shot.cameraMovement || movement
+        const lighting = shot.lighting || 'natural'
+        const visualDesc = shot.visualDescription || shot.scenePrompt || shot.description || environment
+
+        return `Cinematic 9:16, ${frameType}, ${cameraMovement}, ${petRef}${visualDesc}, emotion: ${shot.emotion || 'melancholic'}, ${lighting} light with soft shadows, no people, smooth dissolve transition`
       }
     }
 

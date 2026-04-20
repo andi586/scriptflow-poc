@@ -86,11 +86,26 @@ export async function POST(req: NextRequest) {
       console.log('[create-movie] cast photo uploaded:', castPub.publicUrl)
     }
 
-    // 5. Call movie/generate
+    // 5. Call generate-script first to get story_category
+    let storyCategoryFromScript: string | undefined
+    try {
+      const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: story, personalNote: story })
+      })
+      const scriptData = await scriptRes.json()
+      storyCategoryFromScript = scriptData?.story_category
+      console.log('[create-movie] story_category:', storyCategoryFromScript)
+    } catch (e) {
+      console.warn('[create-movie] generate-script pre-call failed, story_category unknown:', e)
+    }
+
+    // 6. Call movie/generate
     const genRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/movie/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story, tier, userId: twin.id, additional_images: additionalImages })
+      body: JSON.stringify({ story, tier, userId: twin.id, additional_images: additionalImages, story_category: storyCategoryFromScript })
     })
     const genData = await genRes.json()
     if (!genRes.ok) throw new Error(genData.error || 'Generation failed')
