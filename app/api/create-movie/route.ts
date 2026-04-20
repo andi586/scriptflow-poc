@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const today = new Date().toDateString()
     const key = `${ip}_${today}`
     const count = ipLimits.get(key) || 0
-    if (count >= 1) {
+    if (count >= 10) {
       return NextResponse.json({ 
         error: 'Daily limit reached. Contact us to generate more movies.' 
       }, { status: 429 })
