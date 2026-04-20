@@ -67,11 +67,30 @@ export async function POST(req: NextRequest) {
 
     console.log('[create-movie] twin:', twin.id, photoUrl)
 
-    // 4. Call movie/generate
+    // 4. Upload cast photos and collect their URLs
+    const additionalImages: string[] = []
+    for (let j = 0; j < castPhotos.length; j++) {
+      const castFile = castPhotos[j]
+      const castBytes = await castFile.arrayBuffer()
+      const castBuffer = Buffer.from(castBytes)
+      const castFileName = `twins/${Date.now()}_cast_${j}.jpg`
+      const { error: castUploadError } = await supabase.storage
+        .from('recordings')
+        .upload(castFileName, castBuffer, { contentType: 'image/jpeg', upsert: true })
+      if (castUploadError) {
+        console.warn('[create-movie] cast photo upload failed:', castUploadError.message)
+        continue
+      }
+      const { data: castPub } = supabase.storage.from('recordings').getPublicUrl(castFileName)
+      additionalImages.push(castPub.publicUrl)
+      console.log('[create-movie] cast photo uploaded:', castPub.publicUrl)
+    }
+
+    // 5. Call movie/generate
     const genRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/movie/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story, tier, userId: twin.id })
+      body: JSON.stringify({ story, tier, userId: twin.id, additional_images: additionalImages })
     })
     const genData = await genRes.json()
     if (!genRes.ok) throw new Error(genData.error || 'Generation failed')

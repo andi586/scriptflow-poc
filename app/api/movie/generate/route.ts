@@ -10,7 +10,7 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { story, tier = '60s', userId } = await req.json()
+    const { story, tier = '60s', userId, additional_images } = await req.json()
 
     if (!story) {
       return NextResponse.json({ error: 'Story is required' }, { status: 400 })
@@ -131,7 +131,9 @@ export async function POST(req: NextRequest) {
         resolution: '720p',
         aspect_ratio: '9:16',
         enable_audio: true,
-        images: twin.frame_url_mid ? [twin.frame_url_mid] : undefined,
+        images: additional_images && additional_images.length > 0
+          ? [twin.frame_url_mid, ...additional_images]
+          : [twin.frame_url_mid],
         multi_shots: multiShots
       },
       config: {
