@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story, template: 'Dear Mom' })
+      body: JSON.stringify({ template: story, personalNote: story })
     })
     const scriptData = await scriptRes.json()
     const shots = scriptData?.directionPlan?.shots ?? []
