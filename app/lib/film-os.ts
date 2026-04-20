@@ -717,9 +717,9 @@ export function matchArchetypeExtended(story: string): string {
   const s = story.toLowerCase()
 
   // Funny archetypes
-  if (["整蛊", "prank", "搞笑"].some(k => s.includes(k))) return "prank_friend"
-  if (["翻车", "fail"].some(k => s.includes(k))) return "fail_moments"
-  if (["宠物搞笑", "pet funny"].some(k => s.includes(k))) return "pet_funny"
+  if (["整蛊", "prank", "搞笑", "恶作剧"].some(k => s.includes(k))) return "prank_friend"
+  if (["翻车", "fail", "出糗"].some(k => s.includes(k))) return "fail_moments"
+  if (["宠物搞笑", "逗猫", "逗狗"].some(k => s.includes(k))) return "pet_funny"
 
   // New lifestyle archetypes
   if (["旅行", "旅游", "travel"].some(k => s.includes(k))) return "travel_memory"
