@@ -869,6 +869,192 @@ export const NEW_ARCHETYPES = [
       { shot: 7, emotion: "gratitude", intensity: 6, type: "scene" },
       { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
     ]
+  },
+  {
+    archetype: "valentines_day",
+    description: "情人节的浪漫与爱意表达",
+    blueprint: ["期待", "相遇", "惊喜", "表白", "高潮", "余韵"],
+    symbolObjects: ["玫瑰", "巧克力", "烛光", "情书"],
+    forbiddenElements: ["冲突", "沉重情绪"],
+    musicArc: "柔→渐强→浪漫高潮→余韵",
+    dialogueStyle: "温柔+真诚",
+    klingPrompts: {
+      hookShot: "ECU, red roses or heart-shaped chocolate, warm candlelight, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, tender love expression, warm soft light, cinematic 9:16",
+      sceneShot: "romantic setting with candles and flowers, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, overwhelmed with love, cinematic 9:16",
+      endingShot: "WS, romantic scene hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, preparing surprise or gift, cinematic 9:16",
+      conflictShot: "ECU, @image_1, nervous anticipation, cinematic 9:16",
+      silenceShot: "ECU, candle flame, static, cinematic 9:16",
+      symbolShot: "ECU, roses or love letter, warm light, cinematic 9:16",
+      transitionShot: "WS, romantic environment, golden light, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "anticipation", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "nervous_joy", intensity: 6, type: "face" },
+      { shot: 3, emotion: "romance", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "love", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_love", intensity: 10, type: "face" },
+      { shot: 6, emotion: "warmth", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "tenderness", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "mothers_day",
+    description: "母亲节对妈妈的爱与感恩",
+    blueprint: ["回忆", "思念", "感恩", "情感流露", "高潮", "余韵"],
+    symbolObjects: ["康乃馨", "妈妈的手", "旧照片", "家"],
+    forbiddenElements: ["冲突", "轻浮处理"],
+    musicArc: "柔→渐强→温暖高潮→余韵",
+    dialogueStyle: "温柔+真诚",
+    klingPrompts: {
+      hookShot: "ECU, carnation flowers or mother's hands, warm soft light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, deep gratitude and love, warm light, cinematic 9:16",
+      sceneShot: "home environment with family photos, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, tears of love and gratitude, cinematic 9:16",
+      endingShot: "WS, warm home scene hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, emotional memory moment, warm light, cinematic 9:16",
+      conflictShot: "ECU, @image_1, missing mother expression, cinematic 9:16",
+      silenceShot: "WS, quiet home, static, cinematic 9:16",
+      symbolShot: "ECU, flowers or old photo, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, holding flowers or gift, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "nostalgia", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "longing", intensity: 6, type: "face" },
+      { shot: 3, emotion: "warmth", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "gratitude", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_love", intensity: 10, type: "face" },
+      { shot: 6, emotion: "tenderness", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "peace", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "fathers_day",
+    description: "父亲节对爸爸的爱与感恩",
+    blueprint: ["回忆", "父爱", "感恩", "情感流露", "高潮", "余韵"],
+    symbolObjects: ["父亲的手", "旧照片", "工具", "背影"],
+    forbiddenElements: ["冲突", "轻浮处理"],
+    musicArc: "低→渐强→温暖高潮→余韵",
+    dialogueStyle: "简短+真诚",
+    klingPrompts: {
+      hookShot: "ECU, father's hands or old family photo, warm directional light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, deep respect and love, warm light, cinematic 9:16",
+      sceneShot: "home or workshop environment, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, emotional gratitude, cinematic 9:16",
+      endingShot: "WS, warm scene hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, memory or tribute moment, cinematic 9:16",
+      conflictShot: "ECU, @image_1, missing father expression, cinematic 9:16",
+      silenceShot: "WS, quiet home, static, cinematic 9:16",
+      symbolShot: "ECU, father's tool or keepsake, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, holding gift or flowers, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "respect", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "nostalgia", intensity: 6, type: "face" },
+      { shot: 3, emotion: "warmth", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "gratitude", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_love", intensity: 10, type: "face" },
+      { shot: 6, emotion: "tenderness", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "peace", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "christmas",
+    description: "圣诞节的温暖与欢乐",
+    blueprint: ["期待", "装饰", "团聚", "惊喜", "高潮", "余韵"],
+    symbolObjects: ["圣诞树", "礼物", "雪花", "烛光"],
+    forbiddenElements: ["冲突", "沉重情绪"],
+    musicArc: "柔→渐强→欢乐→余韵",
+    dialogueStyle: "温暖+轻松",
+    klingPrompts: {
+      hookShot: "ECU, christmas tree lights or ornaments, warm golden light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, joyful christmas warmth, golden light, cinematic 9:16",
+      sceneShot: "christmas decorated room with tree and gifts, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, pure holiday joy, cinematic 9:16",
+      endingShot: "WS, christmas scene hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, opening gifts or decorating, cinematic 9:16",
+      conflictShot: "ECU, @image_1, emotional holiday moment, cinematic 9:16",
+      silenceShot: "ECU, candle or tree lights, static, cinematic 9:16",
+      symbolShot: "ECU, wrapped gift or ornament, warm light, cinematic 9:16",
+      transitionShot: "WS, snowy or festive environment, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "anticipation", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "joy", intensity: 7, type: "face" },
+      { shot: 3, emotion: "warmth", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "family_love", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_joy", intensity: 10, type: "face" },
+      { shot: 6, emotion: "celebration", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "gratitude", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "misunderstanding_resolved",
+    description: "误会消除后的释然与和解",
+    blueprint: ["误会", "距离", "痛苦", "真相", "释然", "和解"],
+    symbolObjects: ["沉默", "眼神", "手", "泪水"],
+    forbiddenElements: ["持续冲突", "无解决"],
+    musicArc: "低→紧张→释放→温暖",
+    dialogueStyle: "真诚+简短",
+    klingPrompts: {
+      hookShot: "ECU, two people apart, cold light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, hurt and confused expression, cinematic 9:16",
+      sceneShot: "empty space between two chairs or objects, cold light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, moment of realization and relief, cinematic 9:16",
+      endingShot: "WS, warm reconciled scene hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, confrontation or explanation moment, cinematic 9:16",
+      conflictShot: "ECU, @image_1, pain of misunderstanding, cinematic 9:16",
+      silenceShot: "WS, tense empty space, static, cinematic 9:16",
+      symbolShot: "ECU, hands reaching toward each other, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, emotional release, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "hurt", intensity: 6, type: "face" },
+      { shot: 2, emotion: "distance", intensity: 7, type: "scene" },
+      { shot: 3, emotion: "tension", intensity: 8, type: "face" },
+      { shot: 4, emotion: "revelation", intensity: 9, type: "face" },
+      { shot: 5, emotion: "relief", intensity: 10, type: "face" },
+      { shot: 6, emotion: "warmth", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "peace", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "secret_revealed",
+    description: "秘密揭露的震惊与情绪冲击",
+    blueprint: ["平静", "线索", "发现", "揭露", "冲击", "余波"],
+    symbolObjects: ["信件", "照片", "门", "眼神"],
+    forbiddenElements: ["轻浮处理", "无情绪冲击"],
+    musicArc: "低→渐强→爆发→余韵",
+    dialogueStyle: "简短+有力",
+    klingPrompts: {
+      hookShot: "ECU, mysterious object or letter, dramatic light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, shock and disbelief, cinematic 9:16",
+      sceneShot: "revealing environment or object, dramatic light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak shock expression, cinematic 9:16",
+      endingShot: "WS, aftermath silence hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, discovering clue or truth, cinematic 9:16",
+      conflictShot: "ECU, @image_1, confronting the secret, cinematic 9:16",
+      silenceShot: "WS, empty space after revelation, static, cinematic 9:16",
+      symbolShot: "ECU, key object of secret, dramatic light, cinematic 9:16",
+      transitionShot: "MS, @image_1, processing the truth, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "calm", intensity: 3, type: "scene" },
+      { shot: 2, emotion: "suspicion", intensity: 5, type: "face" },
+      { shot: 3, emotion: "discovery", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "shock", intensity: 10, type: "face" },
+      { shot: 5, emotion: "disbelief", intensity: 9, type: "face" },
+      { shot: 6, emotion: "processing", intensity: 7, type: "scene" },
+      { shot: 7, emotion: "aftermath", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "stillness", intensity: 2, type: "scene" }
+    ]
   }
 ]
 
@@ -924,6 +1110,16 @@ export function matchArchetypeExtended(story: string): string {
   if (["老师", "学生", "teacher"].some(k => s.includes(k))) return "teacher_student"
   if (["同事", "工作", "office"].some(k => s.includes(k))) return "colleague_story"
   if (["春节", "过年", "spring festival", "新年"].some(k => s.includes(k))) return "spring_festival"
+
+  // Holiday special archetypes
+  if (["情人节", "valentines"].some(k => s.includes(k))) return "valentines_day"
+  if (["母亲节", "妈妈", "mother"].some(k => s.includes(k))) return "mothers_day"
+  if (["父亲节", "爸爸", "father"].some(k => s.includes(k))) return "fathers_day"
+
+  // Holiday christmas + drama archetypes
+  if (["圣诞", "christmas"].some(k => s.includes(k))) return "christmas"
+  if (["误会", "和解", "误解"].some(k => s.includes(k))) return "misunderstanding_resolved"
+  if (["秘密", "揭露", "secret"].some(k => s.includes(k))) return "secret_revealed"
 
   // Original archetypes
   const triggers = [
