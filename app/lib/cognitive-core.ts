@@ -3,6 +3,8 @@ import { DIRECTOR_BRAIN } from './director-brain'
 import { EMOTION_ARCHETYPES, DURATION_FORMULAS, matchArchetype } from './emotion-archetypes'
 import { SYMBOL_OBJECTS, SUBTEXT_TEMPLATES, EMOTION_TRANSITIONS, HOOK_FORMULAS, ENDING_FORMULAS } from './director-knowledge'
 import { getKlingTemplate, getEmotionProgression, DIRECTOR_SELF_CHECK } from './film-os'
+import { NEW_ARCHETYPES, matchArchetypeExtended } from './film-os'
+import { getDirectorRules } from './director-rules'
 
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
@@ -176,7 +178,9 @@ async function runDirector(
   archetypeName: string,
   shotDurations: number[],
   klingTemplate: ReturnType<typeof getKlingTemplate>,
-  emotionCurve: ReturnType<typeof getEmotionProgression>
+  emotionCurve: ReturnType<typeof getEmotionProgression>,
+  directorRules: ReturnType<typeof getDirectorRules>,
+  durationFormula: typeof DURATION_FORMULAS[string]
 ): Promise<DirectionPlan> {
   const { visual_constraints, emotion_profile } = producerOutput
   const abstractionLevel = emotion_profile.abstraction_level
@@ -253,6 +257,28 @@ MUSIC ARC: ${archetype.musicArc}
 DIALOGUE STYLE: ${archetype.dialogueStyle}
 SHOT DURATIONS: ${shotDurations.join('s, ')}s`
 })()}
+
+═══ FILM OS ACTIVE ═══
+ARCHETYPE: ${archetypeName} - ${(() => { const ALL_ARCHETYPES_INLINE = [...EMOTION_ARCHETYPES, ...NEW_ARCHETYPES]; const archetypeDataInline = ALL_ARCHETYPES_INLINE.find(a => a.archetype === archetypeName); return archetypeDataInline?.description || '' })()}
+BLUEPRINT: ${(() => { const ALL_ARCHETYPES_INLINE = [...EMOTION_ARCHETYPES, ...NEW_ARCHETYPES]; const archetypeDataInline = ALL_ARCHETYPES_INLINE.find(a => a.archetype === archetypeName); return archetypeDataInline?.blueprint?.join(' → ') || '' })()}
+SYMBOL OBJECTS (must appear in scene shots): ${(() => { const ALL_ARCHETYPES_INLINE = [...EMOTION_ARCHETYPES, ...NEW_ARCHETYPES]; const archetypeDataInline = ALL_ARCHETYPES_INLINE.find(a => a.archetype === archetypeName); return archetypeDataInline?.symbolObjects?.join(', ') || '' })()}
+FORBIDDEN: ${(() => { const ALL_ARCHETYPES_INLINE = [...EMOTION_ARCHETYPES, ...NEW_ARCHETYPES]; const archetypeDataInline = ALL_ARCHETYPES_INLINE.find(a => a.archetype === archetypeName); return archetypeDataInline?.forbiddenElements?.join(', ') || '' })()}
+MUSIC ARC: ${(() => { const ALL_ARCHETYPES_INLINE = [...EMOTION_ARCHETYPES, ...NEW_ARCHETYPES]; const archetypeDataInline = ALL_ARCHETYPES_INLINE.find(a => a.archetype === archetypeName); return archetypeDataInline?.musicArc || '' })()}
+DIALOGUE STYLE: ${(() => { const ALL_ARCHETYPES_INLINE = [...EMOTION_ARCHETYPES, ...NEW_ARCHETYPES]; const archetypeDataInline = ALL_ARCHETYPES_INLINE.find(a => a.archetype === archetypeName); return archetypeDataInline?.dialogueStyle || '' })()}
+
+DIRECTOR RULES (follow strictly):
+${directorRules?.directorRules?.join('\n') || ''}
+SHOT SEQUENCE: ${directorRules?.shotSequence || ''}
+CAMERA STYLE: ${directorRules?.cameraStyle || ''}
+LIGHTING: ${directorRules?.lightingDirective || ''}
+PACING: ${directorRules?.pacingDirective || ''}
+DIALOGUE: ${directorRules?.dialogueDirective || ''}
+MUSIC: ${directorRules?.musicDirective || ''}
+
+EMOTION CURVE (follow exactly):
+${emotionCurve?.map(s => `Shot${s.shot}: ${s.emotion} intensity:${s.intensity} type:${s.type}`).join('\n') || ''}
+
+SHOT DURATIONS: ${durationFormula.distribution.join('s, ')}s
 
 
 REALITY ANCHOR RULES (MANDATORY):
@@ -423,7 +449,7 @@ function validateAndFixFaceShots(plan: DirectionPlan): { plan: DirectionPlan; vi
   return { plan: fixed, violations }
 }
 
-async function runNEL(directionPlan: DirectionPlan): Promise<ExecutionPlan> {
+async function runNEL(directionPlan: DirectionPlan, klingTemplate: ReturnType<typeof getKlingTemplate>): Promise<ExecutionPlan> {
   const pipeline = directionPlan.shots.map((shot, i) => ({
     shotNumber: shot.shotNumber,
     type: shot.shotType,
@@ -433,6 +459,20 @@ async function runNEL(directionPlan: DirectionPlan): Promise<ExecutionPlan> {
     emotion: shot.emotion,
     tension: Math.floor((i / directionPlan.shots.length) * 10)
   }))
+
+  // NEL Kling Templates context (available for downstream rendering)
+  const kt = klingTemplate as Record<string, string>
+  const _klingTemplatesContext = `═══ KLING TEMPLATES ═══
+hook: ${kt?.hookShot || ''}
+face: ${kt?.faceShot || ''}
+scene: ${kt?.sceneShot || ''}
+peak: ${kt?.peakShot || ''}
+ending: ${kt?.endingShot || ''}
+build: ${kt?.buildShot || ''}
+conflict: ${kt?.conflictShot || ''}
+silence: ${kt?.silenceShot || ''}
+symbol: ${kt?.symbolShot || ''}
+transition: ${kt?.transitionShot || ''}`
 
   return {
     pipeline,
@@ -469,11 +509,19 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const shotDurations = durationFormula.distribution
   const klingTemplate = getKlingTemplate(archetypeName)
   const emotionCurve = getEmotionProgression(archetypeName)
+
+  const ALL_ARCHETYPES = [...EMOTION_ARCHETYPES, ...NEW_ARCHETYPES]
+  const archetype = matchArchetypeExtended(userInput)
+  const archetypeData = ALL_ARCHETYPES.find(a => a.archetype === archetype)
+  const directorRules = getDirectorRules(archetype)
+  const durationFormulaFilmOS = DURATION_FORMULAS[tier] || DURATION_FORMULAS['30s']
+
+  console.log('[CognitiveCore] archetype matched:', archetype)
   console.log('[CognitiveCore] archetype:', archetypeName, '| shotDurations:', shotDurations)
   console.log('[CognitiveCore] klingTemplate hookShot:', klingTemplate.hookShot.slice(0, 60))
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve)
+  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula)
 
   console.log('[CognitiveCore] Checking reality anchors...')
   checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
@@ -487,7 +535,7 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   }
 
   console.log('[CognitiveCore] Starting NEL...')
-  const executionPlan = await runNEL(directionPlan)
+  const executionPlan = await runNEL(directionPlan, klingTemplate)
 
   console.log('[CognitiveCore] Complete. Total shots:', executionPlan.pipeline.length)
   return { storyState, directionPlan, executionPlan, story_category: producerOutput.story_category }
