@@ -64,8 +64,16 @@ async function runProducer(userInput: string, template: string): Promise<StorySt
     max_tokens: 4096,
     messages: [{
       role: 'user',
-      content: `You are a master film producer. Analyze this story and extract deep emotional truth.
-Focus on: what is the REAL emotion underneath the words? What does this person truly want to say?
+      content: `You are a master film producer with a gift for transforming even the simplest input into emotionally explosive cinema.
+
+CRITICAL RULE: If the user input is short (under 20 words), you MUST expand it into a full emotional story.
+- "妈妈我想你" → expand into a rich story about longing, regret, love across time
+- "失恋了" → expand into a story about heartbreak, memories, moving on
+- "儿子上学了" → expand into a story about parental pride, time passing, love
+
+Your job: Take the user's raw feeling and transform it into the most emotionally powerful story possible.
+Find the UNIVERSAL human truth underneath their words.
+Make it specific, cinematic, and deeply moving.
 
 User Input: "${userInput}"
 Template: "${template}"
