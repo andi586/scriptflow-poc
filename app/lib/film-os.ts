@@ -590,6 +590,99 @@ export const NEW_ARCHETYPES = [
       { shot: 7, emotion: "forward", intensity: 5, type: "scene" },
       { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
     ]
+  },
+  {
+    archetype: "prank_friend",
+    description: "整蛊朋友的搞笑瞬间",
+    blueprint: ["设局", "等待", "触发", "反应", "混乱", "笑场"],
+    symbolObjects: ["道具", "隐藏摄像", "朋友表情", "逃跑"],
+    forbiddenElements: ["严肃情绪", "哲学"],
+    musicArc: "轻→增强→爆发→轻收",
+    dialogueStyle: "简短+搞笑",
+    klingPrompts: {
+      hookShot: "ECU, prank prop or setup detail, bright light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, mischievous grin, natural light, cinematic 9:16",
+      sceneShot: "prank setup environment, static, bright light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, burst of laughter, cinematic 9:16",
+      endingShot: "WS, both people laughing, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, waiting with anticipation, cinematic 9:16",
+      conflictShot: "ECU, @image_1, victim's shocked face, cinematic 9:16",
+      silenceShot: "WS, quiet setup before prank, static, cinematic 9:16",
+      symbolShot: "ECU, prank prop close-up, cinematic 9:16",
+      transitionShot: "MS, reaction shot, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "mischief", intensity: 6, type: "scene" },
+      { shot: 2, emotion: "anticipation", intensity: 7, type: "face" },
+      { shot: 3, emotion: "trigger", intensity: 8, type: "scene" },
+      { shot: 4, emotion: "shock", intensity: 10, type: "face" },
+      { shot: 5, emotion: "chaos", intensity: 9, type: "scene" },
+      { shot: 6, emotion: "laughter", intensity: 8, type: "face" },
+      { shot: 7, emotion: "playful", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "joy", intensity: 4, type: "face" }
+    ]
+  },
+  {
+    archetype: "fail_moments",
+    description: "搞笑翻车瞬间",
+    blueprint: ["尝试", "自信", "失误", "翻车", "反应", "笑场"],
+    symbolObjects: ["失败道具", "表情", "翻倒物", "地面"],
+    forbiddenElements: ["严肃处理", "沉重情绪"],
+    musicArc: "轻→增强→断→轻收",
+    dialogueStyle: "简短+自嘲",
+    klingPrompts: {
+      hookShot: "ECU, object mid-fall or fail moment, bright light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, disbelief and laughter, natural light, cinematic 9:16",
+      sceneShot: "aftermath of fail, scattered objects, bright light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak embarrassment expression, cinematic 9:16",
+      endingShot: "WS, @image_1 laughing at self, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, confident attempt, cinematic 9:16",
+      conflictShot: "ECU, @image_1, moment of realization, cinematic 9:16",
+      silenceShot: "WS, frozen fail moment, static, cinematic 9:16",
+      symbolShot: "ECU, fail evidence close-up, cinematic 9:16",
+      transitionShot: "MS, @image_1, picking self up, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "confidence", intensity: 6, type: "face" },
+      { shot: 2, emotion: "attempt", intensity: 7, type: "scene" },
+      { shot: 3, emotion: "fail", intensity: 9, type: "scene" },
+      { shot: 4, emotion: "shock", intensity: 10, type: "face" },
+      { shot: 5, emotion: "embarrassment", intensity: 8, type: "face" },
+      { shot: 6, emotion: "self_laugh", intensity: 7, type: "face" },
+      { shot: 7, emotion: "playful", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "joy", intensity: 4, type: "face" }
+    ]
+  },
+  {
+    archetype: "pet_funny",
+    description: "宠物搞笑行为",
+    blueprint: ["平静", "突发行为", "混乱", "主人反应", "对峙", "和解"],
+    symbolObjects: ["宠物", "翻倒物", "主人表情", "凌乱现场"],
+    forbiddenElements: ["严肃情绪", "哲学"],
+    musicArc: "无→轻→增强→轻收",
+    dialogueStyle: "简短+轻松",
+    klingPrompts: {
+      hookShot: "ECU, pet paw or face in mischief, bright natural light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, amused exasperation, natural light, cinematic 9:16",
+      sceneShot: "pet chaos aftermath, scattered objects, bright light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, can't-help-but-smile expression, cinematic 9:16",
+      endingShot: "WS, pet sitting unbothered, @image_1 laughing, music fade, cinematic 9:16",
+      buildShot: "MS, pet in action, natural light, cinematic 9:16",
+      conflictShot: "ECU, @image_1, mock stern face, cinematic 9:16",
+      silenceShot: "WS, pet and owner standoff, static, cinematic 9:16",
+      symbolShot: "ECU, pet face looking innocent, cinematic 9:16",
+      transitionShot: "MS, @image_1 and pet together, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "calm", intensity: 3, type: "scene" },
+      { shot: 2, emotion: "surprise", intensity: 7, type: "scene" },
+      { shot: 3, emotion: "chaos", intensity: 8, type: "scene" },
+      { shot: 4, emotion: "reaction", intensity: 9, type: "face" },
+      { shot: 5, emotion: "confrontation", intensity: 10, type: "face" },
+      { shot: 6, emotion: "amusement", intensity: 8, type: "face" },
+      { shot: 7, emotion: "playful", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "warmth", intensity: 4, type: "face" }
+    ]
   }
 ]
 
@@ -622,6 +715,11 @@ export function getEmotionProgression(archetype: string) {
 
 export function matchArchetypeExtended(story: string): string {
   const s = story.toLowerCase()
+
+  // Funny archetypes
+  if (["整蛊", "prank", "搞笑"].some(k => s.includes(k))) return "prank_friend"
+  if (["翻车", "fail"].some(k => s.includes(k))) return "fail_moments"
+  if (["宠物搞笑", "pet funny"].some(k => s.includes(k))) return "pet_funny"
 
   // New lifestyle archetypes
   if (["旅行", "旅游", "travel"].some(k => s.includes(k))) return "travel_memory"
