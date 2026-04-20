@@ -776,6 +776,99 @@ export const NEW_ARCHETYPES = [
       { shot: 7, emotion: "calm_strength", intensity: 5, type: "scene" },
       { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
     ]
+  },
+  {
+    archetype: "teacher_student",
+    description: "师生之间的传承与感恩",
+    blueprint: ["相遇", "教导", "困难", "突破", "感恩", "余韵"],
+    symbolObjects: ["黑板", "书本", "笔记", "握手"],
+    forbiddenElements: ["冲突", "轻浮处理"],
+    musicArc: "柔→渐强→温暖",
+    dialogueStyle: "真诚+简短",
+    klingPrompts: {
+      hookShot: "ECU, chalk on blackboard or open textbook, warm light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, grateful and moved expression, warm light, cinematic 9:16",
+      sceneShot: "classroom or study environment, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, overwhelmed with gratitude, cinematic 9:16",
+      endingShot: "WS, classroom hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, learning or teaching moment, cinematic 9:16",
+      conflictShot: "ECU, @image_1, struggling with difficulty, cinematic 9:16",
+      silenceShot: "WS, empty classroom, static, cinematic 9:16",
+      symbolShot: "ECU, handwritten notes or book, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, moment of understanding, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "respect", intensity: 4, type: "scene" },
+      { shot: 2, emotion: "learning", intensity: 5, type: "face" },
+      { shot: 3, emotion: "struggle", intensity: 6, type: "scene" },
+      { shot: 4, emotion: "guidance", intensity: 8, type: "face" },
+      { shot: 5, emotion: "breakthrough", intensity: 10, type: "face" },
+      { shot: 6, emotion: "gratitude", intensity: 9, type: "face" },
+      { shot: 7, emotion: "warmth", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "colleague_story",
+    description: "同事之间的职场情谊与共同奋斗",
+    blueprint: ["相识", "合作", "压力", "并肩", "成功", "余韵"],
+    symbolObjects: ["办公桌", "咖啡", "文件", "握手"],
+    forbiddenElements: ["背叛", "哲学抽象"],
+    musicArc: "低→渐强→温暖",
+    dialogueStyle: "简短+真实",
+    klingPrompts: {
+      hookShot: "ECU, coffee cup on desk or work documents, office light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, focused determination or warm smile, cinematic 9:16",
+      sceneShot: "office environment or workspace, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, shared triumph expression, cinematic 9:16",
+      endingShot: "WS, office space hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, working hard or collaborating, cinematic 9:16",
+      conflictShot: "ECU, @image_1, under pressure expression, cinematic 9:16",
+      silenceShot: "WS, empty office after hours, static, cinematic 9:16",
+      symbolShot: "ECU, shared work item or coffee, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, moment of connection with colleague, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "focus", intensity: 4, type: "scene" },
+      { shot: 2, emotion: "effort", intensity: 5, type: "face" },
+      { shot: 3, emotion: "pressure", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "solidarity", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_success", intensity: 10, type: "face" },
+      { shot: 6, emotion: "relief", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "warmth", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "spring_festival",
+    description: "春节团圆与年味的温暖",
+    blueprint: ["归家", "团聚", "年夜饭", "情感高潮", "烟花", "余韵"],
+    symbolObjects: ["红灯笼", "饺子", "烟花", "全家福"],
+    forbiddenElements: ["冲突", "沉重情绪"],
+    musicArc: "柔→渐强→欢乐→余韵",
+    dialogueStyle: "温暖+真诚",
+    klingPrompts: {
+      hookShot: "ECU, red lantern or spring festival decoration, warm red-gold light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, warm homecoming joy, golden light, cinematic 9:16",
+      sceneShot: "festive dinner table or living room with decorations, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, overwhelmed with family warmth, cinematic 9:16",
+      endingShot: "WS, family gathering or fireworks hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, reunion moment, warm golden light, cinematic 9:16",
+      conflictShot: "ECU, @image_1, emotional homecoming, cinematic 9:16",
+      silenceShot: "WS, quiet festive room, static, cinematic 9:16",
+      symbolShot: "ECU, dumplings or red envelope, warm light, cinematic 9:16",
+      transitionShot: "WS, fireworks or festive street, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "anticipation", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "homecoming", intensity: 7, type: "face" },
+      { shot: 3, emotion: "warmth", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "family_love", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_reunion", intensity: 10, type: "face" },
+      { shot: 6, emotion: "celebration", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "gratitude", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
   }
 ]
 
@@ -826,6 +919,11 @@ export function matchArchetypeExtended(story: string): string {
   if (["考试", "成绩", "exam"].some(k => s.includes(k))) return "exam_victory"
   if (["朋友", "友情", "bestfriend", "闺蜜"].some(k => s.includes(k))) return "bestfriend_bond"
   if (["兄弟", "brotherhood"].some(k => s.includes(k))) return "brotherhood"
+
+  // Social + holiday archetypes
+  if (["老师", "学生", "teacher"].some(k => s.includes(k))) return "teacher_student"
+  if (["同事", "工作", "office"].some(k => s.includes(k))) return "colleague_story"
+  if (["春节", "过年", "spring festival", "新年"].some(k => s.includes(k))) return "spring_festival"
 
   // Original archetypes
   const triggers = [
