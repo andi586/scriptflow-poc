@@ -181,87 +181,132 @@ async function runDirector(producerOutput: ProducerOutput, template: string): Pr
     max_tokens: 4096,
     messages: [{
       role: 'user',
-      content: `You are a film director trained by Wong Kar-wai, Hirokazu Kore-eda, and Christopher Nolan.
-You receive a structured ProducerOutput and translate it into a shot list.
+      content: `You are ScriptFlow's AI Director. You create 30-60 second viral short videos.
+You think in IMAGES and SOUNDS, never in words.
 
 ProducerOutput: ${JSON.stringify(producerOutput)}
 Template: "${template}"
 
 REALITY ANCHOR RULES (MANDATORY):
 - must_show items: ${JSON.stringify(visual_constraints.must_show)}
-  → Every item in must_show MUST appear in at least 1 shot description or scenePrompt
-  → If "cat" is in must_show, cat MUST appear in at least 2 shots
+  → Every item in must_show MUST appear in at least 2 shots
 - forbidden_concepts: ${JSON.stringify(visual_constraints.forbidden_concepts)}
   → NEVER use these concepts in any shot
 
 ABSTRACTION GUIDE:
 ${abstractionGuide}
 
-STRICT CINEMATIC PROTOCOL:
+═══ IRON RULES (violating any = output invalid) ═══
 
-Every shot is categorized as ONE of:
-- SHOT: purely visual, no people allowed in scene shots
-- DIALOGUE: spoken words only, max 8 words, must have subtext
-- SOUND: non-verbal audio only
+1. HOOK RULE: Shot 1 must be Extreme Close-Up OR Extreme Wide Shot. Never medium shot.
+2. ONE SHOT = ONE IDEA: Each shot expresses exactly one thing. No exceptions.
+3. SHOW DON'T TELL: Zero narration. Zero explanation. Zero internal monologue.
+4. ENTITY LOCK: Every item in must_show MUST appear in at least 2 shots.
+5. DIALOGUE CAP: Max 10 words per line. Must have subtext. Never explain the scene.
+6. FORBIDDEN WORDS in dialogue: feel, think, realize, understand, beautiful, sad, naughty, exist, alive.
+7. ESCALATION: Emotion must build shot by shot. Never flat.
+8. END WITH SILENCE: Final shot = static wide shot OR extreme close-up. Let it breathe.
 
-FORBIDDEN in any output:
-- Narration or voiceover
-- Explaining emotions with words
-- "he feels", "she thinks", "as if", "seems like"
-- Dialogue that describes what is visible on screen
-- Any concept from forbidden_concepts list
+═══ 10 CINEMATIC RULES ═══
 
-DIALOGUE RULES:
-- Maximum 8 words
-- Must have subtext (surface meaning ≠ real meaning)
-- Incomplete sentences preferred
-- Style: ${producerOutput.dialogue_style}
-- NEVER use forbidden_concepts
+RULE 1: Late in, Early out
+→ Start at the KEY moment, not the setup
+→ Example: Start with cup FALLING, not cat approaching cup
 
-SCENE SHOT RULES:
-- Must include must_show items
-- Camera movement must match tone: ${producerOutput.core_elements.tone}
-- Each scene shot = one concrete visual moment
+RULE 2: Shot Size = Emotion Intensity
+→ Wide = relationship/loneliness
+→ Medium = action/context  
+→ Close = emotion/reaction
+→ Extreme Close = peak emotion ONLY
 
-Output ALL text in English only.
-Scene descriptions must be in English with specific physical objects.
+RULE 3: Camera Movement = Emotional Direction
+→ Slow push-in = intimacy/tension growing
+→ Dolly out = isolation/release
+→ Handheld = chaos/reality/urgency
+→ Static = emptiness/weight/peace
 
-EXAMPLE for cat story (must_show: cat):
-- Scene shot: 'Overturned glass on white floor, water spreading, cat's paw print at the edge'
-- Dialogue: 'Again... really?' (with a hidden smile)
-- Scene shot: 'Sunlight through window, cat sitting perfectly still, pretending innocence'
+RULE 4: Lighting = Mood
+→ Warm golden side light = happiness/memory
+→ Cold blue = loneliness/sadness
+→ High contrast = drama/conflict
+→ Soft diffused = tenderness/hope
 
-Create 6 shots alternating: face, scene, face, scene, face, scene
-Each shot duration: 2-3 seconds
+RULE 5: Object as Emotion (use for scene shots)
+→ Spilled water spreading = chaos/time passing
+→ Empty chair = absence/longing
+→ Steam from cup = warmth/life
+→ Falling object = loss of control
+→ Cat sitting still = innocence/indifference
 
-Return ONLY valid JSON (no markdown):
+RULE 6: Sound Design is mandatory
+→ Every shot needs: ambient sound OR music cue OR silence (silence IS a choice)
+→ J-Cut: next shot's sound starts 1 second before cut
+
+RULE 7: Dialogue must be subtext
+→ BAD: "You knocked it over again" (explains what we see)
+→ GOOD: "Today... you win." (says one thing, means another)
+
+RULE 8: Shot sequence must escalate
+→ emotion_intensity must increase shot by shot
+→ Peak at shot 4-5, then release at final shot
+
+RULE 9: Composition matters
+→ Rule of thirds: subjects on intersection points
+→ Negative space: loneliness = subject in corner
+→ Symmetry = order/control
+→ Asymmetry = chaos/freedom
+
+RULE 10: 30-60 second structure
+→ Shot 1-2 (0-6s): HOOK - visual conflict or surprise
+→ Shot 3-4 (6-25s): BUILD - escalate the story
+→ Shot 5-6 (25-50s): PEAK - emotional high point
+→ Shot 7-8 (50-60s): BREATH - lingering silence
+
+═══ EXAMPLE (Input: cat is naughty) ═══
+
+Shot 1 (HOOK): ECU of ceramic cup edge, cat paw enters frame from left, slow push
+Shot 2 (BUILD): CU of water spreading on white floor, cat tail visible at edge  
+Shot 3 (BUILD): MCU user face reflected in mirror, slow realization expression
+Shot 4 (PEAK): MS user and cat facing each other, symmetrical, tense silence
+Shot 5 (DIALOGUE): CU user face slight smile, says: "Today... you win."
+Shot 6 (BREATH): WS room with both, cat sits unbothered, user laughs
+
+═══ MUSIC DIRECTION ═══
+→ Face shots (dialogue): music OFF (let words breathe)
+→ Scene shots (objects): music ON low volume (fill emotional void)  
+→ Peak shot: music crescendo
+→ Final breath shot: music fade out
+
+═══ OUTPUT FORMAT ═══
+
+Output ONLY valid JSON. No other text. Use this exact structure:
 {
   "style": "cinematic",
   "hook": "first line that grabs attention",
+  "pacing": "fast|medium|slow",
+  "emotionalBeats": ["hook", "build", "peak", "breath"],
   "shots": [
     {
       "shotNumber": 1,
-      "type": "close-up",
-      "cameraMovement": "static",
+      "shotType": "face|scene",
       "duration": 3,
-      "description": "person speaking",
-      "emotion": "tender",
-      "shotType": "face",
-      "dialogue": "Again... really?"
-    },
-    {
-      "shotNumber": 2,
-      "type": "wide",
-      "cameraMovement": "push",
-      "duration": 2,
-      "description": "cat next to overturned glass",
-      "emotion": "mischief",
-      "shotType": "scene",
-      "scenePrompt": "overturned glass on white floor, water spreading, cat sitting nearby looking innocent, no people"
+      "type": "ECU|CU|MCU|MS|WS|EWS",
+      "cameraMovement": "static|slow-push-in|dolly-out|handheld|tracking|crane-up",
+      "composition": "rule-of-thirds|symmetrical|negative-space|centered",
+      "lighting": "warm-golden|cold-blue|high-contrast|soft-diffused|neon",
+      "description": "CONCRETE physical description. What camera literally sees.",
+      "scenePrompt": "for scene shots: detailed visual prompt, no people",
+      "dialogue": "Max 10 words OR empty string",
+      "soundDesign": "specific ambient sound or music cue",
+      "emotion": "emotion label",
+      "emotionIntensity": 1,
+      "musicDirection": {
+        "play": false,
+        "volume": 0,
+        "fadeIn": false
+      }
     }
-  ],
-  "pacing": "fast",
-  "emotionalBeats": ["setup", "chaos", "reaction", "smile"]
+  ]
 }`
     }]
   })
