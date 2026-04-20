@@ -404,6 +404,195 @@ export const EMOTION_PROGRESSIONS = [
   ]}
 ]
 
+export const NEW_ARCHETYPES = [
+  {
+    archetype: "travel_memory",
+    description: "旅行中的美好记忆与感动",
+    blueprint: ["出发", "探索", "惊喜", "连接", "高潮", "余韵"],
+    symbolObjects: ["地图", "护照", "窗外风景", "陌生街道"],
+    forbiddenElements: ["无聊日常", "抽象概念"],
+    musicArc: "轻→渐强→明亮",
+    dialogueStyle: "轻松+惊喜",
+    klingPrompts: {
+      hookShot: "WS, scenic landscape or city street, golden hour light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, wonder and joy, bright natural light, cinematic 9:16",
+      sceneShot: "travel destination detail, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, pure joy expression, cinematic 9:16",
+      endingShot: "WS, beautiful view hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, exploring environment, natural light, cinematic 9:16",
+      conflictShot: "ECU, map or sign, slight confusion, cinematic 9:16",
+      silenceShot: "WS, empty scenic spot, static, cinematic 9:16",
+      symbolShot: "ECU, passport or ticket, warm light, cinematic 9:16",
+      transitionShot: "WS, moving vehicle window view, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "anticipation", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "discovery", intensity: 6, type: "face" },
+      { shot: 3, emotion: "wonder", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "joy", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_joy", intensity: 10, type: "face" },
+      { shot: 6, emotion: "warmth", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "gratitude", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "fitness_journey",
+    description: "健身与自我突破的旅程",
+    blueprint: ["起点", "挑战", "痛苦", "坚持", "突破", "成就"],
+    symbolObjects: ["哑铃", "汗水", "镜子", "跑道"],
+    forbiddenElements: ["轻松化处理", "无代价"],
+    musicArc: "低→渐强→爆发",
+    dialogueStyle: "简短+坚定",
+    klingPrompts: {
+      hookShot: "ECU, weights or running shoes, hard directional light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, determined focus, sweat visible, cinematic 9:16",
+      sceneShot: "gym equipment or track, static, strong light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, peak effort expression, cinematic 9:16",
+      endingShot: "WS, @image_1 standing strong, music swell, cinematic 9:16",
+      buildShot: "MS, @image_1, mid-workout effort, cinematic 9:16",
+      conflictShot: "ECU, @image_1, pain and struggle, cinematic 9:16",
+      silenceShot: "WS, empty gym, static, cinematic 9:16",
+      symbolShot: "ECU, sweat drops or weights, cinematic 9:16",
+      transitionShot: "MS, @image_1, catching breath, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "resolve", intensity: 5, type: "face" },
+      { shot: 2, emotion: "effort", intensity: 6, type: "scene" },
+      { shot: 3, emotion: "struggle", intensity: 7, type: "face" },
+      { shot: 4, emotion: "pain", intensity: 8, type: "face" },
+      { shot: 5, emotion: "breakthrough", intensity: 10, type: "face" },
+      { shot: 6, emotion: "triumph", intensity: 9, type: "scene" },
+      { shot: 7, emotion: "pride", intensity: 6, type: "face" },
+      { shot: 8, emotion: "calm", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "baby_growth",
+    description: "宝宝成长的珍贵瞬间",
+    blueprint: ["第一次", "探索", "惊喜", "互动", "里程碑", "余韵"],
+    symbolObjects: ["小手", "玩具", "笑脸", "第一步"],
+    forbiddenElements: ["沉重情绪", "哲学抽象"],
+    musicArc: "柔→温暖→明亮",
+    dialogueStyle: "轻声+温柔",
+    klingPrompts: {
+      hookShot: "ECU, tiny baby hand or foot, soft warm light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, pure joy watching baby, warm light, cinematic 9:16",
+      sceneShot: "baby toys or nursery detail, soft light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, overwhelmed with love, cinematic 9:16",
+      endingShot: "WS, peaceful nursery, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, interacting with baby, warm light, cinematic 9:16",
+      conflictShot: "ECU, @image_1, worried expression, cinematic 9:16",
+      silenceShot: "WS, sleeping baby scene, static, cinematic 9:16",
+      symbolShot: "ECU, baby shoe or toy, warm light, cinematic 9:16",
+      transitionShot: "MS, baby milestone moment, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "wonder", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "tenderness", intensity: 6, type: "face" },
+      { shot: 3, emotion: "joy", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "love", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_love", intensity: 10, type: "face" },
+      { shot: 6, emotion: "warmth", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "gratitude", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "wedding_memory",
+    description: "婚礼中的爱与承诺",
+    blueprint: ["准备", "相遇", "誓言", "情绪高潮", "庆祝", "余韵"],
+    symbolObjects: ["戒指", "婚纱", "鲜花", "泪水"],
+    forbiddenElements: ["沉重悲伤", "冲突"],
+    musicArc: "柔→渐强→高潮→余韵",
+    dialogueStyle: "真诚+简短",
+    klingPrompts: {
+      hookShot: "ECU, wedding ring or flowers, warm golden light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, emotional joy, tears of happiness, cinematic 9:16",
+      sceneShot: "wedding venue detail, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, overwhelmed with emotion, cinematic 9:16",
+      endingShot: "WS, venue hold, music swell fade, cinematic 9:16",
+      buildShot: "MS, @image_1, walking down aisle or ceremony, cinematic 9:16",
+      conflictShot: "ECU, @image_1, nervous anticipation, cinematic 9:16",
+      silenceShot: "WS, empty ceremony space, static, cinematic 9:16",
+      symbolShot: "ECU, rings or bouquet, warm light, cinematic 9:16",
+      transitionShot: "WS, guests and celebration, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "anticipation", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "nervous_joy", intensity: 6, type: "face" },
+      { shot: 3, emotion: "love", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "commitment", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_emotion", intensity: 10, type: "face" },
+      { shot: 6, emotion: "celebration", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "warmth", intensity: 6, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "birthday_celebration",
+    description: "生日的欢乐与感动",
+    blueprint: ["惊喜", "反应", "欢乐", "感动", "高潮", "余韵"],
+    symbolObjects: ["蜡烛", "蛋糕", "笑脸", "礼物"],
+    forbiddenElements: ["沉重情绪", "哲学"],
+    musicArc: "轻→渐强→欢乐",
+    dialogueStyle: "轻松+真诚",
+    klingPrompts: {
+      hookShot: "ECU, birthday candles lit, warm glow, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, surprised joy, warm light, cinematic 9:16",
+      sceneShot: "birthday setup with cake and decorations, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, pure happiness, cinematic 9:16",
+      endingShot: "WS, celebration scene hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, blowing candles or opening gifts, cinematic 9:16",
+      conflictShot: "ECU, @image_1, emotional moment, cinematic 9:16",
+      silenceShot: "ECU, candle flame, static, cinematic 9:16",
+      symbolShot: "ECU, cake with candles, warm light, cinematic 9:16",
+      transitionShot: "WS, gathering of people, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "surprise", intensity: 7, type: "scene" },
+      { shot: 2, emotion: "joy", intensity: 8, type: "face" },
+      { shot: 3, emotion: "warmth", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "gratitude", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_joy", intensity: 10, type: "face" },
+      { shot: 6, emotion: "celebration", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "warmth", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "graduation_memory",
+    description: "毕业的成就与告别",
+    blueprint: ["回顾", "成就", "告别", "情绪", "高潮", "新开始"],
+    symbolObjects: ["学位帽", "证书", "合影", "校园"],
+    forbiddenElements: ["纯悲伤", "无成就感"],
+    musicArc: "低→渐强→高潮→余韵",
+    dialogueStyle: "真诚+简短",
+    klingPrompts: {
+      hookShot: "ECU, graduation cap or diploma, warm light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, bittersweet pride, cinematic 9:16",
+      sceneShot: "campus or ceremony venue, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, emotional peak, tears and smile, cinematic 9:16",
+      endingShot: "WS, campus or horizon, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, ceremony moment, cinematic 9:16",
+      conflictShot: "ECU, @image_1, nostalgic sadness, cinematic 9:16",
+      silenceShot: "WS, empty campus, static, cinematic 9:16",
+      symbolShot: "ECU, diploma or cap, warm light, cinematic 9:16",
+      transitionShot: "WS, group photo moment, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "nostalgia", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "pride", intensity: 6, type: "face" },
+      { shot: 3, emotion: "bittersweet", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "gratitude", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_emotion", intensity: 10, type: "face" },
+      { shot: 6, emotion: "hope", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "forward", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  }
+]
+
 export const DIRECTOR_SELF_CHECK = [
   { error: "台词解释了画面内容", detection: "dialogue contains description of visible action", fix: "replace with subtext template", example: { wrong: "猫咪把杯子打翻了", correct: "又是你。" } },
   { error: "没有情绪递进", detection: "emotion intensity flat across shots", fix: "apply emotion progression curve", example: { wrong: "所有镜头情绪一致", correct: "从平静到爆发" } },
@@ -418,9 +607,52 @@ export const DIRECTOR_SELF_CHECK = [
 ]
 
 export function getKlingTemplate(archetype: string) {
+  // Check NEW_ARCHETYPES first
+  const newArchetype = NEW_ARCHETYPES.find(t => t.archetype === archetype)
+  if (newArchetype) return newArchetype.klingPrompts
   return KLING_PROMPT_TEMPLATES.find(t => t.archetype === archetype)?.klingPrompts || KLING_PROMPT_TEMPLATES[1].klingPrompts
 }
 
 export function getEmotionProgression(archetype: string) {
+  // Check NEW_ARCHETYPES first
+  const newArchetype = NEW_ARCHETYPES.find(p => p.archetype === archetype)
+  if (newArchetype) return newArchetype.emotionCurve
   return EMOTION_PROGRESSIONS.find(p => p.archetype === archetype)?.emotionCurve || EMOTION_PROGRESSIONS[0].emotionCurve
+}
+
+export function matchArchetypeExtended(story: string): string {
+  const s = story.toLowerCase()
+
+  // New lifestyle archetypes
+  if (["旅行", "旅游", "travel"].some(k => s.includes(k))) return "travel_memory"
+  if (["健身", "运动", "fitness"].some(k => s.includes(k))) return "fitness_journey"
+  if (["宝宝", "成长", "baby"].some(k => s.includes(k))) return "baby_growth"
+  if (["婚礼", "结婚", "wedding"].some(k => s.includes(k))) return "wedding_memory"
+  if (["生日", "party", "birthday"].some(k => s.includes(k))) return "birthday_celebration"
+  if (["毕业", "graduation"].some(k => s.includes(k))) return "graduation_memory"
+
+  // Original archetypes
+  const triggers = [
+    { keywords: ["妈妈", "去世", "多年", "miss", "mom"], archetype: "late_regret" },
+    { keywords: ["猫", "狗", "调皮", "cat", "dog", "pet"], archetype: "playful_chaos" },
+    { keywords: ["喜欢", "爱你", "love", "romantic"], archetype: "unspoken_love" },
+    { keywords: ["分手", "breakup", "离开"], archetype: "heartbreak" },
+    { keywords: ["孤独", "lonely", "alone"], archetype: "lonely_reflection" },
+    { keywords: ["童年", "小时候", "childhood"], archetype: "nostalgia" },
+    { keywords: ["失败", "failed"], archetype: "despair" },
+    { keywords: ["成功", "赢了", "success"], archetype: "growth" },
+    { keywords: ["背叛", "betrayal"], archetype: "betrayal" },
+    { keywords: ["希望", "hope"], archetype: "hope" },
+    { keywords: ["家庭", "家人", "family", "爸", "父"], archetype: "reconciliation" },
+    { keywords: ["回忆", "memory"], archetype: "nostalgia" },
+    { keywords: ["害怕", "fear"], archetype: "panic" },
+    { keywords: ["复仇", "revenge"], archetype: "revenge" },
+    { keywords: ["压力", "stress"], archetype: "tension" },
+  ]
+
+  for (const trigger of triggers) {
+    if (trigger.keywords.some(k => s.includes(k))) return trigger.archetype
+  }
+
+  return "bittersweet"
 }
