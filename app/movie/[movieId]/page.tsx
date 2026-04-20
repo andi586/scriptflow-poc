@@ -1,3 +1,4 @@
+import React from 'react'
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
@@ -7,8 +8,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export default function MoviePage({ params }: { params: { movieId: string } }) {
-  const movieId = params.movieId
+export default function MoviePage({ params }: { params: Promise<{ movieId: string }> | { movieId: string } }) {
+  const resolvedParams = 'then' in params ? React.use(params as Promise<{ movieId: string }>) : params
+  const movieId = resolvedParams.movieId
   console.log('[movie page] movieId:', movieId)
   const [movie, setMovie] = useState<any>(null)
   const [loading, setLoading] = useState(true)
