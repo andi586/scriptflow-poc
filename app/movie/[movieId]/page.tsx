@@ -89,13 +89,29 @@ export default function MoviePage({ params }: { params: { movieId: string } }) {
 
       {/* Buttons */}
       <div style={{display:'flex',flexDirection:'column',gap:'12px',width:'100%',maxWidth:'360px'}}>
-        <a
-          href={movie.final_video_url}
-          download="my-scriptflow-movie.mp4"
-          style={{display:'block',background:'#D4A853',color:'#000',padding:'16px',borderRadius:'100px',fontWeight:'800',fontSize:'1rem',textDecoration:'none',textAlign:'center',boxShadow:'0 0 20px rgba(212,168,83,0.3)'}}
+        <button
+          onClick={() => window.open(movie.final_video_url, '_blank')}
+          style={{
+            display: 'block',
+            background: '#D4A853',
+            color: '#000',
+            padding: '16px',
+            borderRadius: '100px',
+            fontWeight: '800',
+            fontSize: '1rem',
+            textDecoration: 'none',
+            textAlign: 'center',
+            boxShadow: '0 0 20px rgba(212,168,83,0.3)',
+            border: 'none',
+            cursor: 'pointer',
+            width: '100%'
+          }}
         >
-          ⬇️ Download My Movie
-        </a>
+          ⬇️ Save My Movie
+        </button>
+        <p style={{color:'#555', fontSize:'0.75rem', textAlign:'center', marginTop:'8px'}}>
+          Opens in new tab → long press → Save to Photos
+        </p>
 
         <button
           onClick={handleCopy}
