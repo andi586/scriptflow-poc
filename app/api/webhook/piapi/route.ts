@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { selectBGM } from '@/app/lib/music-selector'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,16 +37,17 @@ export async function POST(req: NextRequest) {
   // Update movies table (new single Kling 3.0 architecture)
   // First, look up the movie to get its id
   const { data: movie } = await supabaseAdmin.from('movies')
-    .select('id')
+    .select('id, story_input')
     .eq('kling_task_id', taskId)
     .single()
 
   const FFMPEG_URL = 'https://scriptflow-video-merge-production.up.railway.app'
-  const DEFAULT_BGM = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
 
   // Add BGM to video
   let finalVideoUrl = videoUrl
   if (movie) {
+    const emotion = movie.story_input ? 'grief' : 'warm'
+    const bgmUrl = await selectBGM(emotion)
     try {
       const mergeRes = await fetch(`${FFMPEG_URL}/merge`, {
         method: 'POST',
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           projectId: movie.id,
           videoUrls: [videoUrl],
-          bgmUrl: DEFAULT_BGM,
+          bgmUrl: bgmUrl,
           audioUrls: [],
           projectTitle: 'ScriptFlow Movie'
         })
