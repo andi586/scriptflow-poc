@@ -116,6 +116,16 @@ Examples:
 Step 4: Define what must NOT be said (forbidden words/phrases for dialogue).
 These are things too obvious to say - the subtext lives in what's unsaid.
 
+CRITICAL RULE: Never lose the concrete story elements.
+If user mentions a CAT → cat must appear in the film
+If user mentions MOM → mom's presence must be felt in scenes
+If user mentions RAIN → rain must be in the visuals
+
+You can find deeper meaning BUT you cannot erase the original subject.
+
+BAD: User says 'my cat is naughty' → Producer outputs abstract philosophy with no cat
+GOOD: User says 'my cat is naughty' → Producer outputs cat-centered story with deeper meaning (chaos as love, being needed)
+
 User Input: "${userInput}"
 
 Return ONLY valid JSON matching this interface. No markdown:
@@ -184,6 +194,17 @@ SCENE SHOT RULES (no people):
 - Use scene_symbols from Producer output as visual anchors
 - Each scene shot = one emotional symbol
 - Camera movement must match emotion (slow push = grief, static = emptiness, drift = confusion)
+
+Output ALL text in English only.
+Dialogue must be in English (or the language that fits the character).
+Scene descriptions must be in English with specific physical objects.
+
+EXAMPLE for cat story:
+- Scene shot: 'Overturned glass on white floor, water spreading, cat's paw print at the edge'
+- Dialogue: 'Again... really?' (with a hidden smile)
+- Scene shot: 'Sunlight through window, cat sitting perfectly still, pretending innocence'
+
+Keep the cat/dog/pet VISIBLE in scene shots when story is about pets.
 
 Create 6 shots alternating: face, scene, face, scene, face, scene
 Each shot duration: 2-3 seconds
