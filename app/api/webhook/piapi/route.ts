@@ -34,8 +34,47 @@ export async function POST(req: NextRequest) {
     .eq('kling_task_id', taskId)
 
   // Update movies table (new single Kling 3.0 architecture)
+  // First, look up the movie to get its id
+  const { data: movie } = await supabaseAdmin.from('movies')
+    .select('id')
+    .eq('kling_task_id', taskId)
+    .single()
+
+  const FFMPEG_URL = 'https://scriptflow-video-merge-production.up.railway.app'
+  const DEFAULT_BGM = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+
+  // Add BGM to video
+  let finalVideoUrl = videoUrl
+  if (movie) {
+    try {
+      const mergeRes = await fetch(`${FFMPEG_URL}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: movie.id,
+          videoUrls: [videoUrl],
+          bgmUrl: DEFAULT_BGM,
+          audioUrls: [],
+          projectTitle: 'ScriptFlow Movie'
+        })
+      })
+      const mergeData = await mergeRes.json()
+      if (mergeData.success && mergeData.finalVideoUrl) {
+        finalVideoUrl = mergeData.finalVideoUrl
+        console.log('[webhook] BGM added:', finalVideoUrl)
+      }
+    } catch (e) {
+      console.error('[webhook] BGM merge failed, using original:', e)
+      // Fall back to original video if BGM fails
+    }
+  }
+
+  // Update movies table with final merged video
   await supabaseAdmin.from('movies')
-    .update({ final_video_url: videoUrl, status: 'complete' })
+    .update({ 
+      final_video_url: finalVideoUrl,
+      status: 'complete'
+    })
     .eq('kling_task_id', taskId)
 
   console.log('[webhook/piapi] updated task:', taskId)
