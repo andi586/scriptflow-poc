@@ -683,6 +683,99 @@ export const NEW_ARCHETYPES = [
       { shot: 7, emotion: "playful", intensity: 6, type: "scene" },
       { shot: 8, emotion: "warmth", intensity: 4, type: "face" }
     ]
+  },
+  {
+    archetype: "exam_victory",
+    description: "考试成功的喜悦与解脱",
+    blueprint: ["备考压力", "等待结果", "揭晓瞬间", "情绪爆发", "庆祝", "余韵"],
+    symbolObjects: ["试卷", "成绩单", "笔", "书本"],
+    forbiddenElements: ["失败情绪", "哲学抽象"],
+    musicArc: "低→渐强→爆发→余韵",
+    dialogueStyle: "简短+真实",
+    klingPrompts: {
+      hookShot: "ECU, exam paper or phone screen with results, tense light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, nervous anticipation then relief, natural light, cinematic 9:16",
+      sceneShot: "study desk with books and notes, static, warm light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, pure joy and disbelief, cinematic 9:16",
+      endingShot: "WS, @image_1 celebrating, music swell fade, cinematic 9:16",
+      buildShot: "MS, @image_1, staring at screen or paper, cinematic 9:16",
+      conflictShot: "ECU, @image_1, holding breath, cinematic 9:16",
+      silenceShot: "WS, empty study room, static, cinematic 9:16",
+      symbolShot: "ECU, grade or score close-up, warm light, cinematic 9:16",
+      transitionShot: "MS, @image_1, exhale of relief, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "anxiety", intensity: 6, type: "scene" },
+      { shot: 2, emotion: "tension", intensity: 7, type: "face" },
+      { shot: 3, emotion: "anticipation", intensity: 8, type: "face" },
+      { shot: 4, emotion: "shock_joy", intensity: 10, type: "face" },
+      { shot: 5, emotion: "relief", intensity: 9, type: "face" },
+      { shot: 6, emotion: "celebration", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "pride", intensity: 6, type: "face" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "bestfriend_bond",
+    description: "闺蜜/好友之间的深厚情谊",
+    blueprint: ["相遇", "共同时光", "默契瞬间", "情感流露", "高潮", "余韵"],
+    symbolObjects: ["合照", "共同物件", "笑声", "眼神交流"],
+    forbiddenElements: ["冲突", "沉重情绪"],
+    musicArc: "轻→渐强→温暖",
+    dialogueStyle: "轻松+真诚",
+    klingPrompts: {
+      hookShot: "ECU, two hands or shared object, warm natural light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, genuine laughter or warmth, natural light, cinematic 9:16",
+      sceneShot: "shared space or activity environment, warm light, cinematic 9:16",
+      peakShot: "ECU, @image_1, overwhelmed with affection, cinematic 9:16",
+      endingShot: "WS, two friends together, warm light hold, music fade, cinematic 9:16",
+      buildShot: "MS, @image_1, sharing moment with friend, cinematic 9:16",
+      conflictShot: "ECU, @image_1, emotional recognition, cinematic 9:16",
+      silenceShot: "WS, quiet shared space, static, cinematic 9:16",
+      symbolShot: "ECU, shared keepsake or photo, warm light, cinematic 9:16",
+      transitionShot: "MS, both friends in frame, natural light, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "warmth", intensity: 5, type: "scene" },
+      { shot: 2, emotion: "joy", intensity: 6, type: "face" },
+      { shot: 3, emotion: "connection", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "affection", intensity: 8, type: "face" },
+      { shot: 5, emotion: "peak_bond", intensity: 10, type: "face" },
+      { shot: 6, emotion: "gratitude", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "warmth", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
+  },
+  {
+    archetype: "brotherhood",
+    description: "兄弟情义与并肩同行",
+    blueprint: ["相识", "考验", "并肩", "危机", "守护", "余韵"],
+    symbolObjects: ["握手", "肩膀", "共同目标", "背影"],
+    forbiddenElements: ["背叛", "轻浮处理"],
+    musicArc: "低→渐强→爆发→余韵",
+    dialogueStyle: "简短+有力",
+    klingPrompts: {
+      hookShot: "ECU, two hands gripping or fist bump, hard directional light, cinematic 9:16",
+      faceShot: "MCU portrait, @image_1, determined and loyal expression, cinematic 9:16",
+      sceneShot: "shared environment or challenge setting, strong light, no people, cinematic 9:16",
+      peakShot: "ECU, @image_1, fierce loyalty expression, cinematic 9:16",
+      endingShot: "WS, two figures side by side, music swell fade, cinematic 9:16",
+      buildShot: "MS, @image_1, facing challenge together, cinematic 9:16",
+      conflictShot: "ECU, @image_1, protective intensity, cinematic 9:16",
+      silenceShot: "WS, two figures back to back, static, cinematic 9:16",
+      symbolShot: "ECU, shared symbol or object, strong light, cinematic 9:16",
+      transitionShot: "MS, both in frame, moving forward, cinematic 9:16"
+    },
+    emotionCurve: [
+      { shot: 1, emotion: "resolve", intensity: 5, type: "face" },
+      { shot: 2, emotion: "trust", intensity: 6, type: "scene" },
+      { shot: 3, emotion: "challenge", intensity: 7, type: "scene" },
+      { shot: 4, emotion: "solidarity", intensity: 9, type: "face" },
+      { shot: 5, emotion: "peak_bond", intensity: 10, type: "face" },
+      { shot: 6, emotion: "triumph", intensity: 8, type: "scene" },
+      { shot: 7, emotion: "calm_strength", intensity: 5, type: "scene" },
+      { shot: 8, emotion: "peace", intensity: 3, type: "scene" }
+    ]
   }
 ]
 
@@ -728,6 +821,11 @@ export function matchArchetypeExtended(story: string): string {
   if (["婚礼", "结婚", "wedding"].some(k => s.includes(k))) return "wedding_memory"
   if (["生日", "party", "birthday"].some(k => s.includes(k))) return "birthday_celebration"
   if (["毕业", "graduation"].some(k => s.includes(k))) return "graduation_memory"
+
+  // Inspiration + social archetypes
+  if (["考试", "成绩", "exam"].some(k => s.includes(k))) return "exam_victory"
+  if (["朋友", "友情", "bestfriend", "闺蜜"].some(k => s.includes(k))) return "bestfriend_bond"
+  if (["兄弟", "brotherhood"].some(k => s.includes(k))) return "brotherhood"
 
   // Original archetypes
   const triggers = [
