@@ -104,14 +104,23 @@ export interface CognitiveCoreOutput {
 }
 
 function cleanJSON(text: string): string {
+  // Remove markdown code blocks
   text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '')
-  const start = Math.min(
-    text.indexOf('{') === -1 ? Infinity : text.indexOf('{'),
-    text.indexOf('[') === -1 ? Infinity : text.indexOf('[')
-  )
-  if (start === Infinity) return text
+  // Remove lines starting with # (markdown headers)
+  text = text.split('\n').filter(line => !line.trim().startsWith('#')).join('\n')
+  // Find first { or [
+  const firstBrace = text.indexOf('{')
+  const firstBracket = text.indexOf('[')
+  let start = -1
+  if (firstBrace === -1 && firstBracket === -1) return text
+  if (firstBrace === -1) start = firstBracket
+  else if (firstBracket === -1) start = firstBrace
+  else start = Math.min(firstBrace, firstBracket)
   text = text.substring(start)
-  const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'))
+  // Find last } or ]
+  const lastBrace = text.lastIndexOf('}')
+  const lastBracket = text.lastIndexOf(']')
+  const end = Math.max(lastBrace, lastBracket)
   if (end !== -1) text = text.substring(0, end + 1)
   return text.trim()
 }
