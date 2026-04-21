@@ -137,6 +137,46 @@ export function buildStoryProfile(opts: {
 }): StoryProfile {
   const { primaryEmotion, story_category, abstraction_level = 0.3, tone = 'warm' } = opts
 
+  // Emotion-specific overrides: precise valence/arousal/bannedDirections per mood
+  const emotionOverrides: Record<string, { valence: number; arousal: number; bannedDirections: string[] }> = {
+    action:      { valence: 0.6,  arousal: 0.95, bannedDirections: ['pet', 'baby', 'wedding'] },
+    nostalgia:   { valence: 0.4,  arousal: 0.25, bannedDirections: ['action', 'prank'] },
+    wedding:     { valence: 0.9,  arousal: 0.35, bannedDirections: ['action', 'horror'] },
+    baby:        { valence: 0.85, arousal: 0.15, bannedDirections: ['action', 'horror'] },
+    travel:      { valence: 0.85, arousal: 0.7,  bannedDirections: ['grief', 'horror'] },
+    fitness:     { valence: 0.8,  arousal: 0.95, bannedDirections: ['grief', 'baby'] },
+    betrayal:    { valence: -0.6, arousal: 0.5,  bannedDirections: ['pet', 'baby'] },
+    hope:        { valence: 0.85, arousal: 0.6,  bannedDirections: ['horror', 'betrayal'] },
+    inspiring:   { valence: 0.85, arousal: 0.85, bannedDirections: ['grief', 'horror'] },
+    festive:     { valence: 0.95, arousal: 0.8,  bannedDirections: ['grief', 'horror'] },
+    funny:       { valence: 0.9,  arousal: 0.8,  bannedDirections: ['grief', 'sad'] },
+    bittersweet: { valence: 0.2,  arousal: 0.3,  bannedDirections: ['horror', 'prank'] },
+  }
+
+  // Check if primaryEmotion has a direct override
+  if (emotionOverrides[primaryEmotion]) {
+    const override = emotionOverrides[primaryEmotion]
+
+    // Protagonist type from story_category
+    const protagonistMapOverride: Record<string, string> = {
+      pet: 'pet', family: 'family', love: 'couple', grief: 'human',
+      prank: 'human', achievement: 'human', nostalgia: 'human', hope: 'human',
+      wedding: 'couple', baby: 'family', travel: 'human', fitness: 'human',
+      action: 'human', betrayal: 'human', inspiring: 'human', festive: 'family',
+      funny: 'human', bittersweet: 'human',
+    }
+    const protagonistTypeOverride = protagonistMapOverride[story_category ?? ''] ?? protagonistMapOverride[primaryEmotion] ?? 'human'
+
+    return {
+      primaryEmotion,
+      valence: override.valence,
+      arousal: override.arousal,
+      protagonistType: protagonistTypeOverride,
+      setting: 'indoor',
+      bannedDirections: override.bannedDirections,
+    }
+  }
+
   // Derive valence from emotion/category
   const valenceMap: Record<string, number> = {
     grief: -0.8, sad: -0.7, longing: -0.6, regret: -0.6, missing: -0.6, lonely: -0.7,
