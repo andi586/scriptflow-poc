@@ -103,6 +103,19 @@ export interface CognitiveCoreOutput {
   story_category: ProducerOutput['story_category']
 }
 
+function cleanJSON(text: string): string {
+  text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+  const start = Math.min(
+    text.indexOf('{') === -1 ? Infinity : text.indexOf('{'),
+    text.indexOf('[') === -1 ? Infinity : text.indexOf('[')
+  )
+  if (start === Infinity) return text
+  text = text.substring(start)
+  const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'))
+  if (end !== -1) text = text.substring(0, end + 1)
+  return text.trim()
+}
+
 const client = new Anthropic()
 
 async function runProducer(userInput: string): Promise<ProducerOutput> {
@@ -163,13 +176,7 @@ OUTPUT FORMAT (strict JSON, no other text):
     }]
   })
   const raw = (response.content[0] as { text: string }).text
-  let clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-  const start = clean.indexOf('{')
-  const end = clean.lastIndexOf('}')
-  if (start !== -1 && end !== -1) {
-    clean = clean.slice(start, end + 1)
-  }
-  return JSON.parse(clean)
+  return JSON.parse(cleanJSON(raw))
 }
 
 async function runDirector(
@@ -405,13 +412,7 @@ Output ONLY valid JSON. No other text. Use this exact structure:
     }]
   })
   const raw = (response.content[0] as { text: string }).text
-  let clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-  const start = clean.indexOf('{')
-  const end = clean.lastIndexOf('}')
-  if (start !== -1 && end !== -1) {
-    clean = clean.slice(start, end + 1)
-  }
-  return JSON.parse(clean)
+  return JSON.parse(cleanJSON(raw))
 }
 
 function checkRealityAnchors(plan: DirectionPlan, mustShow: string[]): void {
