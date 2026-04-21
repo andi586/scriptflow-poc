@@ -100,7 +100,25 @@ export async function POST(req: NextRequest) {
     storyProfile.setting = s.includes('outdoor') || s.includes('park') || s.includes('nature') ? 'outdoor' : 'indoor'
 
     console.log('[webhook] story profile:', storyProfile.primaryEmotion, storyProfile.valence, storyProfile.arousal)
-    const bgmUrl = await selectBGMv2(storyProfile)
+    // EXECUTION AUTHORITY: Lock BGM by archetype
+const ARCHETYPE_BGM_LOCK: Record<string, string> = {
+  'pet_daily': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3',
+  'playful_chaos': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3',
+  'late_regret': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
+  'heartbreak': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
+  'lonely_reflection': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
+  'hero_moment': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Triumphant_No-Vocal-0249cc79-3054-483b-8a4f-8c211e555672.mp3',
+  'martial_arts': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Triumphant_No-Vocal-0249cc79-3054-483b-8a4f-8c211e555672.mp3',
+  'chase_escape': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3',
+  'unspoken_love': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3',
+  'reconciliation': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3',
+  'spring_festival': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-鞭炮回响-a8dab44d-4f85-4524-8a21-194aaefc19c2.mp3',
+  'christmas': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-dd16ffbd-1798-47bc-b484-934095a07e37.mp3',
+}
+
+const movieArchetype = movie.archetype || storyProfile.primaryEmotion
+const bgmUrl = ARCHETYPE_BGM_LOCK[movieArchetype] || await selectBGMv2(storyProfile)
+console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl)
     console.log('[webhook] BGM selected:', bgmUrl)
     try {
       const mergeRes = await fetch(`${FFMPEG_URL}/merge`, {
