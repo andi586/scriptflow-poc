@@ -8,44 +8,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Simple in-memory rate limit (resets on redeploy)
-const ipLimits = new Map<string, number>()
-
 export async function POST(req: NextRequest) {
   try {
-    // Rate limit: 1 movie per IP per day
-    const ip = req.headers.get('x-forwarded-for') || 'unknown'
-    const today = new Date().toDateString()
-    const key = `${ip}_${today}`
-    const count = ipLimits.get(key) || 0
-    if (count >= 10) {
-      return NextResponse.json({ 
-        error: 'Daily limit reached. Contact us to generate more movies.' 
-      }, { status: 429 })
-    }
-    ipLimits.set(key, count + 1)
-
+    // 1. Validate inputs
     const form = await req.formData()
     const photo = form.get('photo') as File
     const story = form.get('story') as string
-    const tier = form.get('tier') as string || '60s'
 
     if (!photo) return NextResponse.json({ error: 'No photo' }, { status: 400 })
     if (!story) return NextResponse.json({ error: 'No story' }, { status: 400 })
 
-    const castPhotos = []
-    let i = 0
-    while (form.get(`cast_${i}`)) {
-      castPhotos.push(form.get(`cast_${i}`) as File)
-      i++
-    }
-
-    const totalPhotos = 1 + castPhotos.length // 1 for main photo
-    if (totalPhotos > 7) {
-      return NextResponse.json({ error: 'Maximum 7 photos allowed' }, { status: 400 })
-    }
-
-    // 1. Upload photo
+    // 2. Upload photo to Supabase Storage
     const bytes = await photo.arrayBuffer()
     const buffer = Buffer.from(bytes)
     const fileName = `twins/${Date.now()}_photo.jpg`
@@ -54,11 +27,10 @@ export async function POST(req: NextRequest) {
       .upload(fileName, buffer, { contentType: 'image/jpeg', upsert: true })
     if (uploadError) throw new Error('Upload failed: ' + uploadError.message)
 
-    // 2. Get public URL
     const { data: pub } = supabase.storage.from('recordings').getPublicUrl(fileName)
     const photoUrl = pub.publicUrl
 
-    // 3. Create digital twin
+    // 3. Create digital twin record
     const { data: twin, error: twinError } = await supabase
       .from('digital_twins')
       .insert({ user_id: crypto.randomUUID(), frame_url_mid: photoUrl, is_active: true })
@@ -67,30 +39,18 @@ export async function POST(req: NextRequest) {
 
     console.log('[create-movie] twin:', twin.id, photoUrl)
 
-    // 4. Upload cast photos and collect their URLs
-    const additionalImages: string[] = []
-    for (let j = 0; j < castPhotos.length; j++) {
-      const castFile = castPhotos[j]
-      const castBytes = await castFile.arrayBuffer()
-      const castBuffer = Buffer.from(castBytes)
-      const castFileName = `twins/${Date.now()}_cast_${j}.jpg`
-      const { error: castUploadError } = await supabase.storage
-        .from('recordings')
-        .upload(castFileName, castBuffer, { contentType: 'image/jpeg', upsert: true })
-      if (castUploadError) {
-        console.warn('[create-movie] cast photo upload failed:', castUploadError.message)
-        continue
-      }
-      const { data: castPub } = supabase.storage.from('recordings').getPublicUrl(castFileName)
-      additionalImages.push(castPub.publicUrl)
-      console.log('[create-movie] cast photo uploaded:', castPub.publicUrl)
-    }
+    // 4. Create movies record with status='pending', paid=false
+    const { data: movie, error: movieError } = await supabase
+      .from('movies')
+      .insert({ twin_id: twin.id, story, status: 'pending', paid: false })
+      .select().single()
+    if (movieError) throw new Error('Movie failed: ' + movieError.message)
 
-    // 5. Skipped - generation happens after Stripe payment
+    console.log('[create-movie] movie:', movie.id)
 
-    // 6. Movie generation triggered AFTER Stripe payment
-    // Generation disabled here - Stripe webhook triggers generation
-    return NextResponse.json({ movieId: movie.id })
+    // 5. Return { movieId, twinId, photoUrl }
+    // Generation happens ONLY after Stripe payment webhook
+    return NextResponse.json({ movieId: movie.id, twinId: twin.id, photoUrl })
   } catch (e: any) {
     console.error('[create-movie] error:', e.message)
     return NextResponse.json({ error: e.message }, { status: 500 })
