@@ -105,26 +105,13 @@ export default function MoviePage() {
         </p>
 
         <button
-          onClick={async () => {
-            if (navigator.share) {
-              try {
-                await navigator.share({
-                  title: 'My ScriptFlow Movie',
-                  text: 'Check out my AI movie!',
-                  url: movie.final_video_url
-                })
-              } catch(e) {
-                window.open(movie.final_video_url, '_blank')
-              }
-            } else {
-              window.open(movie.final_video_url, '_blank')
-            }
-          }}
+          type="button"
+          onClick={() => window.open(movie.final_video_url, '_blank')}
           style={{
             display: 'block',
-            background: '#1a1a1a',
+            background: '#1a6fb5',
             color: 'white',
-            border: '1px solid #333',
+            border: 'none',
             padding: '16px',
             borderRadius: '100px',
             fontWeight: '700',
@@ -134,10 +121,10 @@ export default function MoviePage() {
             marginTop: '12px'
           }}
         >
-          📤 Share Movie
+          📱 Open Video to Save
         </button>
         <p style={{color:'#555',fontSize:'0.75rem',textAlign:'center',marginTop:'8px'}}>
-          iOS: Share → Save to Photos
+          Tap above → then tap Share → Save to Photos
         </p>
 
         <button
