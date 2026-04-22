@@ -81,12 +81,12 @@ export default function MoviePage() {
       <div style={{display:'flex',flexDirection:'column',gap:'12px',width:'100%',maxWidth:'360px'}}>
         <button
           onClick={() => window.open(movie.final_video_url, '_blank')}
-          style={{background:'#D4A853',color:'#000',border:'none',padding:'16px',borderRadius:'100px',fontWeight:'800',fontSize:'1rem',cursor:'pointer'}}
+          style={{background:'#D4A853',color:'#000',border:'none',padding:'16px',borderRadius:'100px',fontWeight:'800',fontSize:'1rem',cursor:'pointer',width:'100%'}}
         >
-          ⬇️ Save My Movie
+          📱 Open Video to Save
         </button>
-        <p style={{color:'#555',fontSize:'0.75rem',textAlign:'center',margin:'-4px 0 8px'}}>
-          Opens in new tab → long press → Save to Photos
+        <p style={{color:'#888',fontSize:'0.75rem',textAlign:'center',marginTop:'8px'}}>
+          Tap Share → Save to Photos
         </p>
 
         <button

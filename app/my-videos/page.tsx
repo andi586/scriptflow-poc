@@ -14,6 +14,7 @@ export default function MyVideosPage() {
   const [movies, setMovies] = useState<Movie[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -38,9 +39,7 @@ export default function MyVideosPage() {
   }, [])
 
   const handleDelete = async (id: string) => {
-    const confirmed = confirm('Delete this video?')
-    if (!confirmed) return
-
+    setConfirmId(null)
     setDeletingId(id)
     setError(null)
 
@@ -153,9 +152,9 @@ export default function MyVideosPage() {
                       {movie.final_video_url && (
                         <button
                           onClick={() => window.open(movie.final_video_url!, '_blank')}
-                          style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                          style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', background: '#D4A853', border: 'none', color: '#000', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                         >
-                          ⬇️ Save
+                          📱 Open Video to Save
                         </button>
                       )}
                       <button
