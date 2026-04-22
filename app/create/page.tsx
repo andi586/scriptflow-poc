@@ -233,6 +233,17 @@ export default function CreatePage() {
       </button>
 
       <p style={{ color: '#333', fontSize: '0.75rem', marginTop: '16px' }}>~60 second clip • Free to try</p>
+
+      <a href="/my-videos" style={{
+        display: 'block',
+        textAlign: 'center',
+        color: '#555',
+        fontSize: '0.85rem',
+        marginTop: '16px',
+        textDecoration: 'none'
+      }}>
+        📽️ My Videos
+      </a>
     </div>
   )
 }
