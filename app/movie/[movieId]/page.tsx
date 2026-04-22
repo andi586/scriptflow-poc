@@ -123,8 +123,9 @@ export default function MoviePage() {
         >
           📱 Open Video to Save
         </button>
-        <p style={{color:'#555',fontSize:'0.75rem',textAlign:'center',marginTop:'8px'}}>
-          Tap above → then tap Share → Save to Photos
+        <p style={{color:'#888',fontSize:'0.72rem',textAlign:'center',marginTop:'8px',lineHeight:'1.6'}}>
+          💡 Open in Safari for best experience.<br/>
+          Long press video → Save to Photos
         </p>
 
         <button
