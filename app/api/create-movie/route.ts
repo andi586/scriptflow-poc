@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     // 3. Create digital twin record
     const { data: twin, error: twinError } = await supabase
       .from('digital_twins')
-      .insert({ user_id: crypto.randomUUID(), twin_photo_url: photoUrl, is_active: true })
+      .insert({ user_id: crypto.randomUUID(), frame_url_front: photoUrl, is_active: true })
       .select().single()
     if (twinError) throw new Error('Twin failed: ' + twinError.message)
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     // 4. Create movies record with status='pending', paid=false
     const { data: movie, error: movieError } = await supabase
       .from('movies')
-      .insert({ twin_id: twin.id, story_input: story, status: 'pending', paid: false })
+      .insert({ session_id: twin.id, story_input: story, status: 'pending', paid: false })
       .select().single()
     if (movieError) throw new Error('Movie failed: ' + movieError.message)
 
