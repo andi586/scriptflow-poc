@@ -119,10 +119,12 @@ export default function CreatePage() {
         body: JSON.stringify({ movieId, userId: localStorage.getItem('sf_user_id') || '' })
       })
       const stripeData = await stripeRes.json()
+      console.log('[stripe] response:', stripeRes.status, stripeData)
       if (stripeData.checkoutUrl) {
         window.location.href = stripeData.checkoutUrl
       } else {
-        window.location.href = `/movie/${movieId}`
+        console.error('[stripe] no checkoutUrl:', stripeData)
+        alert('Payment error: ' + (stripeData.error || 'Unknown error'))
       }
     } catch (e: any) {
       setError(e.message)
