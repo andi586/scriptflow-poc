@@ -27,6 +27,24 @@ async function getUserIdByStripeCustomerId(customerId: string): Promise<string |
 }
 
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session): Promise<void> {
+  // Handle one-time movie generation payment
+  if (session.metadata?.type === 'movie_generation') {
+    const movieId = session.metadata.movie_id
+    const userId = session.metadata.supabase_user_id
+    if (!movieId || !userId) throw new Error('Missing movie_id or supabase_user_id in metadata')
+    
+    await supabaseAdmin.from('movies').update({ paid: true }).eq('id', movieId)
+    
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
+    fetch(`${baseUrl}/api/movie/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movieId, userId })
+    }).catch(console.error)
+    
+    console.log('[stripe webhook] movie generation triggered:', movieId)
+    return
+  }
   const userId = session.metadata?.supabase_user_id ?? session.client_reference_id ?? null
   const planKey = session.metadata?.plan_key ?? null
   const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null
