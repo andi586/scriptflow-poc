@@ -105,6 +105,42 @@ export default function MoviePage() {
         </p>
 
         <button
+          onClick={async () => {
+            if (navigator.share) {
+              try {
+                await navigator.share({
+                  title: 'My ScriptFlow Movie',
+                  text: 'Check out my AI movie!',
+                  url: movie.final_video_url
+                })
+              } catch(e) {
+                window.open(movie.final_video_url, '_blank')
+              }
+            } else {
+              window.open(movie.final_video_url, '_blank')
+            }
+          }}
+          style={{
+            display: 'block',
+            background: '#1a1a1a',
+            color: 'white',
+            border: '1px solid #333',
+            padding: '16px',
+            borderRadius: '100px',
+            fontWeight: '700',
+            fontSize: '1rem',
+            cursor: 'pointer',
+            width: '100%',
+            marginTop: '12px'
+          }}
+        >
+          📤 Share Movie
+        </button>
+        <p style={{color:'#555',fontSize:'0.75rem',textAlign:'center',marginTop:'8px'}}>
+          iOS: Share → Save to Photos
+        </p>
+
+        <button
           onClick={() => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
           style={{background:'#1a1a1a',color:'white',border:'1px solid #333',padding:'16px',borderRadius:'100px',fontWeight:'700',fontSize:'1rem',cursor:'pointer'}}
         >
