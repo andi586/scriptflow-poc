@@ -4,11 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
+    const { movieId, userId } = await request.json()
+    
+    // Try to get user from session, but allow userId from request body as fallback
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { movieId } = await request.json()
+    const effectiveUserId = user?.id || userId || 'anonymous'
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
 
     const session = await stripe.checkout.sessions.create({
@@ -27,9 +28,9 @@ export async function POST(request: NextRequest) {
       }],
       success_url: `${baseUrl}/movie/${movieId}?paid=true`,
       cancel_url: `${baseUrl}/create`,
-      client_reference_id: user.id,
+      client_reference_id: effectiveUserId,
       metadata: {
-        supabase_user_id: user.id,
+        supabase_user_id: effectiveUserId,
         movie_id: movieId,
         type: 'movie_generation'
       }

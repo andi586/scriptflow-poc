@@ -116,7 +116,7 @@ export default function CreatePage() {
       const stripeRes = await fetch('/api/stripe/movie-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ movieId })
+        body: JSON.stringify({ movieId, userId: localStorage.getItem('sf_user_id') || '' })
       })
       const stripeData = await stripeRes.json()
       if (stripeData.checkoutUrl) {
