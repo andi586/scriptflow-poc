@@ -42,7 +42,14 @@ export async function POST(req: NextRequest) {
     // 4. Create movies record with status='pending', paid=false
     const { data: movie, error: movieError } = await supabase
       .from('movies')
-      .insert({ session_id: twin.id, story_input: story, status: 'pending', paid: false })
+      .insert({
+        user_id: twin.user_id,
+        status: 'pending',
+        story_input: story,
+        tier: 'standard',
+        twin_photo_url: photoUrl,
+        paid: false,
+      })
       .select().single()
     if (movieError) throw new Error('Movie failed: ' + movieError.message)
 
