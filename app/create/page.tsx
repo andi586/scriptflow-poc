@@ -112,7 +112,18 @@ export default function CreatePage() {
         if (data.twinId) localStorage.setItem('sf_twin_id', data.twinId)
         if (data.photoUrl) localStorage.setItem('sf_photo_url', data.photoUrl)
       }
-      window.location.href = `/movie/${movieId}`
+      // Redirect to Stripe payment before generating
+      const stripeRes = await fetch('/api/stripe/movie-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieId })
+      })
+      const stripeData = await stripeRes.json()
+      if (stripeData.checkoutUrl) {
+        window.location.href = stripeData.checkoutUrl
+      } else {
+        window.location.href = `/movie/${movieId}`
+      }
     } catch (e: any) {
       setError(e.message)
       setLoading(false)
