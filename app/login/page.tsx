@@ -19,7 +19,7 @@ export default function AuthPage() {
 
   const handleAuth = async () => {
     if (!email || !password) {
-      toast.error("请填写邮箱和密码");
+      toast.error("请填写Email和Password");
       return;
     }
     setLoading(true);
@@ -29,7 +29,7 @@ export default function AuthPage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success(isLogin ? "欢迎回来" : "注册成功，请查收邮件");
+      toast.success(isLogin ? "Welcome back" : "Account created! Check your email.");
       if (isLogin) router.push("/create");
     }
     setLoading(false);
@@ -37,7 +37,7 @@ export default function AuthPage() {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      toast.error("请先填写邮箱地址");
+      toast.error("Please enter your email first");
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -46,7 +46,7 @@ export default function AuthPage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("重置邮件已发送，请查收");
+      toast.success("Reset email sent! Check your inbox.");
     }
   };
 
@@ -56,7 +56,7 @@ export default function AuthPage() {
         <CardHeader className="space-y-1 text-center">
           <h1 className="text-3xl font-bold text-[#D4AF37]">ScriptFlow</h1>
           <h2 className="text-lg font-medium text-zinc-300">
-            {isLogin ? "登录你的账号" : "创建新账号"}
+            {isLogin ? "Login你的账号" : "创建新账号"}
           </h2>
           <p className="text-sm text-zinc-500">
             {isLogin ? "你心里的导演，等太久了" : "开始你的短剧之旅"}
@@ -65,7 +65,7 @@ export default function AuthPage() {
 
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">邮箱</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
@@ -77,7 +77,7 @@ export default function AuthPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
@@ -99,7 +99,7 @@ export default function AuthPage() {
             onClick={() => void handleAuth()}
             className="h-11 w-full bg-[#D4AF37] font-semibold text-black hover:bg-[#B8962E]"
           >
-            {loading ? "处理中…" : isLogin ? "登录" : "注册"}
+            {loading ? "处理中…" : isLogin ? "Login" : "Sign Up"}
           </Button>
           <Button
             type="button"
@@ -107,7 +107,7 @@ export default function AuthPage() {
             onClick={() => setIsLogin((v) => !v)}
             className="w-full text-zinc-400 hover:bg-zinc-900 hover:text-white"
           >
-            {isLogin ? "没有账号？去注册" : "已有账号？去登录"}
+            {isLogin ? "Don't have an account? 去Sign Up" : "Already have an account? 去Login"}
           </Button>
           {isLogin && (
             <Button
@@ -116,7 +116,7 @@ export default function AuthPage() {
               onClick={() => void handleForgotPassword()}
               className="text-xs text-zinc-500 hover:text-[#D4AF37]"
             >
-              忘记密码
+              忘记Password
             </Button>
           )}
         </CardFooter>
