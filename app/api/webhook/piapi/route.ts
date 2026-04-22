@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   // Update movies table (new single Kling 3.0 architecture)
   // First, look up the movie to get its id
   const { data: movie } = await supabaseAdmin.from('movies')
-    .select('id, story_input')
+    .select('id, story_input, archetype')
     .eq('kling_task_id', taskId)
     .single()
 

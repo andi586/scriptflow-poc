@@ -41,8 +41,9 @@ export async function POST(req: NextRequest) {
     })
     const scriptData = await scriptRes.json()
     const shots = scriptData?.directionPlan?.shots ?? []
+    const archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
 
-    console.log('[movie/generate] Cognitive Core shots:', shots.length)
+    console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype)
 
     // Tier config: total duration must not exceed 15s
     const tierConfig: Record<string, { shots: number; duration: number }> = {
@@ -176,12 +177,13 @@ export async function POST(req: NextRequest) {
       throw new Error('Kling task creation failed: ' + JSON.stringify(klingData).slice(0, 200))
     }
 
-    // Step 5: Update movie with task_id
+    // Step 5: Update movie with task_id and archetype
     await supabase
       .from('movies')
       .update({
         kling_task_id: taskId,
-        status: 'processing'
+        status: 'processing',
+        ...(archetype ? { archetype } : {})
       })
       .eq('id', movie.id)
 
