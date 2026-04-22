@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { selectBGMv2 } from '@/app/lib/bgm-selector-v2'
+import { getLockedBGM } from '@/app/lib/execution-authority'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -116,9 +117,10 @@ const ARCHETYPE_BGM_LOCK: Record<string, string> = {
   'christmas': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-dd16ffbd-1798-47bc-b484-934095a07e37.mp3',
 }
 
+// EXECUTION AUTHORITY: Lock BGM by archetype
 const movieArchetype = movie.archetype || storyProfile.primaryEmotion
-const bgmUrl = ARCHETYPE_BGM_LOCK[movieArchetype] || await selectBGMv2(storyProfile)
-console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl)
+const bgmUrl = getLockedBGM(movieArchetype)
+console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.split('/').pop())
     console.log('[webhook] BGM selected:', bgmUrl)
     try {
       const mergeRes = await fetch(`${FFMPEG_URL}/merge`, {
