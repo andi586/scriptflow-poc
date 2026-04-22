@@ -130,6 +130,13 @@ export default function MyVideosPage() {
                     </div>
                   )}
 
+                  {/* iOS save instruction */}
+                  {movie.final_video_url && (
+                    <p style={{ fontSize: '0.7rem', color: '#555', textAlign: 'center', margin: '0.25rem 0 0' }}>
+                      Opens in new tab → long press → Save to Photos
+                    </p>
+                  )}
+
                   {/* Meta + actions */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -144,13 +151,12 @@ export default function MyVideosPage() {
                         👁 View
                       </a>
                       {movie.final_video_url && (
-                        <a
-                          href={movie.final_video_url}
-                          download
-                          style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: '0.75rem', textDecoration: 'none', fontWeight: 600 }}
+                        <button
+                          onClick={() => window.open(movie.final_video_url!, '_blank')}
+                          style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                         >
-                          ⬇️ Download
-                        </a>
+                          ⬇️ Save
+                        </button>
                       )}
                       <button
                         type="button"
