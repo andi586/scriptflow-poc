@@ -102,17 +102,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Movie generation triggered AFTER Stripe payment
-    // DO NOT generate here - wait for Stripe webhook
-    if (false) { // disabled - payment required first
-    const genRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/movie/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story, tier, userId: twin.id, additional_images: additionalImages, story_category: storyCategoryFromScript })
-    })
-    const genData = await genRes.json()
-    if (!genRes.ok) throw new Error(genData.error || 'Generation failed')
-
-    return NextResponse.json({ movieId: genData.movieId })
+    // Generation disabled here - Stripe webhook triggers generation
+    return NextResponse.json({ movieId: movie.id })
   } catch (e: any) {
     console.error('[create-movie] error:', e.message)
     return NextResponse.json({ error: e.message }, { status: 500 })
