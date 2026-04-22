@@ -19,7 +19,7 @@ const ScriptFlowHome = () => {
             WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 95%)'
           }}
         >
-          <source src="https://storage.theapi.app/videos/308550487305195.mp4" type="video/mp4" />
+          <source src="https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/generated-videos/4a1f5c7d-1c98-4fcf-a06c-5c6c642f83cb/final-1776815889315.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
       </div>
