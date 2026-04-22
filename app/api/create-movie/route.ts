@@ -101,7 +101,9 @@ export async function POST(req: NextRequest) {
       console.warn('[create-movie] generate-script pre-call failed, story_category unknown:', e)
     }
 
-    // 6. Call movie/generate
+    // 6. Movie generation triggered AFTER Stripe payment
+    // DO NOT generate here - wait for Stripe webhook
+    if (false) { // disabled - payment required first
     const genRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/movie/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
