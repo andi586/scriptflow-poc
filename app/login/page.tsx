@@ -30,7 +30,7 @@ export default function AuthPage() {
       toast.error(error.message);
     } else {
       toast.success(isLogin ? "欢迎回来" : "注册成功，请查收邮件");
-      if (isLogin) router.push("/app-flow");
+      if (isLogin) router.push("/dashboard");
     }
     setLoading(false);
   };
@@ -104,7 +104,7 @@ export default function AuthPage() {
           <Button
             type="button"
             variant="ghost"
-            onClick={() => setIsLogin(!isLogin)}
+            onClick={() => setIsLogin((v) => !v)}
             className="w-full text-zinc-400 hover:bg-zinc-900 hover:text-white"
           >
             {isLogin ? "没有账号？去注册" : "已有账号？去登录"}
