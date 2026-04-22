@@ -126,6 +126,11 @@ export default function CreatePage() {
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 20px 140px', fontFamily: 'system-ui', position: 'relative' }}>
       
+      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', maxWidth: '400px', marginBottom: '8px' }}>
+        <a href="/my-videos" style={{ color: '#888', fontSize: '0.8rem', textDecoration: 'none', padding: '4px 12px', border: '1px solid #333', borderRadius: '9999px' }}>
+          🎞️ My Videos
+        </a>
+      </div>
       <h1 style={{ color: '#D4A853', fontSize: '1.8rem', marginBottom: '4px', textAlign: 'center' }}>You Are the Star</h1>
       <p style={{ color: '#555', marginBottom: '40px', fontSize: '0.9rem' }}>Your face is remembered forever ✨</p>
 

@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type VideoJob = {
+type Movie = {
   id: string
-  result_video_url: string
+  status: string
+  final_video_url: string | null
   created_at: string
 }
 
 export default function MyVideosPage() {
-  const [videos, setVideos] = useState<VideoJob[]>([])
+  const [movies, setMovies] = useState<Movie[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -18,34 +19,22 @@ export default function MyVideosPage() {
   useEffect(() => {
     const supabase = createClient()
 
-    const loadVideos = async () => {
-      // Get current user session
-      const { data: { user } } = await supabase.auth.getUser()
-
-      let query = supabase
-        .from('omnihuman_jobs')
-        .select('id, result_video_url, created_at')
-        .not('result_video_url', 'is', null)
+    const loadMovies = async () => {
+      const { data, error: err } = await supabase
+        .from('movies')
+        .select('id, status, final_video_url, created_at')
         .order('created_at', { ascending: false })
+        .limit(20)
 
-      // Require login to view videos
-      if (!user?.id) {
-        setError('Please login to view your videos.')
-        setLoading(false)
-        return
-      }
-
-      // Filter by user_id
-      const { data, error: err } = await query.eq('user_id', user.id)
       if (err) {
         setError(err.message)
       } else {
-        setVideos((data ?? []) as VideoJob[])
+        setMovies((data ?? []) as Movie[])
       }
       setLoading(false)
     }
 
-    void loadVideos()
+    void loadMovies()
   }, [])
 
   const handleDelete = async (id: string) => {
@@ -56,16 +45,12 @@ export default function MyVideosPage() {
     setError(null)
 
     try {
-      const res = await fetch('/api/videos/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: id }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? 'Delete failed')
+      const supabase = createClient()
+      const { error: err } = await supabase.from('movies').delete().eq('id', id)
+      if (err) {
+        setError(err.message)
       } else {
-        setVideos(prev => prev.filter(v => v.id !== id))
+        setMovies(prev => prev.filter(m => m.id !== id))
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
@@ -79,12 +64,19 @@ export default function MyVideosPage() {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  const statusLabel = (status: string) => {
+    if (status === 'thinking') return { text: '🎬 Director is planning...', color: '#a855f7' }
+    if (status === 'processing') return { text: '🎥 Generating...', color: '#f59e0b' }
+    if (status === 'complete') return { text: '✅ Ready', color: '#22c55e' }
+    return { text: status, color: '#888' }
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#000', color: 'white' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <a
-          href="/app-flow"
+          href="/create"
           style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
         >
           ← Back
@@ -103,12 +95,12 @@ export default function MyVideosPage() {
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4rem' }}>
             <div style={{ width: '2.5rem', height: '2.5rem', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', borderTopColor: '#a855f7', animation: 'spin 0.8s linear infinite' }} />
           </div>
-        ) : videos.length === 0 ? (
+        ) : movies.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: '5rem' }}>
             <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🎞️</div>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.95rem' }}>No videos yet.</p>
             <a
-              href="/app-flow"
+              href="/create"
               style={{ display: 'inline-block', marginTop: '1.5rem', padding: '0.75rem 1.75rem', borderRadius: '9999px', background: '#7c3aed', color: 'white', fontSize: '0.9rem', textDecoration: 'none', fontWeight: 600 }}
             >
               ✨ Create Your First Movie
@@ -116,49 +108,68 @@ export default function MyVideosPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {videos.map(video => (
-              <div
-                key={video.id}
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', overflow: 'hidden' }}
-              >
-                {/* Video player */}
-                <video
-                  src={video.result_video_url}
-                  controls
-                  playsInline
-                  style={{ width: '100%', display: 'block', maxHeight: '320px', background: '#111', objectFit: 'contain' }}
-                />
+            {movies.map(movie => {
+              const sl = statusLabel(movie.status)
+              return (
+                <div
+                  key={movie.id}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', overflow: 'hidden' }}
+                >
+                  {/* Video player or placeholder */}
+                  {movie.final_video_url ? (
+                    <video
+                      src={movie.final_video_url}
+                      controls
+                      playsInline
+                      style={{ width: '100%', display: 'block', maxHeight: '320px', background: '#111', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <div style={{ width: '100%', height: '180px', background: '#111', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                      <div style={{ fontSize: '2rem' }}>🎬</div>
+                      <p style={{ color: sl.color, fontSize: '0.85rem', margin: 0 }}>{sl.text}</p>
+                    </div>
+                  )}
 
-                {/* Meta + actions */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
-                    {formatDate(video.created_at)}
-                  </span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <a
-                      href={video.result_video_url}
-                      download
-                      style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', background: 'rgba(124,58,237,0.7)', color: 'white', fontSize: '0.75rem', textDecoration: 'none', fontWeight: 600 }}
-                    >
-                      ⬇️ Download
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(video.id)}
-                      disabled={deletingId === video.id}
-                      style={{
-                        padding: '0.4rem 0.9rem', borderRadius: '9999px',
-                        background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                        color: '#f87171', fontSize: '0.75rem', cursor: deletingId === video.id ? 'not-allowed' : 'pointer',
-                        opacity: deletingId === video.id ? 0.5 : 1, fontWeight: 600,
-                      }}
-                    >
-                      {deletingId === video.id ? '...' : '🗑 Delete'}
-                    </button>
+                  {/* Meta + actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ color: sl.color, fontSize: '0.75rem', fontWeight: 600 }}>{sl.text}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>{formatDate(movie.created_at)}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <a
+                        href={`/movie/${movie.id}`}
+                        style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', background: 'rgba(124,58,237,0.7)', color: 'white', fontSize: '0.75rem', textDecoration: 'none', fontWeight: 600 }}
+                      >
+                        👁 View
+                      </a>
+                      {movie.final_video_url && (
+                        <a
+                          href={movie.final_video_url}
+                          download
+                          style={{ padding: '0.4rem 0.9rem', borderRadius: '9999px', background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: '0.75rem', textDecoration: 'none', fontWeight: 600 }}
+                        >
+                          ⬇️ Download
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(movie.id)}
+                        disabled={deletingId === movie.id}
+                        style={{
+                          padding: '0.4rem 0.9rem', borderRadius: '9999px',
+                          background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+                          color: '#f87171', fontSize: '0.75rem', cursor: deletingId === movie.id ? 'not-allowed' : 'pointer',
+                          opacity: deletingId === movie.id ? 0.5 : 1, fontWeight: 600,
+                        }}
+                      >
+                        {deletingId === movie.id ? '...' : '🗑 Delete'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
