@@ -79,14 +79,29 @@ export default function MoviePage() {
       </div>
 
       <div style={{display:'flex',flexDirection:'column',gap:'12px',width:'100%',maxWidth:'360px'}}>
-        <button
-          onClick={() => window.open(movie.final_video_url, '_blank')}
-          style={{background:'#D4A853',color:'#000',border:'none',padding:'16px',borderRadius:'100px',fontWeight:'800',fontSize:'1rem',cursor:'pointer',width:'100%'}}
+        <a
+          href={movie.final_video_url}
+          download="my-movie.mp4"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'block',
+            background: '#D4A853',
+            color: '#000',
+            padding: '16px',
+            borderRadius: '100px',
+            fontWeight: '800',
+            fontSize: '1rem',
+            textAlign: 'center',
+            textDecoration: 'none',
+            width: '100%',
+            boxSizing: 'border-box' as const
+          }}
         >
-          📱 Open Video to Save
-        </button>
+          ⬇️ Download Movie
+        </a>
         <p style={{color:'#888',fontSize:'0.75rem',textAlign:'center',marginTop:'8px'}}>
-          Tap Share → Save to Photos
+          iPhone: Long press video → Save to Photos
         </p>
 
         <button
