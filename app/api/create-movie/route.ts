@@ -86,20 +86,7 @@ export async function POST(req: NextRequest) {
       console.log('[create-movie] cast photo uploaded:', castPub.publicUrl)
     }
 
-    // 5. Call generate-script first to get story_category
-    let storyCategoryFromScript: string | undefined
-    try {
-      const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: story, personalNote: story })
-      })
-      const scriptData = await scriptRes.json()
-      storyCategoryFromScript = scriptData?.story_category
-      console.log('[create-movie] story_category:', storyCategoryFromScript)
-    } catch (e) {
-      console.warn('[create-movie] generate-script pre-call failed, story_category unknown:', e)
-    }
+    // 5. Skipped - generation happens after Stripe payment
 
     // 6. Movie generation triggered AFTER Stripe payment
     // Generation disabled here - Stripe webhook triggers generation
