@@ -9,13 +9,14 @@ interface Shot {
   type: 'face' | 'scene'
   emotion: string
   duration: number
+  intensity: number // 1-10 scale
 }
 
 interface ExecutionPlan {
   shots: Shot[]
 }
 
-// ─── Emotion → Shot Mapping ───────────────────────────────────────────────────
+// ─── Emotion → Category Mapping ───────────────────────────────────────────────
 
 type EmotionCategory = 'high_tension' | 'grief' | 'love' | 'playful' | 'epic' | 'neutral'
 
@@ -63,26 +64,67 @@ function categorizeEmotion(emotion: string): EmotionCategory {
   return EMOTION_CATEGORY_MAP[normalized] ?? 'neutral'
 }
 
+// ─── Intensity Curves per Category ───────────────────────────────────────────
+// 6 values: hook, build1, build2, peak, release, ending
+// Must increase until peak (index 3), then drop.
+
+const INTENSITY_CURVES: Record<EmotionCategory, number[]> = {
+  high_tension: [4, 6, 7, 10, 5, 2],
+  grief:        [3, 5, 6, 9,  4, 2],
+  love:         [3, 5, 6, 8,  5, 3],
+  playful:      [4, 5, 6, 8,  4, 3],
+  epic:         [4, 6, 7, 10, 5, 3],
+  neutral:      [3, 4, 6, 8,  4, 2],
+}
+
+// ─── Emotion Arc Labels per Category ─────────────────────────────────────────
+// Dynamic: each position gets a label derived from the category's narrative arc.
+
+const EMOTION_ARCS: Record<EmotionCategory, string[]> = {
+  high_tension: ['unease', 'suspicion', 'dread', 'terror', 'shock', 'silence'],
+  grief:        ['memory', 'longing', 'sadness', 'grief', 'release', 'acceptance'],
+  love:         ['warmth', 'tenderness', 'longing', 'love', 'joy', 'peace'],
+  playful:      ['curiosity', 'mischief', 'chaos', 'laughter', 'relief', 'warmth'],
+  epic:         ['struggle', 'determination', 'resistance', 'triumph', 'power', 'legacy'],
+  neutral:      ['calm', 'reflection', 'realization', 'emotion', 'release', 'peace'],
+}
+
+// ─── Dynamic Emotion Arc Generator ───────────────────────────────────────────
+// Returns 6 emotion labels with increasing intensity until peak.
+
+function buildDynamicEmotionArc(primaryEmotion: string): { label: string; intensity: number }[] {
+  const category = categorizeEmotion(primaryEmotion)
+  const labels = EMOTION_ARCS[category]
+  const intensities = INTENSITY_CURVES[category]
+
+  return labels.map((label, i) => ({
+    label,
+    intensity: intensities[i],
+  }))
+}
+
 // ─── Shot Type Rules ──────────────────────────────────────────────────────────
-// Determines whether a shot should be face or scene based on emotion category and position.
+// Intensity-first: high intensity → face, low intensity → scene.
+// Mid-range: context-based (category + position).
 
 function getShotType(
+  intensity: number,
   category: EmotionCategory,
   position: 'hook' | 'build' | 'peak' | 'release' | 'ending'
 ): 'face' | 'scene' {
-  // Hook: scene for contrast/environment, face for immediate tension
+  // Intensity-driven rules (override context)
+  if (intensity >= 8) return 'face'
+  if (intensity <= 3) return 'scene'
+
+  // Context-based for mid-range (4-7)
   if (position === 'hook') {
     return category === 'high_tension' || category === 'grief' ? 'face' : 'scene'
   }
-  // Build: alternate — scene first, then face
   if (position === 'build') {
     return category === 'playful' || category === 'epic' ? 'scene' : 'face'
   }
-  // Peak: always face (maximum emotional impact)
   if (position === 'peak') return 'face'
-  // Release: scene (breathing room, environment)
   if (position === 'release') return 'scene'
-  // Ending: face for emotional closure, scene for open endings
   if (position === 'ending') {
     return category === 'high_tension' || category === 'epic' ? 'scene' : 'face'
   }
@@ -107,24 +149,6 @@ function getShotDuration(
   return durationMap[category][position] ?? 5
 }
 
-// ─── Emotion Sequence Builder ─────────────────────────────────────────────────
-// Maps a primary emotion into a 6-shot emotional arc.
-
-function buildEmotionArc(primaryEmotion: string): string[] {
-  const category = categorizeEmotion(primaryEmotion)
-
-  const arcs: Record<EmotionCategory, string[]> = {
-    high_tension: ['unease', 'suspicion', 'dread', 'terror', 'shock', 'silence'],
-    grief:        ['memory', 'longing', 'sadness', 'grief', 'release', 'acceptance'],
-    love:         ['warmth', 'tenderness', 'longing', 'love', 'joy', 'peace'],
-    playful:      ['curiosity', 'mischief', 'chaos', 'laughter', 'relief', 'warmth'],
-    epic:         ['struggle', 'determination', 'resistance', 'triumph', 'power', 'legacy'],
-    neutral:      ['calm', 'reflection', 'realization', 'emotion', 'release', 'peace'],
-  }
-
-  return arcs[category]
-}
-
 // ─── Main Director V2 Function ────────────────────────────────────────────────
 
 /**
@@ -133,24 +157,28 @@ function buildEmotionArc(primaryEmotion: string): string[] {
  * Given a primary emotion string, returns a valid ExecutionPlan with 6 shots
  * following the arc: hook → build → build → peak → release → ending.
  *
- * Shot selection is fully driven by emotion category:
- * - shot type (face vs scene) depends on emotion + position
+ * Shot selection is fully driven by emotion category and dynamic intensity:
+ * - intensity increases shot by shot until peak (shot 4), then drops
+ * - shot type: intensity >= 8 → face, intensity <= 3 → scene, otherwise context-based
  * - duration depends on emotion category + position
- * - emotion labels follow a narrative arc derived from the primary emotion
  */
 export function buildExecutionPlan(primaryEmotion: string): ExecutionPlan {
   const category = categorizeEmotion(primaryEmotion)
-  const emotionArc = buildEmotionArc(primaryEmotion)
+  const arc = buildDynamicEmotionArc(primaryEmotion)
 
-  const positions: Array<'hook' | 'build' | 'build' | 'peak' | 'release' | 'ending'> = [
+  const positions: Array<'hook' | 'build' | 'peak' | 'release' | 'ending'> = [
     'hook', 'build', 'build', 'peak', 'release', 'ending'
   ]
 
-  const shots: Shot[] = positions.map((position, index) => ({
-    type: getShotType(category, position),
-    emotion: emotionArc[index] ?? primaryEmotion,
-    duration: getShotDuration(category, position),
-  }))
+  const shots: Shot[] = positions.map((position, index) => {
+    const { label, intensity } = arc[index]
+    return {
+      type: getShotType(intensity, category, position),
+      emotion: label,
+      duration: getShotDuration(category, position),
+      intensity,
+    }
+  })
 
   return { shots }
 }
@@ -164,6 +192,9 @@ export function validateExecutionPlan(plan: ExecutionPlan): boolean {
       (s.type === 'face' || s.type === 'scene') &&
       typeof s.emotion === 'string' &&
       typeof s.duration === 'number' &&
-      s.duration > 0
+      s.duration > 0 &&
+      typeof s.intensity === 'number' &&
+      s.intensity >= 1 &&
+      s.intensity <= 10
   )
 }
