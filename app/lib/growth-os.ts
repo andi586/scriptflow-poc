@@ -100,3 +100,14 @@ export function pickWinner(results: { id: string; signal: UserSignal }[]) {
 export function generateTitle(): string {
   return HOOKS[Math.floor(Math.random() * HOOKS.length)]
 }
+
+export function generateColdStartBatch(base: string) {
+  return Array.from({ length: 10 }).map(() => ({
+    title: generateTitle(),
+    prompt: buildGrowthPrompt(base)
+  }))
+}
+
+export function isWinner(signal: UserSignal): boolean {
+  return signal.watchTime > 3 && signal.completionRate > 0.4
+}
