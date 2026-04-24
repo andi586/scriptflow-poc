@@ -1,6 +1,13 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 
+// ── DEV MODE bypass ──────────────────────────────────────────────────────────
+// true in local dev → skip Stripe paywall, redirect directly to movie page
+// false in production → normal payment-gated flow
+// REMOVE before production release.
+const DEV_MODE = process.env.NODE_ENV === 'development'
+// ── End DEV MODE ─────────────────────────────────────────────────────────────
+
 type Role = 'me' | 'prank' | 'pet' | 'love' | 'crew'
 
 interface CastPhoto {
@@ -112,19 +119,25 @@ export default function CreatePage() {
         if (data.twinId) localStorage.setItem('sf_twin_id', data.twinId)
         if (data.photoUrl) localStorage.setItem('sf_photo_url', data.photoUrl)
       }
-      // Redirect to Stripe payment before generating
-      const stripeRes = await fetch('/api/stripe/movie-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ movieId, userId: localStorage.getItem('sf_user_id') || '' })
-      })
-      const stripeData = await stripeRes.json()
-      console.log('[stripe] response:', stripeRes.status, stripeData)
-      if (stripeData.checkoutUrl) {
-        window.location.href = stripeData.checkoutUrl
+      if (DEV_MODE) {
+        // DEV MODE: skip Stripe, go directly to movie page
+        console.log('[create] DEV_MODE — skipping payment, redirecting to movie:', movieId)
+        window.location.href = `/movie/${movieId}`
       } else {
-        console.error('[stripe] no checkoutUrl:', stripeData)
-        alert('Payment error: ' + (stripeData.error || 'Unknown error'))
+        // Redirect to Stripe payment before generating
+        const stripeRes = await fetch('/api/stripe/movie-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ movieId, userId: localStorage.getItem('sf_user_id') || '' })
+        })
+        const stripeData = await stripeRes.json()
+        console.log('[stripe] response:', stripeRes.status, stripeData)
+        if (stripeData.checkoutUrl) {
+          window.location.href = stripeData.checkoutUrl
+        } else {
+          console.error('[stripe] no checkoutUrl:', stripeData)
+          alert('Payment error: ' + (stripeData.error || 'Unknown error'))
+        }
       }
     } catch (e: any) {
       setError(e.message)
