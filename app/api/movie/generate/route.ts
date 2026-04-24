@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
           duration: forcedDuration,
           scene: hookData.visual,
           text: hookData.text,
-          emotion: hookData.text,
+          emotion: selectedShots[0]?.emotion ?? 'tension',
           dialogue: hookData.audio,
           tension: 9,
           visualDescription: hookData.visual,
