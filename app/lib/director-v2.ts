@@ -7,9 +7,10 @@
 
 interface Shot {
   type: 'face' | 'scene'
-  emotion: string
+  emotion: string          // playable physical state (visible behavior, not abstract label)
   duration: number
-  intensity: number // 1-10 scale
+  intensity: number        // 1-10 scale
+  purpose: 'hook' | 'build' | 'peak' | 'release' | 'ending'
 }
 
 interface ExecutionPlan {
@@ -21,7 +22,6 @@ interface ExecutionPlan {
 type EmotionCategory = 'high_tension' | 'grief' | 'love' | 'playful' | 'epic' | 'neutral'
 
 const EMOTION_CATEGORY_MAP: Record<string, EmotionCategory> = {
-  // High tension / fear
   panic: 'high_tension',
   fear: 'high_tension',
   terror: 'high_tension',
@@ -29,31 +29,26 @@ const EMOTION_CATEGORY_MAP: Record<string, EmotionCategory> = {
   betrayal: 'high_tension',
   confrontation: 'high_tension',
   anger: 'high_tension',
-  // Grief / sadness
   grief: 'grief',
   sadness: 'grief',
   longing: 'grief',
   regret: 'grief',
   melancholy: 'grief',
   bittersweet: 'grief',
-  // Love / warmth
   love: 'love',
   romance: 'love',
   tenderness: 'love',
   warmth: 'love',
   nostalgia: 'love',
-  // Playful / light
   playful: 'playful',
   funny: 'playful',
   joy: 'playful',
   excitement: 'playful',
-  // Epic / triumph
   epic: 'epic',
   triumph: 'epic',
   power: 'epic',
   determination: 'epic',
   comeback: 'epic',
-  // Default
   neutral: 'neutral',
   calm: 'neutral',
   reflective: 'neutral',
@@ -66,77 +61,115 @@ function categorizeEmotion(emotion: string): EmotionCategory {
 
 // ─── Intensity Curves per Category ───────────────────────────────────────────
 // 6 values: hook, build1, build2, peak, release, ending
-// Must increase until peak (index 3), then drop.
+// Increases until peak (index 3), then drops.
 
 const INTENSITY_CURVES: Record<EmotionCategory, number[]> = {
   high_tension: [4, 6, 7, 10, 5, 2],
-  grief:        [3, 5, 6, 9,  4, 2],
-  love:         [3, 5, 6, 8,  5, 3],
-  playful:      [4, 5, 6, 8,  4, 3],
+  grief:        [3, 5, 6,  9, 4, 2],
+  love:         [3, 5, 6,  8, 5, 3],
+  playful:      [4, 5, 6,  8, 4, 3],
   epic:         [4, 6, 7, 10, 5, 3],
-  neutral:      [3, 4, 6, 8,  4, 2],
+  neutral:      [3, 4, 6,  8, 4, 2],
 }
 
-// ─── Emotion Arc Labels per Category ─────────────────────────────────────────
-// Dynamic: each position gets a label derived from the category's narrative arc.
+// ─── Playable State Arcs ──────────────────────────────────────────────────────
+// Each entry is a visible physical behavior — not an abstract emotion label.
+// Actors and AI can directly render these states.
 
-const EMOTION_ARCS: Record<EmotionCategory, string[]> = {
-  high_tension: ['unease', 'suspicion', 'dread', 'terror', 'shock', 'silence'],
-  grief:        ['memory', 'longing', 'sadness', 'grief', 'release', 'acceptance'],
-  love:         ['warmth', 'tenderness', 'longing', 'love', 'joy', 'peace'],
-  playful:      ['curiosity', 'mischief', 'chaos', 'laughter', 'relief', 'warmth'],
-  epic:         ['struggle', 'determination', 'resistance', 'triumph', 'power', 'legacy'],
-  neutral:      ['calm', 'reflection', 'realization', 'emotion', 'release', 'peace'],
+const PLAYABLE_STATE_ARCS: Record<EmotionCategory, string[]> = {
+  high_tension: [
+    'eyes scanning the room, shoulders raised',
+    'jaw tightening, breath held',
+    'hands gripping surface, body frozen',
+    'pupils wide, mouth slightly open, body rigid',
+    'sudden exhale, hands releasing grip',
+    'eyes closing slowly, stillness',
+  ],
+  grief: [
+    'gaze drifting to a distant point, lips pressed together',
+    'eyes lowering, breath slowing, hands folded',
+    'chin dropping, shoulders curling inward',
+    'tears forming, throat visibly tightening',
+    'slow exhale, body releasing tension',
+    'eyes closing, small nod, quiet stillness',
+  ],
+  love: [
+    'soft smile forming, eyes warming',
+    'leaning slightly forward, gaze softening',
+    'hand reaching out, breath catching',
+    'eyes glistening, full smile, body open',
+    'slow blink, exhale, shoulders dropping',
+    'quiet gaze, gentle stillness, lips relaxed',
+  ],
+  playful: [
+    'eyebrows raising, corner of mouth twitching',
+    'suppressed grin, eyes darting sideways',
+    'sudden movement, body leaning in',
+    'full laugh breaking out, head tilting back',
+    'catching breath, wiping eye, grinning',
+    'relaxed smile, slow head shake',
+  ],
+  epic: [
+    'head down, fists clenched at sides',
+    'jaw set, eyes narrowing with focus',
+    'body straightening, chin lifting',
+    'eyes blazing, chest expanding, voice rising',
+    'standing tall, breathing hard, surveying',
+    'slow turn, calm gaze, weight settling',
+  ],
+  neutral: [
+    'still posture, eyes unfocused, breathing steady',
+    'slow head turn, gaze settling on something',
+    'slight frown forming, eyes sharpening',
+    'body leaning forward, expression opening',
+    'long exhale, shoulders dropping',
+    'eyes closing briefly, quiet nod',
+  ],
 }
 
-// ─── Dynamic Emotion Arc Generator ───────────────────────────────────────────
-// Returns 6 emotion labels with increasing intensity until peak.
+// ─── Dynamic Arc Builder ──────────────────────────────────────────────────────
 
-function buildDynamicEmotionArc(primaryEmotion: string): { label: string; intensity: number }[] {
+function buildDynamicEmotionArc(primaryEmotion: string): { state: string; intensity: number }[] {
   const category = categorizeEmotion(primaryEmotion)
-  const labels = EMOTION_ARCS[category]
+  const states = PLAYABLE_STATE_ARCS[category]
   const intensities = INTENSITY_CURVES[category]
 
-  return labels.map((label, i) => ({
-    label,
+  return states.map((state, i) => ({
+    state,
     intensity: intensities[i],
   }))
 }
 
 // ─── Shot Type Rules ──────────────────────────────────────────────────────────
-// Intensity-first: high intensity → face, low intensity → scene.
-// Mid-range: context-based (category + position).
+// Intensity-first: high → face, low → scene. Mid-range: context-based.
 
 function getShotType(
   intensity: number,
   category: EmotionCategory,
-  position: 'hook' | 'build' | 'peak' | 'release' | 'ending'
+  purpose: 'hook' | 'build' | 'peak' | 'release' | 'ending'
 ): 'face' | 'scene' {
-  // Intensity-driven rules (override context)
   if (intensity >= 8) return 'face'
   if (intensity <= 3) return 'scene'
 
-  // Context-based for mid-range (4-7)
-  if (position === 'hook') {
+  if (purpose === 'hook') {
     return category === 'high_tension' || category === 'grief' ? 'face' : 'scene'
   }
-  if (position === 'build') {
+  if (purpose === 'build') {
     return category === 'playful' || category === 'epic' ? 'scene' : 'face'
   }
-  if (position === 'peak') return 'face'
-  if (position === 'release') return 'scene'
-  if (position === 'ending') {
+  if (purpose === 'peak') return 'face'
+  if (purpose === 'release') return 'scene'
+  if (purpose === 'ending') {
     return category === 'high_tension' || category === 'epic' ? 'scene' : 'face'
   }
   return 'scene'
 }
 
 // ─── Duration Rules ───────────────────────────────────────────────────────────
-// Emotion category and position influence pacing.
 
 function getShotDuration(
   category: EmotionCategory,
-  position: 'hook' | 'build' | 'peak' | 'release' | 'ending'
+  purpose: 'hook' | 'build' | 'peak' | 'release' | 'ending'
 ): number {
   const durationMap: Record<EmotionCategory, Record<string, number>> = {
     high_tension: { hook: 3, build: 4, peak: 5, release: 4, ending: 4 },
@@ -146,7 +179,7 @@ function getShotDuration(
     epic:         { hook: 4, build: 5, peak: 7, release: 5, ending: 6 },
     neutral:      { hook: 4, build: 5, peak: 6, release: 5, ending: 5 },
   }
-  return durationMap[category][position] ?? 5
+  return durationMap[category][purpose] ?? 5
 }
 
 // ─── Main Director V2 Function ────────────────────────────────────────────────
@@ -157,26 +190,29 @@ function getShotDuration(
  * Given a primary emotion string, returns a valid ExecutionPlan with 6 shots
  * following the arc: hook → build → build → peak → release → ending.
  *
- * Shot selection is fully driven by emotion category and dynamic intensity:
- * - intensity increases shot by shot until peak (shot 4), then drops
- * - shot type: intensity >= 8 → face, intensity <= 3 → scene, otherwise context-based
- * - duration depends on emotion category + position
+ * Each shot has:
+ * - emotion: a visible playable physical state (not an abstract label)
+ * - purpose: the narrative role of the shot
+ * - intensity: 1-10, increases until peak then drops
+ * - type: face or scene, driven by intensity then context
+ * - duration: paced by emotion category and purpose
  */
 export function buildExecutionPlan(primaryEmotion: string): ExecutionPlan {
   const category = categorizeEmotion(primaryEmotion)
   const arc = buildDynamicEmotionArc(primaryEmotion)
 
-  const positions: Array<'hook' | 'build' | 'peak' | 'release' | 'ending'> = [
+  const purposes: Array<'hook' | 'build' | 'peak' | 'release' | 'ending'> = [
     'hook', 'build', 'build', 'peak', 'release', 'ending'
   ]
 
-  const shots: Shot[] = positions.map((position, index) => {
-    const { label, intensity } = arc[index]
+  const shots: Shot[] = purposes.map((purpose, index) => {
+    const { state, intensity } = arc[index]
     return {
-      type: getShotType(intensity, category, position),
-      emotion: label,
-      duration: getShotDuration(category, position),
+      type: getShotType(intensity, category, purpose),
+      emotion: state,
+      duration: getShotDuration(category, purpose),
       intensity,
+      purpose,
     }
   })
 
@@ -187,14 +223,17 @@ export function buildExecutionPlan(primaryEmotion: string): ExecutionPlan {
 
 export function validateExecutionPlan(plan: ExecutionPlan): boolean {
   if (!plan || !Array.isArray(plan.shots) || plan.shots.length === 0) return false
+  const validPurposes = new Set(['hook', 'build', 'peak', 'release', 'ending'])
   return plan.shots.every(
     s =>
       (s.type === 'face' || s.type === 'scene') &&
       typeof s.emotion === 'string' &&
+      s.emotion.length > 0 &&
       typeof s.duration === 'number' &&
       s.duration > 0 &&
       typeof s.intensity === 'number' &&
       s.intensity >= 1 &&
-      s.intensity <= 10
+      s.intensity <= 10 &&
+      validPurposes.has(s.purpose)
   )
 }
