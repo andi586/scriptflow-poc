@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({ template: story, personalNote: story })
     })
     const scriptData = await scriptRes.json()
+    console.log('[DEBUG scriptData]', scriptData)
+    console.log('[DEBUG shots]', scriptData?.shots)
+    console.log('[DEBUG directionPlan]', scriptData?.directionPlan)
+    console.log('[DEBUG hook]', scriptData?.hook)
+
     const shots = scriptData?.directionPlan?.shots ?? []
     const archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
     const hookData = scriptData?.hook ?? null
