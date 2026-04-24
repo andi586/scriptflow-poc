@@ -14,7 +14,7 @@ export const KLING_PROMPT_TEMPLATES = [
     klingPrompts: {
       hookShot: "ECU, fast motion, object falling mid-air, bright light, cinematic 9:16",
       faceShot: "MCU portrait, @image_1, amused frustration, slight smile, natural light, cinematic 9:16",
-      sceneShot: "messy floor with scattered objects, static camera, bright light, no people, cinematic 9:16",
+      sceneShot: "messy floor with scattered objects, cat visible, static camera, bright light, cinematic 9:16",
       peakShot: "ECU, @image_1, sudden reaction, raised eyebrow, cinematic 9:16",
       endingShot: "WS, messy room frozen, music fade, cinematic 9:16"
     }
