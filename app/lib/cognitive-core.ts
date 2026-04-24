@@ -319,6 +319,34 @@ REALITY ANCHOR RULES (MANDATORY):
 ABSTRACTION GUIDE:
 ${abstractionGuide}
 
+═══ IRON RULES FOR SHOT DESCRIPTIONS ═══
+
+RULE: Every shot description MUST include the story's core subjects.
+
+1. SUBJECT PERSISTENCE RULE:
+   - Identify all core subjects from the story (cat, dog, person, object)
+   - Every scene shot MUST mention these subjects explicitly
+   - NEVER write a scene shot without the main subject present
+   - WRONG: "messy floor with scattered objects"
+   - RIGHT: "messy floor with cat sitting among scattered objects"
+
+2. CAUSE-EFFECT RULE:
+   - Show cause BEFORE effect in the same shot or sequence
+   - WRONG: "cup flying through air" (effect only)
+   - RIGHT: "cat paw pushes cup, cup falls off edge" (cause→effect)
+
+3. CHARACTER CONTINUITY RULE:
+   - @image_1 must appear in at least 40% of shots
+   - Scene shots without @image_1 must still reference the story subject
+   - Never have 3 consecutive shots without the main character
+
+4. SPECIFICITY RULE:
+   - Never use generic descriptions
+   - WRONG: "object falls"
+   - RIGHT: "coffee cup falls after cat pushes it"
+
+These rules apply to ALL archetypes without exception.
+
 --- IRON RULES (violating any = output invalid) ---
 
 1. HOOK RULE: Shot 1 must be Extreme Close-Up OR Extreme Wide Shot. Never medium shot.
