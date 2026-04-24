@@ -7,10 +7,15 @@ import { NEW_ARCHETYPES, matchArchetypeExtended } from './film-os'
 import { getDirectorRules } from './director-rules'
 import {
   buildKlingPrompt,
+  buildShotStates,
+  generatePerformance,
+  generateBlocking,
+  generateNarrative,
   type PerformanceTimeline,
   type BlockingPlan,
   type NarrativeControl,
 } from './director-brain-v2'
+import { buildGrowthPrompt } from './growth-os'
 
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
@@ -602,8 +607,39 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
     console.log('[CognitiveCore] All face shots passed validation ✓')
   }
 
+  // Director Brain v2: enhance shots with performance/blocking/narrative + growth prompts
+  const shotStates = buildShotStates(directionPlan.shots.length)
+
+  const enhancedShots = directionPlan.shots.map((shot: any, i: number) => {
+    const state = shotStates[i]
+    const performance = generatePerformance(state)
+    const blocking = generateBlocking(state)
+    const narrative = generateNarrative(state)
+
+    const basePrompt = shot.prompt || shot.scene || shot.description || ''
+
+    const enhancedPrompt = buildKlingPrompt(
+      basePrompt,
+      performance,
+      blocking,
+      narrative
+    )
+
+    const growthPrompt = buildGrowthPrompt(enhancedPrompt)
+
+    return {
+      ...shot,
+      prompt: growthPrompt,
+      scene: growthPrompt
+    }
+  })
+
+  console.log('[CognitiveCore] Director Brain v2 activated, shots enhanced:', enhancedShots.length)
+
+  const enhancedDirectionPlan = { ...directionPlan, shots: enhancedShots }
+
   console.log('[CognitiveCore] Starting NEL...')
-  const executionPlan = await runNEL(directionPlan, klingTemplate, archetypeName, emotionCurve)
+  const executionPlan = await runNEL(enhancedDirectionPlan, klingTemplate, archetypeName, emotionCurve)
 
   console.log('[CognitiveCore] Complete. Total shots:', executionPlan.pipeline.length)
   return { storyState, directionPlan, executionPlan, story_category: producerOutput.story_category }
