@@ -444,19 +444,41 @@ CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explana
   return JSON.parse(cleanJSON(raw))
 }
 
-function checkRealityAnchors(plan: DirectionPlan, mustShow: string[]): void {
+function checkRealityAnchors(plan: DirectionPlan, mustShow: string[]): DirectionPlan {
   const allText = plan.shots
     .map(s => `${s.description || ''} ${s.scenePrompt || ''} ${s.dialogue || ''}`)
     .join(' ')
     .toLowerCase()
 
+  const missingItems: string[] = []
   for (const item of mustShow) {
     if (!allText.includes(item.toLowerCase())) {
-      console.warn(`[CognitiveCore] Reality anchor MISSING: "${item}" not found in any shot`)
+      console.warn(`[CognitiveCore] Reality anchor MISSING: "${item}" not found in any shot — auto-injecting`)
+      missingItems.push(item)
     } else {
       console.log(`[CognitiveCore] Reality anchor OK: "${item}" ✓`)
     }
   }
+
+  if (missingItems.length === 0) return plan
+
+  // Auto-inject missing anchors into scene shots
+  const fixedShots = plan.shots.map(shot => {
+    if (shot.shotType !== 'scene') return shot
+    let updatedShot = { ...shot }
+    for (const item of missingItems) {
+      const injection = `with ${item} visible in frame`
+      updatedShot = {
+        ...updatedShot,
+        description: updatedShot.description ? `${updatedShot.description}, ${injection}` : injection,
+        scenePrompt: updatedShot.scenePrompt ? `${updatedShot.scenePrompt}, ${injection}` : injection,
+      }
+      console.log(`[CognitiveCore] Injected "${item}" into shot ${shot.shotNumber}`)
+    }
+    return updatedShot
+  })
+
+  return { ...plan, shots: fixedShots }
 }
 
 const MAX_FACE_CHARS = 20
@@ -602,10 +624,10 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula)
 
   console.log('[CognitiveCore] Checking reality anchors...')
-  checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
+  const anchoredPlan = checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
 
   console.log('[CognitiveCore] Validating face shot lengths...')
-  const { plan: directionPlan, violations } = validateAndFixFaceShots(rawDirectionPlan)
+  const { plan: directionPlan, violations } = validateAndFixFaceShots(anchoredPlan)
   if (violations.length > 0) {
     console.warn('[CognitiveCore] Face shot violations fixed:', violations)
   } else {
