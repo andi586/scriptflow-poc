@@ -15,7 +15,7 @@ export interface Proposal {
 
 export interface DecisionContext {
   targetEmotion: 'grief' | 'tension' | 'desire' | 'release'
-  phase: 'build' | 'peak' | 'release'
+  phase: 'setup' | 'build' | 'tension' | 'peak' | 'release'
   intensity: number
 }
 
@@ -149,4 +149,150 @@ Narrative: ${decision.narrative?.action}
 
 Style: cinematic, restrained, emotional realism, shallow depth of field
 `.trim()
+}
+
+// ============ SHOT SYSTEM ============
+
+export type ShotPhase = 'setup' | 'build' | 'tension' | 'peak' | 'release'
+
+export interface ShotState {
+  shotId: string
+  phase: ShotPhase
+  duration: number
+  intensity: number
+  emotion: 'grief' | 'desire' | 'tension' | 'release'
+}
+
+export interface AudioLayer {
+  type: 'bgm' | 'ambient' | 'silence' | 'subjective'
+  start: number
+  end: number
+  volume: number
+}
+
+export interface AudioPlan {
+  layers: AudioLayer[]
+}
+
+export interface ShotPlan {
+  id: string
+  state: ShotState
+  performance: PerformanceTimeline
+  blocking: BlockingPlan
+  narrative: NarrativeControl
+  audio: AudioPlan
+  decisions: ReturnType<typeof directorBrain>
+  prompt: string
+}
+
+export function buildShotStates(totalShots: number): ShotState[] {
+  const phases: ShotPhase[] = ['setup','build','tension','peak','release']
+  return Array.from({ length: totalShots }).map((_, i) => {
+    const ratio = i / totalShots
+    let phase: ShotPhase = 'setup'
+    if (ratio > 0.2) phase = 'build'
+    if (ratio > 0.5) phase = 'tension'
+    if (ratio > 0.75) phase = 'peak'
+    if (ratio > 0.9) phase = 'release'
+    return {
+      shotId: `shot_${i}`,
+      phase,
+      duration: 2 + Math.random() * 2,
+      intensity: ratio,
+      emotion: 'tension'
+    }
+  })
+}
+
+export function generatePerformance(state: ShotState): PerformanceTimeline {
+  if (state.phase === 'tension') {
+    return {
+      duration: state.duration,
+      frames: [
+        { t: 0, emotion: 'suppressed', micro: 'eye_shift', breath: 'hold', gaze: 'avoid' },
+        { t: 1.2, emotion: 'tension', micro: 'jaw_clench', breath: 'shallow', gaze: 'lock' }
+      ]
+    }
+  }
+  if (state.phase === 'peak') {
+    return {
+      duration: state.duration,
+      frames: [
+        { t: 0, emotion: 'tension', micro: 'blink_slow', breath: 'hold', gaze: 'lock' },
+        { t: 1.0, emotion: 'release', micro: 'lip_press', breath: 'release', gaze: 'close_eyes' }
+      ]
+    }
+  }
+  return {
+    duration: state.duration,
+    frames: [{ t: 0, emotion: 'neutral', micro: null, breath: null, gaze: 'down' }]
+  }
+}
+
+export function generateBlocking(state: ShotState): BlockingPlan {
+  if (state.phase === 'tension') {
+    return { zMovement: 'push_in', depth: 'shallow', foreground: false, midground: true, background: true }
+  }
+  if (state.phase === 'release') {
+    return { zMovement: 'pull_out', depth: 'deep', foreground: true, midground: true, background: true }
+  }
+  return { zMovement: 'static', depth: 'shallow', foreground: false, midground: true, background: false }
+}
+
+export function generateNarrative(state: ShotState): NarrativeControl {
+  if (state.phase === 'setup') {
+    return { layers: [{ viewerKnows: false, characterKnows: true, revealAt: 0 }] }
+  }
+  if (state.phase === 'peak') {
+    return { layers: [
+      { viewerKnows: false, characterKnows: true, revealAt: 0 },
+      { viewerKnows: true, characterKnows: false, revealAt: 1.5 }
+    ]}
+  }
+  return { layers: [{ viewerKnows: true, characterKnows: true, revealAt: 0 }] }
+}
+
+export function generateAudio(state: ShotState): AudioPlan {
+  if (state.phase === 'tension') {
+    return { layers: [{ type: 'silence', start: 0, end: state.duration, volume: 1 }] }
+  }
+  if (state.phase === 'peak') {
+    return { layers: [{ type: 'ambient', start: 0, end: state.duration, volume: 0.1 }] }
+  }
+  return { layers: [{ type: 'bgm', start: 0, end: state.duration, volume: 0.2 }] }
+}
+
+export function buildProposals(state: ShotState): Proposal[] {
+  return [
+    {
+      id: 'cam_push', module: 'camera', action: 'slow_push', params: {},
+      emotionAlignment: 0.9, tensionScore: 0.8, novelty: 0.5, cost: 0.2
+    },
+    {
+      id: 'perf_suppress', module: 'performance', action: 'emotion_suppression', params: {},
+      emotionAlignment: 0.95, tensionScore: 0.9, novelty: 0.6, cost: 0.3
+    }
+  ]
+}
+
+export async function runShotPipeline(story: string, totalShots: number = 6) {
+  const states = buildShotStates(totalShots)
+  const shots: ShotPlan[] = []
+
+  for (const state of states) {
+    const performance = generatePerformance(state)
+    const blocking = generateBlocking(state)
+    const narrative = generateNarrative(state)
+    const audio = generateAudio(state)
+    const proposals = buildProposals(state)
+    const decisions = directorBrain(proposals, {
+      targetEmotion: state.emotion,
+      phase: state.phase,
+      intensity: state.intensity
+    })
+    const prompt = buildKlingPrompt(story, performance, blocking, narrative)
+    shots.push({ id: state.shotId, state, performance, blocking, narrative, audio, decisions, prompt })
+  }
+
+  return shots
 }
