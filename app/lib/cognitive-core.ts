@@ -7,9 +7,9 @@ import { NEW_ARCHETYPES, matchArchetypeExtended } from './film-os'
 import { getDirectorRules } from './director-rules'
 import {
   buildKlingPrompt,
-  buildPerformanceTimeline,
-  buildNarrativeControl,
-  buildBlockingPlans,
+  type PerformanceTimeline,
+  type BlockingPlan,
+  type NarrativeControl,
 } from './director-brain-v2'
 
 export interface ProducerOutput {
@@ -476,9 +476,32 @@ async function runNEL(
   emotionCurve: ReturnType<typeof getEmotionProgression>
 ): Promise<ExecutionPlan> {
   // Build Director Brain v2 systems from archetype + emotion curve
-  const performanceTimeline = buildPerformanceTimeline(emotionCurve)
-  const narrativeControl = buildNarrativeControl(archetypeName, emotionCurve)
-  const blockingPlans = buildBlockingPlans(emotionCurve)
+  const performanceTimeline: PerformanceTimeline = {
+    duration: directionPlan.shots.reduce((sum, s) => sum + s.duration, 0),
+    frames: emotionCurve.map(s => ({
+      t: s.shot * 2,
+      emotion: s.intensity >= 8 ? 'release' : s.intensity >= 5 ? 'tension' : 'suppressed',
+      micro: s.intensity >= 8 ? 'jaw_clench' : s.intensity >= 5 ? 'lip_press' : 'blink_slow',
+      breath: s.intensity >= 8 ? 'hold' : s.intensity >= 5 ? 'shallow' : 'release',
+      gaze: s.shot === 1 ? 'lock' : s.intensity >= 7 ? 'down' : 'avoid',
+    })),
+  }
+
+  const narrativeControl: NarrativeControl = {
+    layers: emotionCurve.map((s, i) => ({
+      viewerKnows: i > 0,
+      characterKnows: s.intensity >= 6,
+      revealAt: s.shot * 2,
+    })),
+  }
+
+  const blockingPlan: BlockingPlan = {
+    zMovement: 'push_in',
+    depth: 'shallow',
+    foreground: true,
+    midground: true,
+    background: false,
+  }
 
   const kt = klingTemplate as Record<string, string>
 
@@ -501,9 +524,8 @@ async function runNEL(
     const finalPrompt = buildKlingPrompt(
       baseTemplate,
       performanceTimeline,
-      blockingPlans,
-      narrativeControl,
-      shot.shotNumber
+      blockingPlan,
+      narrativeControl
     )
 
     console.log(`[NEL] Shot ${shot.shotNumber} finalPrompt (first 80): ${finalPrompt.slice(0, 80)}`)
