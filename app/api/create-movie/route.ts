@@ -3,6 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const maxDuration = 120
 
+// ── DEV MODE bypass ──────────────────────────────────────────────────────────
+// Set to true to skip Stripe payment check and allow full generation pipeline.
+// Set to false to restore normal payment-gated flow.
+// REMOVE this flag and the bypass block before production release.
+const DEV_MODE = true
+// ── End DEV MODE ─────────────────────────────────────────────────────────────
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -54,6 +61,24 @@ export async function POST(req: NextRequest) {
     if (movieError) throw new Error('Movie failed: ' + movieError.message)
 
     console.log('[create-movie] movie:', movie.id)
+
+    // 5. DEV MODE: skip payment gate and trigger generation immediately
+    if (DEV_MODE) {
+      console.log('[create-movie] DEV_MODE=true — skipping Stripe, triggering generation directly')
+
+      // Mark as paid so downstream checks pass
+      await supabase.from('movies').update({ paid: true, status: 'processing' }).eq('id', movie.id)
+
+      // Fire-and-forget: trigger movie generation pipeline
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      fetch(`${baseUrl}/api/movie/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieId: movie.id, userId: twin.id, story }),
+      }).catch((err: Error) => console.error('[create-movie] DEV generation trigger failed:', err.message))
+
+      return NextResponse.json({ movieId: movie.id, twinId: twin.id, photoUrl, dev: true })
+    }
 
     // 5. Return { movieId, twinId, photoUrl }
     // Generation happens ONLY after Stripe payment webhook
