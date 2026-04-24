@@ -630,13 +630,8 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
       narrative
     )
 
-    const growthPrompt = buildGrowthPrompt(enhancedPrompt)
-
-    return {
-      ...shot,
-      prompt: growthPrompt,
-      scene: growthPrompt
-    }
+    // Growth OS hook injection disabled - ruins Kling scene prompts
+    return { ...shot, prompt: enhancedPrompt, scene: enhancedPrompt }
   })
 
   console.log('[CognitiveCore] Director Brain v2 activated, shots enhanced:', enhancedShots.length)
