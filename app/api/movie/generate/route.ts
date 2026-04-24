@@ -42,8 +42,9 @@ export async function POST(req: NextRequest) {
     const scriptData = await scriptRes.json()
     const shots = scriptData?.directionPlan?.shots ?? []
     const archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
+    const hookData = scriptData?.hook ?? null
 
-    console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype)
+    console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype, 'hook:', !!hookData)
 
     // Tier config: total duration must not exceed 15s
     const tierConfig: Record<string, { shots: number; duration: number }> = {
@@ -109,9 +110,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Hook Shot injection ───────────────────────────────────────────────
+    // If hook exists from director-v2/hook-engine, use it as Shot 1.
+    // Remaining shots follow the original ExecutionPlan.
+    // If hook is missing or fails, fall back to original shot[0].
+    let shotsForKling = selectedShots
+
+    if (hookData && hookData.visual && hookData.text) {
+      try {
+        // Build a synthetic shot object from hook data, compatible with buildPrompt
+        const hookShot = {
+          shotType: 'face',
+          emotion: hookData.text,           // use hook text as emotion descriptor
+          dialogue: hookData.audio,         // use hook audio cue as dialogue hint
+          description: hookData.visual,     // use hook visual as scene description
+          visualDescription: hookData.visual,
+          frameType: 'extreme close-up',
+          cameraMovement: 'static with micro-tremor',
+          lighting: 'high contrast, harsh',
+        }
+        // Prepend hook as Shot 1, keep remaining shots (skip original shot[0])
+        shotsForKling = [hookShot, ...selectedShots.slice(1)]
+        console.log('[movie/generate] hook injected as Shot 1:', hookData.text)
+      } catch (hookInjectErr) {
+        // Non-fatal: fall back to original shots
+        console.warn('[movie/generate] hook injection failed (fallback to original shot[0]):', hookInjectErr)
+        shotsForKling = selectedShots
+      }
+    } else {
+      console.log('[movie/generate] no hook data — using original shot[0]')
+    }
+    // ── End Hook Shot injection ───────────────────────────────────────────
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const multiShots = selectedShots.map((shot: any, index: number) => ({
-      prompt: buildPrompt(shot, index, selectedShots.length),
+    const multiShots = shotsForKling.map((shot: any, index: number) => ({
+      prompt: buildPrompt(shot, index, shotsForKling.length),
       duration: forcedDuration, // ALWAYS use this, ignore shot.duration from Cognitive Core
     }))
 
