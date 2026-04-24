@@ -7,7 +7,7 @@ export const maxDuration = 120
 // Set to true to skip Stripe payment check and allow full generation pipeline.
 // Set to false to restore normal payment-gated flow.
 // REMOVE this flag and the bypass block before production release.
-const DEV_MODE = true
+const DEV_MODE = process.env.NODE_ENV === 'development'
 // ── End DEV MODE ─────────────────────────────────────────────────────────────
 
 const supabase = createClient(
