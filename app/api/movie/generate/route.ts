@@ -123,13 +123,19 @@ export async function POST(req: NextRequest) {
 
     if (hookData && hookData.visual && hookData.text) {
       try {
-        // Build a synthetic shot object from hook data, compatible with buildPrompt
+        // Build a synthetic shot object from hook data, matching original shot structure
         const hookShot = {
+          shotNumber: 1,
+          type: 'face',
           shotType: 'face',
-          emotion: hookData.text,           // use hook text as emotion descriptor
-          dialogue: hookData.audio,         // use hook audio cue as dialogue hint
-          description: hookData.visual,     // use hook visual as scene description
+          duration: forcedDuration,
+          scene: hookData.visual,
+          text: hookData.text,
+          emotion: hookData.text,
+          dialogue: hookData.audio,
+          tension: 9,
           visualDescription: hookData.visual,
+          description: hookData.visual,
           frameType: 'extreme close-up',
           cameraMovement: 'static with micro-tremor',
           lighting: 'high contrast, harsh',
