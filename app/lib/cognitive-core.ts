@@ -616,25 +616,12 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const shotStates = buildShotStates(directionPlan.shots.length)
 
   const enhancedShots = directionPlan.shots.map((shot: any, i: number) => {
-    const state = shotStates[i]
-    const performance = generatePerformance(state)
-    const blocking = generateBlocking(state)
-    const narrative = generateNarrative(state)
-
-    const basePrompt = shot.prompt || shot.scene || shot.description || ''
-
-    const enhancedPrompt = buildKlingPrompt(
-      basePrompt,
-      performance,
-      blocking,
-      narrative
-    )
-
-    // Growth OS hook injection disabled - ruins Kling scene prompts
-    return { ...shot, prompt: enhancedPrompt, scene: enhancedPrompt }
+    // Director Brain v2 data collected but NOT injected into Kling prompts
+    // Kling works better with clean simple prompts
+    return shot
   })
 
-  console.log('[CognitiveCore] Director Brain v2 activated, shots enhanced:', enhancedShots.length)
+  console.log('[CognitiveCore] Director Brain v2 data collected, shots:', enhancedShots.length)
 
   const enhancedDirectionPlan = { ...directionPlan, shots: enhancedShots }
 
