@@ -402,6 +402,11 @@ Shot 6 (BREATH): WS room with both, cat sits unbothered, user laughs
 
 --- OUTPUT FORMAT ---
 
+SHOT COUNT RULES (HARD LIMIT - DO NOT EXCEED):
+- tier "30s": output EXACTLY 6 shots
+- tier "60s": output EXACTLY 8 shots
+- tier "90s": output EXACTLY 10 shots
+
 Output ONLY valid JSON. No other text. Use this exact structure:
 {
   "style": "cinematic",
