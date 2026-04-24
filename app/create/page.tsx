@@ -119,26 +119,31 @@ export default function CreatePage() {
         if (data.twinId) localStorage.setItem('sf_twin_id', data.twinId)
         if (data.photoUrl) localStorage.setItem('sf_photo_url', data.photoUrl)
       }
-      if (DEV_MODE) {
-        // DEV MODE: skip Stripe, go directly to movie page
-        console.log('[create] DEV_MODE — skipping payment, redirecting to movie:', movieId)
-        window.location.href = `/movie/${movieId}`
-      } else {
-        // Redirect to Stripe payment before generating
-        const stripeRes = await fetch('/api/stripe/movie-checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ movieId, userId: localStorage.getItem('sf_user_id') || '' })
-        })
-        const stripeData = await stripeRes.json()
-        console.log('[stripe] response:', stripeRes.status, stripeData)
-        if (stripeData.checkoutUrl) {
-          window.location.href = stripeData.checkoutUrl
-        } else {
-          console.error('[stripe] no checkoutUrl:', stripeData)
-          alert('Payment error: ' + (stripeData.error || 'Unknown error'))
-        }
-      }
+      // TEMP: bypass Stripe checkout for testing — redirect directly to movie page
+      // TODO: re-enable Stripe payment after verification
+      console.log('[create] TEMP bypass — skipping payment, redirecting to movie:', movieId)
+      window.location.href = `/movie/${movieId}`
+
+      // if (DEV_MODE) {
+      //   // DEV MODE: skip Stripe, go directly to movie page
+      //   console.log('[create] DEV_MODE — skipping payment, redirecting to movie:', movieId)
+      //   window.location.href = `/movie/${movieId}`
+      // } else {
+      //   // Redirect to Stripe payment before generating
+      //   const stripeRes = await fetch('/api/stripe/movie-checkout', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({ movieId, userId: localStorage.getItem('sf_user_id') || '' })
+      //   })
+      //   const stripeData = await stripeRes.json()
+      //   console.log('[stripe] response:', stripeRes.status, stripeData)
+      //   if (stripeData.checkoutUrl) {
+      //     window.location.href = stripeData.checkoutUrl
+      //   } else {
+      //     console.error('[stripe] no checkoutUrl:', stripeData)
+      //     alert('Payment error: ' + (stripeData.error || 'Unknown error'))
+      //   }
+      // }
     } catch (e: any) {
       setError(e.message)
       setLoading(false)
