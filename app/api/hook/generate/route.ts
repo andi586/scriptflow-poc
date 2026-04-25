@@ -7,32 +7,30 @@ export const maxDuration = 120
 
 const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM' // Rachel
 
-// ── Replicate IP-Adapter FaceID expression generation ────────────────────────
+// ── Replicate SDXL expression generation ─────────────────────────────────────
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 })
 
 async function generateExpressions(imageUrl: string): Promise<string[]> {
   const expressions = [
-    "same person, same identity, calm neutral expression, close-up portrait, cinematic lighting, ultra realistic",
-    "same person, same identity, surprised shocked expression, eyes wide open, close-up portrait, cinematic lighting, ultra realistic",
-    "same person, same identity, fearful scared tense expression, close-up portrait, cinematic lighting, ultra realistic",
+    "calm neutral expression",
+    "surprised shocked expression, eyes wide open",
+    "fearful scared tense expression",
   ]
 
   const results: string[] = []
 
-  for (const prompt of expressions) {
+  for (const expression of expressions) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const output = await replicate.run(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        "lucataco/ip-adapter-faceid" as any,
+        "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b" as any,
         {
           input: {
+            prompt: `portrait photo of person, ${expression}, photorealistic, cinematic`,
             image: imageUrl,
-            prompt,
-            negative_prompt: "different person, deformed, ugly, extra face, blurry, bad quality",
-            num_inference_steps: 30,
-            guidance_scale: 8.0,
+            strength: 0.4,
           },
         }
       )
