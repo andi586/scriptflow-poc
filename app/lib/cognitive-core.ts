@@ -5,16 +5,6 @@ import { SYMBOL_OBJECTS, SUBTEXT_TEMPLATES, EMOTION_TRANSITIONS, HOOK_FORMULAS, 
 import { getKlingTemplate, getEmotionProgression, DIRECTOR_SELF_CHECK } from './film-os'
 import { NEW_ARCHETYPES, matchArchetypeExtended } from './film-os'
 import { getDirectorRules } from './director-rules'
-import {
-  buildKlingPrompt,
-  buildShotStates,
-  generatePerformance,
-  generateBlocking,
-  generateNarrative,
-  type PerformanceTimeline,
-  type BlockingPlan,
-  type NarrativeControl,
-} from './director-brain-v2'
 import { buildGrowthPrompt } from './growth-os'
 
 export interface ProducerOutput {
@@ -531,65 +521,8 @@ function validateAndFixFaceShots(plan: DirectionPlan): { plan: DirectionPlan; vi
 
 async function runNEL(
   directionPlan: DirectionPlan,
-  klingTemplate: ReturnType<typeof getKlingTemplate>,
-  archetypeName: string,
-  emotionCurve: ReturnType<typeof getEmotionProgression>
 ): Promise<ExecutionPlan> {
-  // Build Director Brain v2 systems from archetype + emotion curve
-  const performanceTimeline: PerformanceTimeline = {
-    duration: directionPlan.shots.reduce((sum, s) => sum + s.duration, 0),
-    frames: emotionCurve.map(s => ({
-      t: s.shot * 2,
-      emotion: s.intensity >= 8 ? 'release' : s.intensity >= 5 ? 'tension' : 'suppressed',
-      micro: s.intensity >= 8 ? 'jaw_clench' : s.intensity >= 5 ? 'lip_press' : 'blink_slow',
-      breath: s.intensity >= 8 ? 'hold' : s.intensity >= 5 ? 'shallow' : 'release',
-      gaze: s.shot === 1 ? 'lock' : s.intensity >= 7 ? 'down' : 'avoid',
-    })),
-  }
-
-  const narrativeControl: NarrativeControl = {
-    layers: emotionCurve.map((s, i) => ({
-      viewerKnows: i > 0,
-      characterKnows: s.intensity >= 6,
-      revealAt: s.shot * 2,
-    })),
-  }
-
-  const blockingPlan: BlockingPlan = {
-    zMovement: 'push_in',
-    depth: 'shallow',
-    foreground: true,
-    midground: true,
-    background: false,
-  }
-
-  const kt = klingTemplate as Record<string, string>
-
   const pipeline = directionPlan.shots.map((shot, i) => {
-    // Select base template based on shot type and position
-    const isHook = i === 0
-    const isPeak = i === Math.floor(directionPlan.shots.length * 0.6)
-    const isEnding = i === directionPlan.shots.length - 1
-    const baseTemplate = isHook
-      ? (kt?.hookShot || '')
-      : isPeak
-      ? (kt?.peakShot || '')
-      : isEnding
-      ? (kt?.endingShot || '')
-      : shot.shotType === 'face'
-      ? (kt?.faceShot || '')
-      : (kt?.sceneShot || '')
-
-    // Build enriched Kling prompt using Director Brain v2
-    const finalPrompt = buildKlingPrompt(
-      baseTemplate,
-      performanceTimeline,
-      blockingPlan,
-      narrativeControl
-    )
-
-    console.log(`[NEL] Shot ${shot.shotNumber} finalPrompt (first 80): ${finalPrompt.slice(0, 80)}`)
-
     return {
       shotNumber: shot.shotNumber,
       type: shot.shotType,
@@ -598,7 +531,6 @@ async function runNEL(
       scene: shot.scenePrompt,
       emotion: shot.emotion,
       tension: Math.floor((i / directionPlan.shots.length) * 10),
-      klingPrompt: finalPrompt,
     }
   })
 
@@ -662,33 +594,14 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
     console.log('[CognitiveCore] All face shots passed validation ✓')
   }
 
-  // Director Brain v2: enhance shots with performance/blocking/narrative + growth prompts
-  const shotStates = buildShotStates(directionPlan.shots.length)
-
   let enhancedShots = directionPlan.shots.map((shot: any, i: number) => {
-    // Director Brain v2 data collected but NOT injected into Kling prompts
-    // Kling works better with clean simple prompts
-    return shot
+    return shot  // No modification - keep original clean shot
   })
-
-  const totalLength = enhancedShots.reduce((sum, s) => sum + (s.prompt || s.scene || '').length, 0)
-  console.log('[CognitiveCore] Total prompt length:', totalLength)
-
-  if (totalLength > 2500) {
-    // Strip Actor performance timeline from prompts - keep only base Kling prompt
-    enhancedShots = enhancedShots.map(shot => {
-      const basePrompt = (shot.prompt || shot.scene || '').split('\nActor performance')[0].split('\nCinematic blocking')[0].split('\nNarrative reveal')[0].trim()
-      return { ...shot, prompt: basePrompt, scene: basePrompt }
-    })
-    console.log('[CognitiveCore] Prompt trimmed to fit Kling 2500 limit')
-  }
-
-  console.log('[CognitiveCore] Director Brain v2 data collected, shots:', enhancedShots.length)
 
   const enhancedDirectionPlan = { ...directionPlan, shots: enhancedShots }
 
   console.log('[CognitiveCore] Starting NEL...')
-  const executionPlan = await runNEL(enhancedDirectionPlan, klingTemplate, archetypeName, emotionCurve)
+  const executionPlan = await runNEL(enhancedDirectionPlan)
 
   console.log('[CognitiveCore] Complete. Total shots:', executionPlan.pipeline.length)
   return { storyState, directionPlan, executionPlan, story_category: producerOutput.story_category }
