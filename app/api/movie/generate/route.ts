@@ -111,7 +111,8 @@ export async function POST(req: NextRequest) {
         const frameType = shot.frameType || shot.type || 'wide'
         const cameraMovement = shot.cameraMovement || movement
         const lighting = shot.lighting || 'natural'
-        const visualDesc = shot.visualDescription || shot.scenePrompt || shot.description || environment
+        const rawDesc = shot.scenePrompt || shot.visualDescription || shot.description || environment
+        const visualDesc = rawDesc.length > 150 ? rawDesc.substring(0, 150) : rawDesc
 
         return `Cinematic 9:16, ${frameType}, ${cameraMovement}, ${petRef}${visualDesc}, emotion: ${shot.emotion || 'melancholic'}, ${lighting} light with soft shadows, no people, smooth dissolve transition`
       }
