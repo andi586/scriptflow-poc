@@ -102,6 +102,7 @@ export interface CognitiveCoreOutput {
   directionPlan: DirectionPlan
   executionPlan: ExecutionPlan
   story_category: ProducerOutput['story_category']
+  archetype: string | null
 }
 
 function cleanJSON(text: string): string {
