@@ -604,5 +604,5 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   const executionPlan = await runNEL(enhancedDirectionPlan)
 
   console.log('[CognitiveCore] Complete. Total shots:', executionPlan.pipeline.length)
-  return { storyState, directionPlan, executionPlan, story_category: producerOutput.story_category }
+  return { storyState, directionPlan, executionPlan, story_category: producerOutput.story_category, archetype }
 }
