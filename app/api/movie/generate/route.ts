@@ -163,6 +163,19 @@ export async function POST(req: NextRequest) {
       duration: forcedDuration, // ALWAYS use this, ignore shot.duration from Cognitive Core
     }))
 
+    const totalPromptLength = multiShots.reduce((sum: number, s: { prompt: string; duration: number }) => sum + (s.prompt || '').length, 0)
+    console.log('[movie/generate] total prompt length:', totalPromptLength)
+
+    if (totalPromptLength > 2000) {
+      const maxPerShot = Math.floor(2000 / multiShots.length)
+      multiShots.forEach((s: { prompt: string; duration: number }) => {
+        if (s.prompt && s.prompt.length > maxPerShot) {
+          s.prompt = s.prompt.substring(0, maxPerShot)
+        }
+      })
+      console.log('[movie/generate] prompts truncated to fit 2500 limit')
+    }
+
     console.log('[movie/generate] multi_shots:', JSON.stringify(multiShots).slice(0, 300))
     console.log('[movie/generate] multiShots durations:', multiShots.map((s: { duration: number }) => s.duration))
     console.log('[movie/generate] total duration:', multiShots.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0))
