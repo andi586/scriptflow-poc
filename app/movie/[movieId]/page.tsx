@@ -57,6 +57,21 @@ export default function MoviePage() {
       <p style={{color:'#888'}}>This takes 2-5 minutes</p>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{marginTop:'32px',width:'40px',height:'40px',border:'3px solid #D4A853',borderTop:'3px solid transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}} />
+      <button
+        onClick={() => window.location.reload()}
+        style={{
+          marginTop:'16px',
+          background:'#D4A853',
+          color:'#000',
+          border:'none',
+          padding:'12px 24px',
+          borderRadius:'100px',
+          fontWeight:'700',
+          cursor:'pointer'
+        }}
+      >
+        🔄 Check if ready
+      </button>
     </div>
   )
 
