@@ -665,11 +665,23 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   // Director Brain v2: enhance shots with performance/blocking/narrative + growth prompts
   const shotStates = buildShotStates(directionPlan.shots.length)
 
-  const enhancedShots = directionPlan.shots.map((shot: any, i: number) => {
+  let enhancedShots = directionPlan.shots.map((shot: any, i: number) => {
     // Director Brain v2 data collected but NOT injected into Kling prompts
     // Kling works better with clean simple prompts
     return shot
   })
+
+  const totalLength = enhancedShots.reduce((sum, s) => sum + (s.prompt || s.scene || '').length, 0)
+  console.log('[CognitiveCore] Total prompt length:', totalLength)
+
+  if (totalLength > 2500) {
+    // Strip Actor performance timeline from prompts - keep only base Kling prompt
+    enhancedShots = enhancedShots.map(shot => {
+      const basePrompt = (shot.prompt || shot.scene || '').split('\nActor performance')[0].split('\nCinematic blocking')[0].split('\nNarrative reveal')[0].trim()
+      return { ...shot, prompt: basePrompt, scene: basePrompt }
+    })
+    console.log('[CognitiveCore] Prompt trimmed to fit Kling 2500 limit')
+  }
 
   console.log('[CognitiveCore] Director Brain v2 data collected, shots:', enhancedShots.length)
 
