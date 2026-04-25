@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       storyState: output.storyState,
       directionPlan: output.directionPlan,
       story_category: output.story_category,
+      archetype: output.archetype,
       ...(hook ? { hook } : {}),
     })
   } catch (err) {
