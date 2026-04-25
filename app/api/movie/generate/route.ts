@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buildPrompt = (shot: any, shotIndex: number, _totalShots: number): string => {
+    if (shot.klingPrompt) { shot = { ...shot, klingPrompt: shot.klingPrompt.split("\nActor")[0].split("\nCinematic")[0].trim() } }
       const movement = cameraMovements[shotIndex % cameraMovements.length]
       const environment = sceneEnvironments[shotIndex % sceneEnvironments.length]
 
