@@ -46,6 +46,22 @@ export async function POST(req: NextRequest) {
 
     console.log('[create-movie] twin:', twin.id, photoUrl)
 
+    // Upload cast photos
+    const castPhotoUrls: string[] = []
+    for (let i = 0; i < 6; i++) {
+      const castFile = form.get(`cast_${i}`) as File
+      if (!castFile) break
+      const castBytes = await castFile.arrayBuffer()
+      const castBuffer = Buffer.from(castBytes)
+      const castFileName = `twins/cast_${Date.now()}_${i}.jpg`
+      const { error: castErr } = await supabase.storage.from('recordings').upload(castFileName, castBuffer, { contentType: 'image/jpeg', upsert: true })
+      if (!castErr) {
+        const { data: castPub } = supabase.storage.from('recordings').getPublicUrl(castFileName)
+        castPhotoUrls.push(castPub.publicUrl)
+      }
+    }
+    console.log('[create-movie] cast photos:', castPhotoUrls.length)
+
     // 4. Create movies record with status='pending', paid=false
     const { data: movie, error: movieError } = await supabase
       .from('movies')
@@ -74,7 +90,7 @@ export async function POST(req: NextRequest) {
       fetch(`${baseUrl}/api/movie/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ movieId: movie.id, userId: twin.id, story }),
+        body: JSON.stringify({ movieId: movie.id, userId: twin.id, story, additional_images: castPhotoUrls }),
       }).catch((err: Error) => console.error('[create-movie] DEV generation trigger failed:', err.message))
 
       return NextResponse.json({ movieId: movie.id, twinId: twin.id, photoUrl, dev: true })
