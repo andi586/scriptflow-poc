@@ -1,10 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getLockedBGM } from '@/app/lib/execution-authority'
+import Replicate from 'replicate'
 
 export const maxDuration = 120
 
 const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM' // Rachel
+
+// ── Replicate IP-Adapter FaceID expression generation ────────────────────────
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+})
+
+async function generateExpressions(imageUrl: string): Promise<string[]> {
+  const expressions = [
+    "same person, same identity, calm neutral expression, close-up portrait, cinematic lighting, ultra realistic",
+    "same person, same identity, surprised shocked expression, eyes wide open, close-up portrait, cinematic lighting, ultra realistic",
+    "same person, same identity, fearful scared tense expression, close-up portrait, cinematic lighting, ultra realistic",
+  ]
+
+  const results: string[] = []
+
+  for (const prompt of expressions) {
+    try {
+      const output = await replicate.run(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "lucataco/ip-adapter-faceid" as any,
+        {
+          input: {
+            image: imageUrl,
+            prompt,
+            negative_prompt: "different person, deformed, ugly, extra face, blurry, bad quality",
+            num_inference_steps: 30,
+            guidance_scale: 8.0,
+          },
+        }
+      )
+      results.push((output as string[])[0])
+    } catch (err) {
+      console.warn('[hook/generate] Replicate expression failed, using original:', err)
+      results.push(imageUrl) // fallback to original photo
+    }
+  }
+
+  return results
+}
 
 function getSupabaseAdmin() {
   return createClient(
@@ -202,10 +242,25 @@ export async function POST(request: NextRequest) {
       { text: lines[2], startTime: 10, endTime: 12 },
     ]
 
-    // Step 8: Call Railway /hook endpoint
-    const photoUrl = twin.frame_url_front ?? twin.frame_url_mid
+    // Step 8: Generate 3 expression variants via Replicate IP-Adapter
+    const basePhotoUrl = twin.frame_url_front ?? twin.frame_url_mid
+    let photoUrls: string[] = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
+
+    if (process.env.REPLICATE_API_TOKEN) {
+      try {
+        console.log('[hook/generate] generating expressions via Replicate...')
+        photoUrls = await generateExpressions(basePhotoUrl)
+        console.log('[hook/generate] expression URLs:', photoUrls)
+      } catch (repErr) {
+        console.warn('[hook/generate] Replicate failed (using original photo x3):', repErr)
+      }
+    } else {
+      console.log('[hook/generate] REPLICATE_API_TOKEN not set — skipping expression generation')
+    }
+
+    // Step 9: Call Railway /hook endpoint
     const railwayPayload = {
-      photoUrl,
+      photoUrls,
       audioUrls,
       subtitles,
       bgmUrl,
@@ -213,7 +268,7 @@ export async function POST(request: NextRequest) {
       duration: 15,
     }
 
-    console.log('[hook/generate] calling Railway /hook with photoUrl:', photoUrl)
+    console.log('[hook/generate] calling Railway /hook with photoUrls:', photoUrls)
 
     const railwayRes = await fetch(
       'https://scriptflow-video-merge-production.up.railway.app/hook',
