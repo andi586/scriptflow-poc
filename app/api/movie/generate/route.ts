@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     console.log('[movie/generate] looking for twin id:', userId)
     const { data: twin } = await supabase
       .from('digital_twins')
-      .select('id, frame_url_mid')
+      .select('id, frame_url_mid, frame_url_front')
       .eq('id', userId)
       .single()
 
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('[movie/generate] twin found:', twin.id)
+    console.log('[movie/generate] twin photo:', twin?.frame_url_front)
 
     // Step 2: Call Cognitive Core for shot plan
     const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
           frameType: 'extreme close-up',
           cameraMovement: 'static with micro-tremor',
           lighting: 'high contrast, harsh',
+          imageUrl: twin.frame_url_front,
         }
         // Prepend hook as Shot 1, keep remaining shots (skip original shot[0])
         shotsForKling = [hookShot, ...selectedShots.slice(1)]
@@ -191,8 +193,8 @@ export async function POST(req: NextRequest) {
         aspect_ratio: '9:16',
         enable_audio: true,
         images: additional_images && additional_images.length > 0
-          ? [twin.frame_url_mid, ...additional_images]
-          : [twin.frame_url_mid],
+          ? [twin.frame_url_front ?? twin.frame_url_mid, ...additional_images]
+          : [twin.frame_url_front ?? twin.frame_url_mid],
         multi_shots: multiShots
       },
       config: {
