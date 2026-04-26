@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
       model: 'kling',
       task_type: 'omni_video_generation',
       input: {
-        version: '3.0',
+        version: '2.6',
         resolution: '720p',
         aspect_ratio: '9:16',
         enable_audio: true,
