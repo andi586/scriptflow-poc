@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const { error: uploadError } = await supabase.storage
       .from('recordings')
       .upload(fileName, buffer, { contentType: 'image/jpeg', upsert: true })
-    if (uploadError) throw new Error('Upload failed: ' + uploadError.message)
+    if (uploadError) throw new Error('Upload failed: ' + uploadError.message + ' ' + JSON.stringify(uploadError))
 
     const { data: pub } = supabase.storage.from('recordings').getPublicUrl(fileName)
     const photoUrl = pub.publicUrl
