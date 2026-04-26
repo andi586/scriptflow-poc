@@ -119,9 +119,20 @@ export default function CreatePage() {
         if (data.twinId) localStorage.setItem('sf_twin_id', data.twinId)
         if (data.photoUrl) localStorage.setItem('sf_photo_url', data.photoUrl)
       }
-      // TEMP: bypass Stripe checkout for testing — redirect directly to movie page
-      // TODO: re-enable Stripe payment after verification
-      console.log('[create] TEMP bypass — skipping payment, redirecting to movie:', movieId)
+      // Call /api/hook/generate (fire and forget — non-blocking)
+      console.log('[create] calling /api/hook/generate for movieId:', movieId)
+      fetch('/api/hook/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieId })
+      }).then(hookRes => hookRes.json()).then(hookData => {
+        console.log('[create] hook/generate response:', hookData)
+      }).catch(hookErr => {
+        console.warn('[create] hook/generate failed (non-fatal):', hookErr)
+      })
+
+      // Redirect to movie page
+      console.log('[create] redirecting to movie:', movieId)
       window.location.href = `/movie/${movieId}`
 
       // if (DEV_MODE) {

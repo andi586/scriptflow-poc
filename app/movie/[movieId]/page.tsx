@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -12,6 +12,8 @@ export default function MoviePage() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [movieId, setMovieId] = useState<string | null>(null)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const paywallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const id = window.location.pathname.split('/').pop()
@@ -41,16 +43,29 @@ export default function MoviePage() {
         .select('*')
         .eq('id', movieId)
         .single()
-      if (data?.final_video_url) {
+      if (data?.final_video_url || data?.hook_video_url) {
         setMovie(data)
-        clearInterval(interval)
+        if (data?.final_video_url) clearInterval(interval)
       }
     }, 5000)
 
     return () => clearInterval(interval)
   }, [movieId])
 
-  if (loading || !movie?.final_video_url) return (
+  // Show paywall after 13 seconds if hook video is playing and not paid
+  useEffect(() => {
+    if (movie?.hook_video_url && !movie?.paid && !movie?.final_video_url) {
+      paywallTimerRef.current = setTimeout(() => {
+        setShowPaywall(true)
+      }, 13000)
+    }
+    return () => {
+      if (paywallTimerRef.current) clearTimeout(paywallTimerRef.current)
+    }
+  }, [movie?.hook_video_url, movie?.paid, movie?.final_video_url])
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (loading) return (
     <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'white'}}>
       <div style={{fontSize:'3rem',marginBottom:'24px'}}>🎬</div>
       <h2 style={{color:'#D4A853',marginBottom:'12px'}}>Creating your movie...</h2>
@@ -59,22 +74,100 @@ export default function MoviePage() {
       <div style={{marginTop:'32px',width:'40px',height:'40px',border:'3px solid #D4A853',borderTop:'3px solid transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}} />
       <button
         onClick={() => window.location.reload()}
-        style={{
-          marginTop:'16px',
-          background:'#D4A853',
-          color:'#000',
-          border:'none',
-          padding:'12px 24px',
-          borderRadius:'100px',
-          fontWeight:'700',
-          cursor:'pointer'
-        }}
+        style={{marginTop:'16px',background:'#D4A853',color:'#000',border:'none',padding:'12px 24px',borderRadius:'100px',fontWeight:'700',cursor:'pointer'}}
       >
         🔄 Check if ready
       </button>
     </div>
   )
 
+  // ── Hook video + paywall (paid=false, hook ready, final not ready) ─────────
+  if (movie?.hook_video_url && !movie?.paid && !movie?.final_video_url) {
+    return (
+      <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',padding:'48px 20px 120px',color:'white',fontFamily:'system-ui'}}>
+        <h1 style={{color:'#D4A853',fontSize:'1.3rem',marginBottom:'4px'}}>🎬 Your Preview is Ready</h1>
+        <p style={{color:'#555',fontSize:'0.85rem',marginBottom:'24px'}}>Watch the first 15 seconds of your movie</p>
+
+        <div style={{position:'relative',display:'inline-block',marginBottom:'32px'}}>
+          <video
+            src={movie.hook_video_url}
+            autoPlay
+            playsInline
+            muted={false}
+            style={{maxHeight:'70vh',maxWidth:'360px',borderRadius:'16px',boxShadow:'0 0 60px rgba(212,168,83,0.2)'}}
+          />
+
+          {/* Paywall overlay */}
+          {showPaywall && (
+            <div style={{
+              position:'absolute',
+              inset:0,
+              borderRadius:'16px',
+              background:'linear-gradient(to bottom, rgba(10,10,10,0) 0%, rgba(10,10,10,0.85) 40%, rgba(10,10,10,0.98) 100%)',
+              display:'flex',
+              flexDirection:'column',
+              alignItems:'center',
+              justifyContent:'flex-end',
+              padding:'32px 24px',
+              gap:'12px'
+            }}>
+              <p style={{color:'#D4A853',fontWeight:'800',fontSize:'1.1rem',textAlign:'center',margin:0}}>
+                Your movie is being created...
+              </p>
+              <p style={{color:'#aaa',fontSize:'0.85rem',textAlign:'center',margin:0}}>
+                Unlock the full movie now
+              </p>
+              <button
+                onClick={() => {
+                  // TODO: wire up Stripe checkout
+                  alert('Stripe checkout coming soon!')
+                }}
+                style={{
+                  background:'#D4A853',
+                  color:'#000',
+                  border:'none',
+                  borderRadius:'100px',
+                  padding:'14px 36px',
+                  fontWeight:'800',
+                  fontSize:'1rem',
+                  cursor:'pointer',
+                  width:'100%',
+                  maxWidth:'280px'
+                }}
+              >
+                🔓 Unlock now → $2.9
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!showPaywall && (
+          <p style={{color:'#555',fontSize:'0.8rem',textAlign:'center'}}>
+            Full movie unlocks in a moment...
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  // ── Waiting for final video (no hook yet either) ───────────────────────────
+  if (!movie?.final_video_url) return (
+    <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'white'}}>
+      <div style={{fontSize:'3rem',marginBottom:'24px'}}>🎬</div>
+      <h2 style={{color:'#D4A853',marginBottom:'12px'}}>Creating your movie...</h2>
+      <p style={{color:'#888'}}>This takes 2-5 minutes</p>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{marginTop:'32px',width:'40px',height:'40px',border:'3px solid #D4A853',borderTop:'3px solid transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}} />
+      <button
+        onClick={() => window.location.reload()}
+        style={{marginTop:'16px',background:'#D4A853',color:'#000',border:'none',padding:'12px 24px',borderRadius:'100px',fontWeight:'700',cursor:'pointer'}}
+      >
+        🔄 Check if ready
+      </button>
+    </div>
+  )
+
+  // ── Final video ready ─────────────────────────────────────────────────────
   return (
     <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',padding:'48px 20px 120px',color:'white',fontFamily:'system-ui'}}>
       <h1 style={{color:'#D4A853',fontSize:'1.5rem',marginBottom:'4px'}}>Your Movie is Ready! 🎬</h1>

@@ -52,18 +52,17 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype, 'hook:', !!hookData)
 
-    // Tier config: total duration must not exceed 15s
+    // Tier config
     const tierConfig: Record<string, { shots: number; duration: number }> = {
-      '30s': { shots: 4, duration: 3 }, // 4 × 3 = 12s
-      '60s': { shots: 6, duration: 2 }, // 6 × 2 = 12s
-      '90s': { shots: 6, duration: 2 }, // 6 × 2 = 12s (first call)
+      '30s': { shots: 4, duration: 6 },
+      '60s': { shots: 6, duration: 8 },
+      '90s': { shots: 8, duration: 8 },
     }
     const config = tierConfig[tier] ?? tierConfig['60s']
     const selectedShots = shots.slice(0, config.shots)
 
-    // Force override duration — ALWAYS use tier duration, ignore Cognitive Core duration
-    const TIER_DURATION = { '30s': 3, '60s': 2, '90s': 2 }
-    const forcedDuration = TIER_DURATION[tier as keyof typeof TIER_DURATION] || 3
+    // Force override duration — use tier duration from config
+    const forcedDuration = config.duration
 
     // Build multi_shots prompts from shot plan
     const cameraMovements = [
