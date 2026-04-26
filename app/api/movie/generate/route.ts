@@ -18,6 +18,34 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] story:', story, 'tier:', tier)
 
+    // ── Daily cost guard ──────────────────────────────────────────────────────
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const { count: dailyCount } = await supabase
+      .from('movies')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', today.toISOString())
+    const dailyLimit = parseInt(process.env.DAILY_MOVIE_LIMIT || '10', 10)
+    console.log('[cost-guard] daily count:', dailyCount, '/ limit:', dailyLimit)
+    if ((dailyCount ?? 0) >= dailyLimit) {
+      return NextResponse.json({ error: 'Daily limit reached. Please try again tomorrow.' }, { status: 429 })
+    }
+
+    // ── PiAPI balance log ─────────────────────────────────────────────────────
+    try {
+      const balRes = await fetch('https://api.piapi.ai/api/v1/user/balance', {
+        headers: { 'x-api-key': process.env.PIAPI_API_KEY! }
+      })
+      if (balRes.ok) {
+        const balData = await balRes.json()
+        const balance = balData?.data?.balance ?? balData?.balance ?? 'unknown'
+        console.log('[cost-guard] PiAPI balance:', balance)
+      }
+    } catch (balErr) {
+      console.warn('[cost-guard] PiAPI balance check failed (non-fatal):', balErr)
+    }
+    // ── End cost guard ────────────────────────────────────────────────────────
+
     // Step 1: Get digital twin photo (query by id, since frontend passes twinId as userId)
     console.log('[movie/generate] userId received:', userId)
     console.log('[movie/generate] looking for twin id:', userId)
