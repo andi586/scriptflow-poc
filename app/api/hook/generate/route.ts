@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
 
     // Step 9: Call Railway /hook endpoint
     const railwayPayload = {
-      photoUrls,
+      photoUrl: photoUrls[0],
       audioUrls,
       subtitles,
       bgmUrl,
