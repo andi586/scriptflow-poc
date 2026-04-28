@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         prompt: `Use the provided image as identity reference. Generate a portrait of the SAME person with EXPRESSION: ${exp.toUpperCase()}. Keep identity identical, same lighting and angle, only expression changes, ultra realistic, cinematic.`,
         size: "1024x1024",
       })
-      const base64 = response.data[0].b64_json!
+      const base64 = response.data?.[0]?.b64_json ?? ''
       const imgBuffer = Buffer.from(base64, "base64")
       const url = await uploadToStorage(imgBuffer, `face-variants/${uuidv4()}-${exp}.png`)
       results[exp] = url
