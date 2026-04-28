@@ -3,7 +3,7 @@ import OpenAI from "openai"
 import { createClient } from "@supabase/supabase-js"
 import { v4 as uuidv4 } from "uuid"
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+// OpenAI initialized inside handler
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const results: Record<string, string> = {}
 
     await Promise.all(expressions.map(async (exp) => {
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
       const response = await openai.images.generate({
         model: "gpt-image-2",
         prompt: `Use the provided image as identity reference. Generate a portrait of the SAME person with EXPRESSION: ${exp.toUpperCase()}. Keep identity identical, same lighting and angle, only expression changes, ultra realistic, cinematic.`,
