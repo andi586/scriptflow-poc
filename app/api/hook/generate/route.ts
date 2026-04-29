@@ -246,6 +246,7 @@ export async function POST(request: NextRequest) {
       // GPT Image 2 expressions will be added in future version
       photoUrls = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
       console.log('[hook/generate] using original photo x3 for speed')
+    }
 
     // Step 9: Call Railway /hook endpoint
     const railwayPayload = {
