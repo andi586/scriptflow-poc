@@ -246,16 +246,6 @@ export async function POST(request: NextRequest) {
       // GPT Image 2 expressions will be added in future version
       photoUrls = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
       console.log('[hook/generate] using original photo x3 for speed')
-      if (false) { try {
-        console.log('[hook/generate] generating expressions via Replicate...')
-        photoUrls = await generateExpressions(basePhotoUrl)
-        console.log('[hook/generate] expression URLs:', photoUrls)
-      } catch (repErr) {
-        console.warn('[hook/generate] Replicate failed (using original photo x3):', repErr)
-      }
-    } else {
-      console.log('[hook/generate] REPLICATE_API_TOKEN not set — skipping expression generation')
-    }
 
     // Step 9: Call Railway /hook endpoint
     const railwayPayload = {
