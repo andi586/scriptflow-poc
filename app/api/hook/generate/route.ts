@@ -19,15 +19,14 @@ async function generateExpressions(imageUrl: string): Promise<string[]> {
     const photoBuffer = Buffer.from(await photoRes.arrayBuffer())
     
     // Use GPT Image 2 via our API
-    const FormData = (await import('form-data')).default
-    const form = new FormData()
-    form.append('file', photoBuffer, { filename: 'user.jpg', contentType: 'image/jpeg' })
+    const nativeForm = new globalThis.FormData()
+    const blob = new Blob([photoBuffer], { type: 'image/jpeg' })
+    nativeForm.append('file', blob, 'user.jpg')
     
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
     const res = await fetch(`${baseUrl}/api/generate-face-variants`, {
       method: 'POST',
-      body: form,
-      headers: form.getHeaders()
+      body: nativeForm
     })
     
     const data = await res.json()
