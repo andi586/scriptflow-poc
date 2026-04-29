@@ -13,37 +13,35 @@ const replicate = new Replicate({
 })
 
 async function generateExpressions(imageUrl: string): Promise<string[]> {
-  const expressions = [
-    "calm neutral expression",
-    "surprised shocked expression, eyes wide open",
-    "fearful scared tense expression",
-  ]
-
-  const results: string[] = []
-
-  for (const expression of expressions) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const output = await replicate.run(
-        "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b" as any,
-        {
-          input: {
-            prompt: `portrait photo of person, ${expression}, photorealistic, cinematic`,
-            image: imageUrl,
-            strength: 0.4,
-          },
-        }
-      )
-      results.push((output as string[])[0])
-    } catch (err) {
-      console.warn('[hook/generate] Replicate expression failed, using original:', err)
-      results.push(imageUrl) // fallback to original photo
+  try {
+    // Download user photo
+    const photoRes = await fetch(imageUrl)
+    const photoBuffer = Buffer.from(await photoRes.arrayBuffer())
+    
+    // Use GPT Image 2 via our API
+    const FormData = (await import('form-data')).default
+    const form = new FormData()
+    form.append('file', photoBuffer, { filename: 'user.jpg', contentType: 'image/jpeg' })
+    
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
+    const res = await fetch(`${baseUrl}/api/generate-face-variants`, {
+      method: 'POST',
+      body: form,
+      headers: form.getHeaders()
+    })
+    
+    const data = await res.json()
+    
+    if (data.success && data.images) {
+      return [data.images.neutral, data.images.surprised, data.images.fear]
     }
+    
+    throw new Error('GPT Image 2 failed')
+  } catch (err) {
+    console.warn('[hook] GPT Image 2 expression failed:', err)
+    return [imageUrl, imageUrl, imageUrl]
   }
-
-  return results
 }
-
 function getSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
