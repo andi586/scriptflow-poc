@@ -37,7 +37,12 @@ export async function POST(req: NextRequest) {
       const response = await openai.images.edit({
         model: "gpt-image-2",
         image: imageFile,
-        prompt: `Keep this EXACT person's face and identity. Only change the facial expression to: ${exp.toUpperCase()}. Same lighting, same angle, same person, ultra realistic, cinematic portrait.`,
+        prompt: `Keep this EXACT person's face structure, facial features, skin tone, and identity UNCHANGED. 
+This is a portrait edit - ONLY change the facial expression to: ${exp.toUpperCase()}.
+Do NOT alter: face shape, nose, eyes, mouth structure, skin, hair.
+Same person, same face, same lighting direction, same camera angle.
+Ultra realistic, photographic quality, cinematic portrait.
+Expression change only: ${exp.toUpperCase()}`,
         size: "1024x1024",
       })
       const base64 = response.data?.[0]?.b64_json ?? ''
