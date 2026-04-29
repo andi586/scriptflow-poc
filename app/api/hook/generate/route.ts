@@ -237,20 +237,15 @@ export async function POST(request: NextRequest) {
       { text: lines[2], startTime: 10, endTime: 12 },
     ]
 
-    // Step 8: Generate 3 expression variants via Replicate IP-Adapter
+    // Step 8: Generate 3 expression variants via GPT Image 2
     const basePhotoUrl = twin.frame_url_front ?? twin.frame_url_mid
-    let photoUrls: string[] = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
-
-    if (process.env.REPLICATE_API_TOKEN) {
-      // Skip expression generation - use original photo x3 for speed
-      // GPT Image 2 expressions will be added in future version
-      photoUrls = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
-      console.log('[hook/generate] using original photo x3 for speed')
-    }
+    console.log('[hook/generate] generating 3 expressions via GPT Image 2...')
+    const photoUrls = await generateExpressions(basePhotoUrl)
+    console.log('[hook/generate] expression photos generated:', photoUrls)
 
     // Step 9: Call Railway /hook endpoint
     const railwayPayload = {
-      photoUrl: photoUrls[0],
+      photoUrls: photoUrls,  // array of 3 expression photos
       audioUrls,
       subtitles,
       bgmUrl,
