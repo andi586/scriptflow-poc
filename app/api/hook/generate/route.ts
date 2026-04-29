@@ -242,7 +242,11 @@ export async function POST(request: NextRequest) {
     let photoUrls: string[] = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
 
     if (process.env.REPLICATE_API_TOKEN) {
-      try {
+      // Skip expression generation - use original photo x3 for speed
+      // GPT Image 2 expressions will be added in future version
+      photoUrls = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
+      console.log('[hook/generate] using original photo x3 for speed')
+      if (false) { try {
         console.log('[hook/generate] generating expressions via Replicate...')
         photoUrls = await generateExpressions(basePhotoUrl)
         console.log('[hook/generate] expression URLs:', photoUrls)
