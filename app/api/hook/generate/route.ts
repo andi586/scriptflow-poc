@@ -237,15 +237,14 @@ export async function POST(request: NextRequest) {
       { text: lines[2], startTime: 10, endTime: 12 },
     ]
 
-    // Step 8: Generate 3 expression variants via GPT Image 2
+    // Step 8: Use original photo x3 for all segments (fast generation)
     const basePhotoUrl = twin.frame_url_front ?? twin.frame_url_mid
-    console.log('[hook/generate] generating 3 expressions via GPT Image 2...')
-    const photoUrls = await generateExpressions(basePhotoUrl)
-    console.log('[hook/generate] expression photos generated:', photoUrls)
+    const photoUrls = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
+    console.log('[hook/generate] using original photo x3 for fast generation')
 
     // Step 9: Call Railway /hook endpoint
     const railwayPayload = {
-      photoUrls: photoUrls,  // array of 3 expression photos
+      photoUrls: photoUrls,  // array of 3 photos (same photo for stability)
       audioUrls,
       subtitles,
       bgmUrl,
