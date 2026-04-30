@@ -127,7 +127,14 @@ function cleanJSON(text: string): string {
   return text.trim()
 }
 
-const client = new Anthropic()
+const client = new Anthropic({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+  defaultHeaders: {
+    'HTTP-Referer': 'https://getscriptflow.com',
+    'X-Title': 'ScriptFlow'
+  }
+})
 
 async function runProducer(userInput: string): Promise<ProducerOutput> {
   const response = await client.messages.create({

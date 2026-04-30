@@ -23,9 +23,16 @@ export async function GET() {
 
   // --- Anthropic: minimal messages call ---
   try {
-    const key = process.env.ANTHROPIC_API_KEY;
-    if (!key) throw new Error("Missing ANTHROPIC_API_KEY");
-    const client = new Anthropic({ apiKey: key });
+    const key = process.env.OPENROUTER_API_KEY;
+    if (!key) throw new Error("Missing OPENROUTER_API_KEY");
+    const client = new Anthropic({
+      apiKey: key,
+      baseURL: 'https://openrouter.ai/api/v1',
+      defaultHeaders: {
+        'HTTP-Referer': 'https://getscriptflow.com',
+        'X-Title': 'ScriptFlow'
+      }
+    });
     await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1,
