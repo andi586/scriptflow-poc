@@ -195,11 +195,16 @@ OUTPUT FORMAT (strict JSON, no other text):
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
     }]
   })
-  console.log('[CognitiveCore] raw response type:', typeof response)
-  console.log('[CognitiveCore] raw response keys:', Object.keys(response as any))
-  const raw = (response as any).choices?.[0]?.message?.content 
-    ?? ((response as any).content?.[0] as { text: string })?.text 
-    ?? ''
+  console.log('[CognitiveCore] full response:', JSON.stringify(response).substring(0, 500))
+  let raw = ''
+  if (typeof response === 'string') {
+    raw = response
+  } else if ((response as any).choices?.[0]?.message?.content) {
+    raw = (response as any).choices[0].message.content
+  } else if ((response as any).content?.[0]?.text) {
+    raw = (response as any).content[0].text
+  }
+  console.log('[CognitiveCore] extracted raw:', raw?.substring(0, 200))
   try {
     const parsed = JSON.parse(cleanJSON(raw))
     return parsed
@@ -476,11 +481,16 @@ Output ONLY valid JSON. No other text. Use this exact structure:
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
     }]
   })
-  console.log('[CognitiveCore] raw response type:', typeof response)
-  console.log('[CognitiveCore] raw response keys:', Object.keys(response as any))
-  const raw = (response as any).choices?.[0]?.message?.content 
-    ?? ((response as any).content?.[0] as { text: string })?.text 
-    ?? ''
+  console.log('[CognitiveCore] full response:', JSON.stringify(response).substring(0, 500))
+  let raw = ''
+  if (typeof response === 'string') {
+    raw = response
+  } else if ((response as any).choices?.[0]?.message?.content) {
+    raw = (response as any).choices[0].message.content
+  } else if ((response as any).content?.[0]?.text) {
+    raw = (response as any).content[0].text
+  }
+  console.log('[CognitiveCore] extracted raw:', raw?.substring(0, 200))
   try {
     const parsed = JSON.parse(cleanJSON(raw))
     return parsed
