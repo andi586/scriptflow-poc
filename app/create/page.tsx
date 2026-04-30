@@ -8,82 +8,75 @@ import { useState, useRef, useEffect } from 'react'
 const DEV_MODE = process.env.NODE_ENV === 'development'
 // ── End DEV MODE ─────────────────────────────────────────────────────────────
 
-type Role = 'me' | 'prank' | 'pet' | 'love' | 'crew'
-
-interface CastPhoto {
-  role: Role
-  file: File
-  url: string
+interface CharacterPhoto {
+  file: File | null
+  url: string | null
 }
 
-const DYNAMIC_QUESTIONS: Record<string, string> = {
-  default: "What's your story?",
-  prank: "Who's the lucky victim? What happens? 😈",
-  pet: "What adventure do you and your pet go on? 🐾",
-  love: "What do you wish you could say to them? ❤️",
-  crew: "What crazy thing happens to you guys? 🎉",
-}
+const CHARACTER_SLOTS = [
+  { id: 1, label: '主角 / You', required: true },
+  { id: 2, label: '朋友 2 / Friend 2', required: false },
+  { id: 3, label: '朋友 3 / Friend 3', required: false },
+  { id: 4, label: '朋友 4 / Friend 4', required: false },
+  { id: 5, label: '朋友 5 / Friend 5', required: false },
+  { id: 6, label: '朋友 6 / Friend 6', required: false },
+  { id: 7, label: '宠物 / Pet', required: false },
+]
 
 export default function CreatePage() {
-  const [mePhoto, setMePhoto] = useState<{ file: File | null; url: string } | null>(null)
-  const [cast, setCast] = useState<CastPhoto[]>([])
-  const [showAddMenu, setShowAddMenu] = useState(false)
+  const [characters, setCharacters] = useState<CharacterPhoto[]>(
+    Array(7).fill(null).map(() => ({ file: null, url: null }))
+  )
   const [story, setStory] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const meInputRef = useRef<HTMLInputElement>(null)
-  const castInputRef = useRef<HTMLInputElement>(null)
-  const [pendingRole, setPendingRole] = useState<Role | null>(null)
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
     const savedUrl = localStorage.getItem('sf_photo_url')
-    if (savedUrl) setMePhoto({ file: null, url: savedUrl })
+    if (savedUrl) {
+      setCharacters(prev => {
+        const updated = [...prev]
+        updated[0] = { file: null, url: savedUrl }
+        return updated
+      })
+    }
   }, [])
 
-  const totalPhotos = (mePhoto ? 1 : 0) + cast.length
-  const remaining = 7 - totalPhotos
-
-  const handleMePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setMePhoto({ file, url: URL.createObjectURL(file) })
+    
+    setCharacters(prev => {
+      const updated = [...prev]
+      updated[index] = { file, url: URL.createObjectURL(file) }
+      return updated
+    })
   }
 
-  const handleCastPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !pendingRole) return
-    setCast(prev => [...prev.filter(c => c.role !== pendingRole), { role: pendingRole, file, url: URL.createObjectURL(file) }])
-    setPendingRole(null)
-    setShowAddMenu(false)
-  }
-
-  const addCast = (role: Role) => {
-    setPendingRole(role)
-    setShowAddMenu(false)
-    castInputRef.current?.click()
-  }
-
-  const removeCast = (role: Role) => setCast(prev => prev.filter(c => c.role !== role))
-
-  const getDynamicQuestion = () => {
-    if (cast.length === 0) return DYNAMIC_QUESTIONS.default
-    const roles = cast.map(c => c.role)
-    if (roles.includes('prank')) return DYNAMIC_QUESTIONS.prank
-    if (roles.includes('pet')) return DYNAMIC_QUESTIONS.pet
-    if (roles.includes('love')) return DYNAMIC_QUESTIONS.love
-    if (roles.includes('crew')) return DYNAMIC_QUESTIONS.crew
-    return DYNAMIC_QUESTIONS.default
+  const removePhoto = (index: number) => {
+    setCharacters(prev => {
+      const updated = [...prev]
+      updated[index] = { file: null, url: null }
+      return updated
+    })
   }
 
   const handleGenerate = async () => {
     const savedTwinId = localStorage.getItem('sf_twin_id')
-    if (!mePhoto && !savedTwinId) { setError('Please upload your photo first'); return }
+    const mainPhoto = characters[0]
+    
+    if (!mainPhoto.url && !savedTwinId) { 
+      setError('Please upload your photo first (Slot 1 is required)'); 
+      return 
+    }
     if (!story.trim()) { setError('Tell us your story first'); return }
+    
     setLoading(true)
     setError(null)
     try {
       let movieId: string
-      if (savedTwinId && !mePhoto?.file) {
+      if (savedTwinId && !mainPhoto.file) {
         const res = await fetch('/api/movie/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -101,10 +94,19 @@ export default function CreatePage() {
         movieId = data.movieId
       } else {
         const form = new FormData()
-        form.append('photo', mePhoto!.file!)
+        form.append('photo', mainPhoto.file!)
         form.append('story', story)
         form.append('tier', '60s')
-        cast.forEach((c, i) => form.append(`cast_${i}`, c.file))
+        
+        // Add all additional character photos (slots 2-7)
+        let castIndex = 0
+        for (let i = 1; i < 7; i++) {
+          if (characters[i].file) {
+            form.append(`cast_${castIndex}`, characters[i].file!)
+            castIndex++
+          }
+        }
+        
         const res = await fetch('/api/create-movie', { method: 'POST', body: form })
         const data = await res.json()
         console.log('[create] response data:', data)
@@ -161,95 +163,127 @@ export default function CreatePage() {
     }
   }
 
-  const castLabels: Record<Role, string> = {
-    me: 'Me', prank: '😂 Prank', pet: '🐾 Pet', love: '❤️ Love', crew: '👥 Crew'
-  }
-
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 20px 140px', fontFamily: 'system-ui', position: 'relative' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', maxWidth: '400px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', maxWidth: '600px', marginBottom: '8px' }}>
         <a href="/my-videos" style={{ color: '#888', fontSize: '0.8rem', textDecoration: 'none', padding: '4px 12px', border: '1px solid #333', borderRadius: '9999px' }}>
           🎞️ My Videos
         </a>
       </div>
-      <h1 style={{ color: '#D4A853', fontSize: '1.8rem', marginBottom: '4px', textAlign: 'center' }}>You Are the Star</h1>
-      <p style={{ color: '#555', marginBottom: '40px', fontSize: '0.9rem' }}>Your face is remembered forever ✨</p>
+      <h1 style={{ color: '#D4A853', fontSize: '1.8rem', marginBottom: '4px', textAlign: 'center' }}>SquadCast - Your Story, Your Crew</h1>
+      <p style={{ color: '#555', marginBottom: '32px', fontSize: '0.9rem' }}>Add up to 7 characters to your movie ✨</p>
 
-      <input ref={meInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleMePhoto} style={{ display: 'none' }} />
-      <input ref={castInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleCastPhoto} style={{ display: 'none' }} />
+      {/* Hidden file inputs */}
+      {CHARACTER_SLOTS.map((slot, index) => (
+        <input
+          key={slot.id}
+          ref={el => { fileInputRefs.current[index] = el }}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp"
+          onChange={(e) => handlePhotoChange(index, e)}
+          style={{ display: 'none' }}
+        />
+      ))}
 
-      {/* Me photo */}
-      <div onClick={() => meInputRef.current?.click()} style={{ cursor: 'pointer', marginBottom: '24px', textAlign: 'center' }}>
-        {mePhoto
-          ? <>
-              <img src={mePhoto.url} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #D4A853', display: 'block', margin: '0 auto' }} />
-              <p style={{ color: '#555', fontSize: '0.75rem', marginTop: '6px' }}>Tap to change</p>
-            </>
-          : <div style={{ width: '100px', height: '100px', borderRadius: '50%', border: '2px dashed #D4A853', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#D4A853', gap: '4px' }}>
-              <span style={{ fontSize: '1.8rem' }}>📷</span>
-              <span style={{ fontSize: '0.7rem' }}>Add Me</span>
-            </div>
-        }
-      </div>
-
-      {/* Cast photos */}
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '32px', maxWidth: '400px' }}>
-        {cast.map(c => (
-          <div key={c.role} style={{ textAlign: 'center', position: 'relative' }}>
-            <img src={c.url} style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #333' }} />
-            <p style={{ color: '#888', fontSize: '0.65rem', marginTop: '4px' }}>{castLabels[c.role]}</p>
-            <button
-              onClick={() => removeCast(c.role)}
-              style={{ position: 'absolute', top: '-4px', right: '-4px', background: '#333', border: 'none', borderRadius: '50%', width: '18px', height: '18px', color: '#aaa', cursor: 'pointer', fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >✕</button>
-          </div>
-        ))}
-
-        {remaining > 0 && (
-          <div style={{ position: 'relative' }}>
-            <div
-              onClick={() => setShowAddMenu(v => !v)}
-              style={{ width: '64px', height: '64px', borderRadius: '50%', border: '2px dashed #333', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#555', cursor: 'pointer', gap: '2px' }}
-            >
-              <span style={{ fontSize: '1.4rem' }}>+</span>
-              <span style={{ fontSize: '0.6rem' }}>Cast</span>
-            </div>
-
-            {showAddMenu && (
-              <div style={{ position: 'absolute', top: '72px', left: '50%', transform: 'translateX(-50%)', background: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', padding: '8px', zIndex: 100, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {(['prank', 'pet', 'love', 'crew'] as Role[])
-                  .filter(r => !cast.find(c => c.role === r))
-                  .map(role => (
-                    <button
-                      key={role}
-                      onClick={() => addCast(role)}
-                      style={{ background: 'none', border: 'none', color: 'white', padding: '8px 12px', cursor: 'pointer', borderRadius: '8px', textAlign: 'left', fontSize: '0.85rem' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                    >
-                      {castLabels[role]}
-                    </button>
-                  ))}
+      {/* Character photo slots */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '16px', width: '100%', maxWidth: '600px', marginBottom: '32px', padding: '0 20px' }}>
+        {CHARACTER_SLOTS.map((slot, index) => {
+          const character = characters[index]
+          const hasPhoto = character.url !== null
+          
+          return (
+            <div key={slot.id} style={{ textAlign: 'center', position: 'relative' }}>
+              <div
+                onClick={() => fileInputRefs.current[index]?.click()}
+                style={{
+                  cursor: 'pointer',
+                  width: '100%',
+                  aspectRatio: '1',
+                  maxWidth: '120px',
+                  margin: '0 auto',
+                  borderRadius: '50%',
+                  border: hasPhoto 
+                    ? (slot.required ? '3px solid #D4A853' : '2px solid #555')
+                    : (slot.required ? '2px dashed #D4A853' : '2px dashed #333'),
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  background: hasPhoto ? 'transparent' : '#111'
+                }}
+              >
+                {hasPhoto ? (
+                  <img 
+                    src={character.url!} 
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'cover' 
+                    }} 
+                    alt={slot.label}
+                  />
+                ) : (
+                  <>
+                    <span style={{ fontSize: '1.5rem' }}>📷</span>
+                    <span style={{ fontSize: '0.65rem', color: slot.required ? '#D4A853' : '#555', marginTop: '4px' }}>
+                      {slot.required ? 'Required' : 'Optional'}
+                    </span>
+                  </>
+                )}
               </div>
-            )}
-          </div>
-        )}
+              
+              {hasPhoto && !slot.required && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removePhoto(index)
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '0',
+                    right: '50%',
+                    transform: 'translateX(calc(50% + 50px))',
+                    background: '#333',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    color: '#aaa',
+                    cursor: 'pointer',
+                    fontSize: '0.7rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10
+                  }}
+                >✕</button>
+              )}
+              
+              <p style={{ 
+                color: slot.required ? '#D4A853' : '#888', 
+                fontSize: '0.7rem', 
+                marginTop: '8px',
+                fontWeight: slot.required ? 600 : 400
+              }}>
+                {slot.label}
+              </p>
+              {hasPhoto && (
+                <p style={{ color: '#555', fontSize: '0.65rem', marginTop: '2px' }}>
+                  Tap to change
+                </p>
+              )}
+            </div>
+          )
+        })}
       </div>
-
-      {totalPhotos > 0 && (
-        <p style={{ color: remaining === 0 ? '#ff4444' : '#555', fontSize: '0.75rem', marginBottom: '16px', textAlign: 'center' }}>
-          {remaining === 0 
-            ? '✕ Maximum 7 photos reached' 
-            : `${totalPhotos}/7 photos used · ${remaining} slots remaining`
-          }
-        </p>
-      )}
 
       {/* Story input */}
-      <div style={{ width: '100%', maxWidth: '400px', marginBottom: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '600px', marginBottom: '24px', padding: '0 20px' }}>
         <label style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>
-          {getDynamicQuestion()}
+          What's your story?
         </label>
         <textarea
           value={story}
