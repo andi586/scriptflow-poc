@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
 
-export const maxDuration = 120
+export const maxDuration = 300
 
 // Configure fal.ai
 fal.config({ credentials: process.env.FAL_KEY })
@@ -228,32 +228,32 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] movie created:', movie.id)
 
-    // Step 4: Generate videos with Happy Horse via fal.ai
+    // Step 4: Generate videos with Happy Horse via fal.ai (max 4 shots, parallel)
     console.log('[movie/generate] generating videos with Happy Horse...')
-    const videoUrls: string[] = []
+    const maxShots = Math.min(multiShots.length, 4)
+    console.log(`[movie/generate] generating ${maxShots} shots in parallel...`)
     
-    for (let i = 0; i < multiShots.length; i++) {
-      const shot = multiShots[i]
-      console.log(`[movie/generate] generating shot ${i + 1}/${multiShots.length}...`)
-      
-      try {
-        const result = await fal.subscribe('alibaba/happy-horse/image-to-video', {
-          input: {
-            image_url: twin.frame_url_front ?? twin.frame_url_mid,
-            prompt: shot.prompt,
-            duration: shot.duration || 5,
-          },
-        })
-        
-        const videoUrl = result.data.video.url
-        videoUrls.push(videoUrl)
-        console.log(`[movie/generate] shot ${i + 1} generated:`, videoUrl)
-      } catch (shotErr) {
-        console.error(`[movie/generate] shot ${i + 1} failed:`, shotErr)
-        throw new Error(`Shot ${i + 1} generation failed: ${shotErr}`)
-      }
-    }
-
+    const shotResults = await Promise.all(
+      multiShots.slice(0, maxShots).map(async (shot: { prompt: string; duration: number }, i: number) => {
+        try {
+          console.log(`[movie/generate] generating shot ${i + 1}/${maxShots}...`)
+          const result = await fal.subscribe('alibaba/happy-horse/image-to-video', {
+            input: {
+              image_url: twin.frame_url_front ?? twin.frame_url_mid,
+              prompt: shot.prompt,
+              duration: shot.duration || 5,
+            }
+          })
+          console.log(`[movie/generate] shot ${i + 1} generated:`, result.data.video.url)
+          return result.data.video.url
+        } catch (err) {
+          console.error(`[movie/generate] shot ${i + 1} failed:`, err)
+          return null
+        }
+      })
+    )
+    
+    const videoUrls = shotResults.filter(Boolean) as string[]
     console.log('[movie/generate] all shots generated:', videoUrls.length)
 
     // Step 5: Update movie with video URLs and archetype
