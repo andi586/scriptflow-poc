@@ -3,32 +3,66 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 const HOOKS = [
-  "I caught my girlfriend cheating…",
-  "My boss humiliated me, I got revenge…",
-  "I met my future self…",
-  "My best friend betrayed me…",
-  "My pet saved my life…",
-  "My dog's last message to me…",
-  "She checked my phone at 3AM…",
+  { label: "出轨", story: "I caught my partner cheating on me at 3AM..." },
+  { label: "复仇", story: "My boss humiliated me in front of everyone, I got revenge..." },
+  { label: "背叛", story: "My best friend betrayed me after 10 years..." },
+  { label: "穿越", story: "I met my future self and got a warning..." },
+  { label: "宠物", story: "My dog left me a final message before passing away..." },
+  { label: "重逢", story: "I ran into my ex after 5 years and everything changed..." },
+  { label: "整蛊", story: "My friends pranked me and it went completely viral..." },
+  { label: "秘密", story: "Someone discovered my biggest secret..." },
 ];
 
+const CHARACTER_LABELS = [
+  "主角 / You",
+  "朋友 2 / Friend 2",
+  "朋友 3 / Friend 3",
+  "朋友 4 / Friend 4",
+  "朋友 5 / Friend 5",
+  "朋友 6 / Friend 6",
+  "宠物 / Pet",
+];
+
+interface CharacterPhoto {
+  file: File | null;
+  url: string | null;
+}
+
 export default function CreatePage() {
-  const [story, setStory] = useState(HOOKS[0]);
-  const [photo, setPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
+  const [story, setStory] = useState("I caught my partner cheating on me at 3AM...");
+  const [characters, setCharacters] = useState<CharacterPhoto[]>([
+    { file: null, url: null }
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhoto({ file, url: URL.createObjectURL(file) });
+    
+    setCharacters(prev => {
+      const updated = [...prev];
+      updated[index] = { file, url: URL.createObjectURL(file) };
+      return updated;
+    });
     setError(null);
   };
 
+  const addCharacterSlot = () => {
+    if (characters.length < 7) {
+      setCharacters(prev => [...prev, { file: null, url: null }]);
+    }
+  };
+
+  const removeCharacterSlot = (index: number) => {
+    if (index === 0) return; // Can't remove main character
+    setCharacters(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleGenerate = async () => {
-    if (!photo.file) {
+    if (!characters[0].file) {
       setError("Please upload your photo first!");
       return;
     }
@@ -39,9 +73,18 @@ export default function CreatePage() {
     
     try {
       const form = new FormData();
-      form.append("photo", photo.file);
+      form.append("photo", characters[0].file!);
       form.append("story", story);
       form.append("tier", "30s");
+      
+      // Add additional character photos
+      let castIndex = 0;
+      for (let i = 1; i < characters.length; i++) {
+        if (characters[i].file) {
+          form.append(`cast_${castIndex}`, characters[i].file!);
+          castIndex++;
+        }
+      }
       
       const res = await fetch("/api/create-movie", {
         method: "POST",
@@ -61,119 +104,323 @@ export default function CreatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
-      <div className="text-center max-w-xl w-full space-y-8">
+    <div style={{ 
+      background: '#0a0a0a', 
+      minHeight: '100vh', 
+      color: 'white', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      padding: '48px 20px 140px', 
+      fontFamily: 'system-ui' 
+    }}>
+      <div style={{ maxWidth: '600px', width: '100%' }}>
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold mb-2">
-            🔥 See yourself in a viral movie
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <h1 style={{ color: '#D4A853', fontSize: '2rem', marginBottom: '8px', fontWeight: 700 }}>
+            🎬 Create Your Viral Movie
           </h1>
-          <p className="text-neutral-400 text-sm">
+          <p style={{ color: '#888', fontSize: '0.9rem' }}>
             Your face. Your story. Ready in 60 seconds.
           </p>
         </div>
 
-        {/* Step 1: Choose Story */}
-        <div className="text-left">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="bg-yellow-400 text-black w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">1</span>
-            <h2 className="text-lg font-semibold">Choose your story</h2>
-          </div>
+        {/* Story Input */}
+        <div style={{ marginBottom: '32px' }}>
+          <label style={{ color: '#D4A853', fontSize: '0.9rem', fontWeight: 600, display: 'block', marginBottom: '12px' }}>
+            📝 Your Story
+          </label>
           <textarea
             value={story}
             onChange={(e) => setStory(e.target.value)}
-            rows={3}
-            className="w-full p-4 rounded-lg bg-neutral-900 border border-neutral-700 text-white mb-3"
-            placeholder="Write your own or pick one below..."
+            rows={4}
+            placeholder="Write your story here..."
+            style={{ 
+              width: '100%', 
+              background: '#111', 
+              border: '1px solid #333', 
+              borderRadius: '12px', 
+              color: 'white', 
+              padding: '14px', 
+              fontSize: '0.95rem', 
+              resize: 'none', 
+              outline: 'none', 
+              boxSizing: 'border-box',
+              marginBottom: '12px'
+            }}
           />
-          <div className="flex flex-wrap gap-2">
-            {HOOKS.map((h, i) => (
+          
+          {/* Keyword Chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {HOOKS.map((hook, i) => (
               <button
                 key={i}
-                onClick={() => setStory(h)}
-                className="px-3 py-2 bg-neutral-800 rounded-lg text-xs hover:bg-neutral-700 transition"
+                onClick={() => setStory(hook.story)}
+                style={{
+                  background: '#1a1a1a',
+                  border: '1px solid #333',
+                  borderRadius: '20px',
+                  padding: '6px 14px',
+                  color: '#D4A853',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontWeight: 500
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#D4A853';
+                  e.currentTarget.style.color = '#000';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#1a1a1a';
+                  e.currentTarget.style.color = '#D4A853';
+                }}
               >
-                {h}
+                {hook.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Step 2: Add Photo */}
-        <div className="text-left">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="bg-yellow-400 text-black w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">2</span>
-            <h2 className="text-lg font-semibold">Add your face</h2>
-            <span className="text-red-400 text-sm font-semibold">REQUIRED</span>
+        {/* Character Photos - Accordion Style */}
+        <div style={{ marginBottom: '32px' }}>
+          <label style={{ color: '#D4A853', fontSize: '0.9rem', fontWeight: 600, display: 'block', marginBottom: '12px' }}>
+            📷 Characters
+          </label>
+
+          {/* Main Character (Always Visible) */}
+          <div style={{ marginBottom: '16px' }}>
+            <input
+              ref={el => { fileInputRefs.current[0] = el }}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              onChange={(e) => handlePhotoChange(0, e)}
+              style={{ display: 'none' }}
+            />
+            
+            <div
+              onClick={() => fileInputRefs.current[0]?.click()}
+              style={{
+                cursor: 'pointer',
+                background: '#111',
+                border: characters[0].url ? '2px solid #D4A853' : '2px dashed #D4A853',
+                borderRadius: '16px',
+                padding: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                background: characters[0].url ? 'transparent' : '#1a1a1a',
+                border: '2px solid #D4A853',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                flexShrink: 0
+              }}>
+                {characters[0].url ? (
+                  <img src={characters[0].url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Main character" />
+                ) : (
+                  <span style={{ fontSize: '2rem' }}>📷</span>
+                )}
+              </div>
+              
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ 
+                    background: '#D4A853', 
+                    color: '#000', 
+                    width: '24px', 
+                    height: '24px', 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 700 
+                  }}>1</span>
+                  <span style={{ color: '#D4A853', fontWeight: 600, fontSize: '0.95rem' }}>
+                    {CHARACTER_LABELS[0]}
+                  </span>
+                  <span style={{ color: '#ff4444', fontSize: '0.75rem', fontWeight: 600 }}>REQUIRED</span>
+                </div>
+                <p style={{ color: characters[0].url ? '#4ade80' : '#888', fontSize: '0.85rem', margin: 0 }}>
+                  {characters[0].url ? '✓ Photo uploaded - Click to change' : 'Click to upload your photo'}
+                </p>
+              </div>
+            </div>
           </div>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
-            onChange={handlePhotoChange}
-            className="hidden"
-          />
-          
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="cursor-pointer border-2 border-dashed border-neutral-700 rounded-lg p-6 hover:border-yellow-400 transition"
-          >
-            {photo.url ? (
-              <div className="flex items-center gap-4">
-                <img
-                  src={photo.url}
-                  alt="Your photo"
-                  className="w-20 h-20 rounded-full object-cover border-2 border-yellow-400"
+
+          {/* Additional Character Slots */}
+          {characters.slice(1).map((char, index) => {
+            const actualIndex = index + 1;
+            return (
+              <div key={actualIndex} style={{ marginBottom: '12px' }}>
+                <input
+                  ref={el => { fileInputRefs.current[actualIndex] = el }}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={(e) => handlePhotoChange(actualIndex, e)}
+                  style={{ display: 'none' }}
                 />
-                <div className="text-left">
-                  <p className="text-green-400 font-semibold">✓ Photo uploaded</p>
-                  <p className="text-neutral-400 text-sm">Click to change</p>
+                
+                <div style={{
+                  background: '#111',
+                  border: '1px solid #333',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div
+                    onClick={() => fileInputRefs.current[actualIndex]?.click()}
+                    style={{
+                      cursor: 'pointer',
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '50%',
+                      background: char.url ? 'transparent' : '#1a1a1a',
+                      border: char.url ? '2px solid #555' : '2px dashed #333',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      flexShrink: 0
+                    }}
+                  >
+                    {char.url ? (
+                      <img src={char.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={`Character ${actualIndex + 1}`} />
+                    ) : (
+                      <span style={{ fontSize: '1.5rem' }}>📷</span>
+                    )}
+                  </div>
+                  
+                  <div style={{ flex: 1 }} onClick={() => fileInputRefs.current[actualIndex]?.click()}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                      <span style={{ 
+                        background: '#333', 
+                        color: '#888', 
+                        width: '20px', 
+                        height: '20px', 
+                        borderRadius: '50%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        fontSize: '0.7rem', 
+                        fontWeight: 600 
+                      }}>{actualIndex + 1}</span>
+                      <span style={{ color: '#aaa', fontSize: '0.85rem' }}>
+                        {CHARACTER_LABELS[actualIndex]}
+                      </span>
+                    </div>
+                    <p style={{ color: char.url ? '#4ade80' : '#666', fontSize: '0.75rem', margin: 0, cursor: 'pointer' }}>
+                      {char.url ? '✓ Uploaded' : 'Click to add photo'}
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={() => removeCharacterSlot(actualIndex)}
+                    style={{
+                      background: '#1a1a1a',
+                      border: '1px solid #333',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      color: '#888',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >✕</button>
                 </div>
               </div>
-            ) : (
-              <div className="text-center">
-                <div className="text-4xl mb-2">📷</div>
-                <p className="text-neutral-300 font-semibold">Click to upload your photo</p>
-                <p className="text-neutral-500 text-sm mt-1">This is what makes you the star</p>
-              </div>
-            )}
-          </div>
-        </div>
+            );
+          })}
 
-        {/* Step 3: Generate */}
-        <div className="text-left">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="bg-yellow-400 text-black w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">3</span>
-            <h2 className="text-lg font-semibold">Generate your movie</h2>
-          </div>
-          
-          {error && (
-            <p className="text-red-400 text-sm mb-3 bg-red-950 border border-red-800 rounded-lg p-3">
-              {error}
-            </p>
+          {/* Add Character Button */}
+          {characters.length < 7 && (
+            <button
+              onClick={addCharacterSlot}
+              style={{
+                width: '100%',
+                background: '#1a1a1a',
+                border: '2px dashed #333',
+                borderRadius: '12px',
+                padding: '16px',
+                color: '#888',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#D4A853';
+                e.currentTarget.style.color = '#D4A853';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#333';
+                e.currentTarget.style.color = '#888';
+              }}
+            >
+              <span style={{ fontSize: '1.2rem' }}>+</span>
+              Add Character {characters.length + 1}
+            </button>
           )}
-          
-          <button
-            onClick={handleGenerate}
-            disabled={loading || !photo.file}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition ${
-              loading || !photo.file
-                ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
-                : "bg-yellow-400 text-black hover:bg-yellow-500"
-            }`}
-          >
-            {loading ? "🎬 Generating..." : "🎬 Generate My Viral Movie"}
-          </button>
-          <p className="text-sm text-neutral-400 text-center mt-2">⚡ Ready in 60 seconds</p>
         </div>
 
-        {/* Benefits */}
-        <div className="text-sm text-neutral-400 text-center space-y-1 pt-4 border-t border-neutral-800">
-          <p>• You as the main character</p>
-          <p>• Cinematic scenes + AI voice</p>
-          <p>• Ready for TikTok in 60 seconds</p>
-        </div>
+        {/* Error Message */}
+        {error && (
+          <div style={{
+            background: '#1a0a0a',
+            border: '1px solid #ff4444',
+            borderRadius: '12px',
+            padding: '12px 16px',
+            color: '#ff4444',
+            fontSize: '0.85rem',
+            marginBottom: '20px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Generate Button */}
+        <button
+          onClick={handleGenerate}
+          disabled={loading || !characters[0].file}
+          style={{
+            width: '100%',
+            background: loading || !characters[0].file ? '#333' : '#D4A853',
+            color: loading || !characters[0].file ? '#666' : '#000',
+            border: 'none',
+            borderRadius: '16px',
+            padding: '18px',
+            fontSize: '1.1rem',
+            fontWeight: 700,
+            cursor: loading || !characters[0].file ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+            marginBottom: '12px'
+          }}
+        >
+          {loading ? '✨ Creating your movie...' : '🎬 Create My Movie'}
+        </button>
+
+        <p style={{ textAlign: 'center', color: '#555', fontSize: '0.8rem' }}>
+          ⚡ Ready in 60 seconds • Free to try
+        </p>
       </div>
     </div>
   );
