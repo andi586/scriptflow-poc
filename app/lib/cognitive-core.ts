@@ -195,10 +195,18 @@ OUTPUT FORMAT (strict JSON, no other text):
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
     }]
   })
+  console.log('[CognitiveCore] raw response type:', typeof response)
+  console.log('[CognitiveCore] raw response keys:', Object.keys(response as any))
   const raw = (response as any).choices?.[0]?.message?.content 
     ?? ((response as any).content?.[0] as { text: string })?.text 
     ?? ''
-  return JSON.parse(cleanJSON(raw))
+  try {
+    const parsed = JSON.parse(cleanJSON(raw))
+    return parsed
+  } catch (parseErr) {
+    console.error('[CognitiveCore] JSON parse error, raw was:', raw?.substring(0, 200))
+    throw parseErr
+  }
 }
 
 async function runDirector(
@@ -468,10 +476,18 @@ Output ONLY valid JSON. No other text. Use this exact structure:
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
     }]
   })
+  console.log('[CognitiveCore] raw response type:', typeof response)
+  console.log('[CognitiveCore] raw response keys:', Object.keys(response as any))
   const raw = (response as any).choices?.[0]?.message?.content 
     ?? ((response as any).content?.[0] as { text: string })?.text 
     ?? ''
-  return JSON.parse(cleanJSON(raw))
+  try {
+    const parsed = JSON.parse(cleanJSON(raw))
+    return parsed
+  } catch (parseErr) {
+    console.error('[CognitiveCore] JSON parse error, raw was:', raw?.substring(0, 200))
+    throw parseErr
+  }
 }
 
 function checkRealityAnchors(plan: DirectionPlan, mustShow: string[]): DirectionPlan {
