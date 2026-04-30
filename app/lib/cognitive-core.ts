@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { DIRECTOR_BRAIN } from './director-brain'
 import { EMOTION_ARCHETYPES, DURATION_FORMULAS, matchArchetype } from './emotion-archetypes'
 import { SYMBOL_OBJECTS, SUBTEXT_TEMPLATES, EMOTION_TRANSITIONS, HOOK_FORMULAS, ENDING_FORMULAS } from './director-knowledge'
@@ -127,22 +126,32 @@ function cleanJSON(text: string): string {
   return text.trim()
 }
 
-const client = new Anthropic({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  defaultHeaders: {
-    'HTTP-Referer': 'https://getscriptflow.com',
-    'X-Title': 'ScriptFlow'
-  }
-})
+async function callClaude(systemPrompt: string, userContent: string): Promise<string> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://getscriptflow.com',
+      'X-Title': 'ScriptFlow'
+    },
+    body: JSON.stringify({
+      model: 'anthropic/claude-sonnet-4-5',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      max_tokens: 4000
+    })
+  })
+  
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content ?? ''
+}
 
 async function runProducer(userInput: string): Promise<ProducerOutput> {
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    messages: [{
-      role: 'user',
-      content: `You are a grounded story producer for short-form social video (30-60 seconds).
+  const systemPrompt = 'You are a grounded story producer for short-form social video (30-60 seconds).'
+  const userContent = `You are a grounded story producer for short-form social video (30-60 seconds).
 
 Your job is NOT to philosophize or poeticize.
 Your job is to PRESERVE the user's reality and add just enough emotion.
@@ -193,18 +202,10 @@ OUTPUT FORMAT (strict JSON, no other text):
 }
 
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
-    }]
-  })
-  console.log('[CognitiveCore] full response:', JSON.stringify(response).substring(0, 500))
-  let raw = ''
-  if (typeof response === 'string') {
-    raw = response
-  } else if ((response as any).choices?.[0]?.message?.content) {
-    raw = (response as any).choices[0].message.content
-  } else if ((response as any).content?.[0]?.text) {
-    raw = (response as any).content[0].text
-  }
+  
+  const raw = await callClaude(systemPrompt, userContent)
   console.log('[CognitiveCore] extracted raw:', raw?.substring(0, 200))
+  
   try {
     const parsed = JSON.parse(cleanJSON(raw))
     return parsed
@@ -233,12 +234,8 @@ async function runDirector(
     ? 'abstraction_level is MEDIUM (0.3-0.5): Show real objects with some emotional framing. Cat can be shown with warm lighting.'
     : 'abstraction_level is HIGH (0.6+): Artistic metaphors allowed. Objects can represent emotions.'
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    messages: [{
-      role: 'user',
-      content: `You are ScriptFlow's AI Director. You create 30-60 second viral short videos.
+  const systemPrompt = "You are ScriptFlow's AI Director. You create 30-60 second viral short videos. You think in IMAGES and SOUNDS, never in words."
+  const userContent = `You are ScriptFlow's AI Director. You create 30-60 second viral short videos.
 You think in IMAGES and SOUNDS, never in words.
 
 DIRECTOR BRAIN - YOUR REFLEXES (follow automatically, no thinking needed):
@@ -479,18 +476,10 @@ Output ONLY valid JSON. No other text. Use this exact structure:
 }
 
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
-    }]
-  })
-  console.log('[CognitiveCore] full response:', JSON.stringify(response).substring(0, 500))
-  let raw = ''
-  if (typeof response === 'string') {
-    raw = response
-  } else if ((response as any).choices?.[0]?.message?.content) {
-    raw = (response as any).choices[0].message.content
-  } else if ((response as any).content?.[0]?.text) {
-    raw = (response as any).content[0].text
-  }
+  
+  const raw = await callClaude(systemPrompt, userContent)
   console.log('[CognitiveCore] extracted raw:', raw?.substring(0, 200))
+  
   try {
     const parsed = JSON.parse(cleanJSON(raw))
     return parsed
