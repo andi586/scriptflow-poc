@@ -207,6 +207,19 @@ export async function POST(req: NextRequest) {
     console.log('[movie/generate] multiShots durations:', multiShots.map((s: { duration: number }) => s.duration))
     console.log('[movie/generate] total duration:', multiShots.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0))
 
+    // Ensure total duration doesn't exceed 15 seconds for Kling
+    const MAX_KLING_DURATION = 15
+    let totalDuration = multiShots.reduce((sum: number, s: any) => sum + s.duration, 0)
+
+    if (totalDuration > MAX_KLING_DURATION) {
+      // Scale down all durations proportionally
+      const scale = MAX_KLING_DURATION / totalDuration
+      multiShots.forEach((s: any) => {
+        s.duration = Math.max(2, Math.floor(s.duration * scale))
+      })
+      console.log('[movie/generate] scaled durations to fit 15s limit:', multiShots.map((s: any) => s.duration))
+    }
+
     // Step 3: Create movie record
     const { data: movie, error: movieError } = await supabase
       .from('movies')
