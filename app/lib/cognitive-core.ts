@@ -195,7 +195,9 @@ OUTPUT FORMAT (strict JSON, no other text):
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
     }]
   })
-  const raw = (response.content[0] as { text: string }).text
+  const raw = (response as any).choices?.[0]?.message?.content 
+    ?? ((response as any).content?.[0] as { text: string })?.text 
+    ?? ''
   return JSON.parse(cleanJSON(raw))
 }
 
@@ -466,7 +468,9 @@ Output ONLY valid JSON. No other text. Use this exact structure:
 CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
     }]
   })
-  const raw = (response.content[0] as { text: string }).text
+  const raw = (response as any).choices?.[0]?.message?.content 
+    ?? ((response as any).content?.[0] as { text: string })?.text 
+    ?? ''
   return JSON.parse(cleanJSON(raw))
 }
 
