@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { fal } from '@fal-ai/client'
 
 export const maxDuration = 300
-
-// Configure fal.ai
-fal.config({ credentials: process.env.FAL_KEY })
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -228,40 +224,53 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] movie created:', movie.id)
 
-    // Step 4: Generate videos with Happy Horse via fal.ai (max 4 shots, parallel)
-    console.log('[movie/generate] generating videos with Happy Horse...')
-    const maxShots = Math.min(multiShots.length, 4)
-    console.log(`[movie/generate] generating ${maxShots} shots in parallel...`)
-    
-    const shotResults = await Promise.all(
-      multiShots.slice(0, maxShots).map(async (shot: { prompt: string; duration: number }, i: number) => {
-        try {
-          console.log(`[movie/generate] generating shot ${i + 1}/${maxShots}...`)
-          const result = await fal.subscribe('alibaba/happy-horse/image-to-video', {
-            input: {
-              image_url: twin.frame_url_front ?? twin.frame_url_mid,
-              prompt: shot.prompt,
-              duration: shot.duration || 5,
-            }
-          })
-          console.log(`[movie/generate] shot ${i + 1} generated:`, result.data.video.url)
-          return result.data.video.url
-        } catch (err) {
-          console.error(`[movie/generate] shot ${i + 1} failed:`, err)
-          return null
+    // Step 4: Call Kling 3.0 Omni - ONE API call with native audio
+    const klingBody = {
+      model: 'kling',
+      task_type: 'omni_video_generation',
+      input: {
+        version: '3.0',
+        resolution: '720p',
+        aspect_ratio: '9:16',
+        enable_audio: true,
+        images: additional_images && additional_images.length > 0
+          ? [twin.frame_url_front ?? twin.frame_url_mid, ...additional_images]
+          : [twin.frame_url_front ?? twin.frame_url_mid],
+        multi_shots: multiShots
+      },
+      config: {
+        service_mode: 'public',
+        webhook_config: {
+          endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
+          secret: ''
         }
-      })
-    )
-    
-    const videoUrls = shotResults.filter(Boolean) as string[]
-    console.log('[movie/generate] all shots generated:', videoUrls.length)
+      }
+    }
 
-    // Step 5: Update movie with video URLs and archetype
+    const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.PIAPI_API_KEY!,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(klingBody)
+    })
+
+    const klingData = await klingRes.json()
+    const taskId = klingData?.data?.task_id
+
+    console.log('[movie/generate] Kling task_id:', taskId)
+
+    if (!taskId) {
+      throw new Error('Kling task creation failed: ' + JSON.stringify(klingData).slice(0, 200))
+    }
+
+    // Step 5: Update movie with task_id and archetype
     await supabase
       .from('movies')
       .update({
-        video_urls: videoUrls,
-        status: 'completed',
+        kling_task_id: taskId,
+        status: 'processing',
         ...(archetype ? { archetype } : {})
       })
       .eq('id', movie.id)
@@ -269,9 +278,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       movieId: movie.id,
-      videoUrls,
+      taskId,
       tier,
-      message: 'Your movie has been created!'
+      message: 'Your movie is being created. This takes 2-5 minutes.'
     })
 
   } catch (error: unknown) {
