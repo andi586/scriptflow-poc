@@ -257,16 +257,18 @@ export default function CreatePage() {
                 </button>
               ))}
             </div>
+            <p style={{ 
+              color: '#666', 
+              fontSize: '0.75rem', 
+              fontStyle: 'italic', 
+              marginTop: '10px',
+              marginBottom: 0 
+            }}>
+              Or describe your own story here...
+            </p>
           </div>
           
           {/* Textarea */}
-          <style>{`
-            textarea::placeholder {
-              color: #666;
-              font-size: 0.85rem;
-              font-style: italic;
-            }
-          `}</style>
           <textarea
             value={story}
             onChange={(e) => {
@@ -274,7 +276,6 @@ export default function CreatePage() {
               setSelectedKeyword('');
             }}
             rows={4}
-            placeholder="Or describe your own story here..."
             style={{ 
               width: '100%', 
               background: '#111', 
