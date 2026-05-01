@@ -66,14 +66,39 @@ export default function CreatePage() {
     setError(null);
     
     try {
+      // Upload extra character photos to Supabase first
+      const additionalImages: string[] = [];
+      for (const photo of extraPhotos) {
+        if (photo.file) {
+          const formData = new FormData();
+          formData.append('file', photo.file);
+          
+          // Upload to Supabase storage
+          const uploadRes = await fetch('/api/upload-photo', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            if (uploadData.url) {
+              additionalImages.push(uploadData.url);
+            }
+          }
+        }
+      }
+      
+      const body = {
+        story: story,
+        tier: "30s",
+        userId: "2877b339-1f39-4871-92f4-e638d63b5d09",
+        ...(additionalImages.length > 0 && { additional_images: additionalImages })
+      };
+      
       const res = await fetch("/api/movie/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          story: story,
-          tier: "30s",
-          userId: "2877b339-1f39-4871-92f4-e638d63b5d09"
-        }),
+        body: JSON.stringify(body)
       });
       
       const data = await res.json();
