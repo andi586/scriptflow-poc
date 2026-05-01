@@ -1,0 +1,71 @@
+{
+  "intent": "prank",
+  "keywords": ["prank", "joke", "trick", "fooled", "got you", "surprise", "scared"],
+  "archetype": "playful",
+  "emotionCurve": [2, 3, 5, 7, 9, 10],
+  "shots": [
+    {
+      "shotNumber": 1,
+      "duration": 4,
+      "shotType": "scene",
+      "type": "wide",
+      "cameraMovement": "static",
+      "description": "Normal situation, unsuspecting victim going about their day",
+      "emotion": "calm",
+      "emotionIntensity": 2
+    },
+    {
+      "shotNumber": 2,
+      "duration": 5,
+      "shotType": "scene",
+      "type": "medium",
+      "cameraMovement": "slow-push-in",
+      "description": "Prank being set up, hidden camera angle, anticipation building",
+      "emotion": "mischief",
+      "emotionIntensity": 3
+    },
+    {
+      "shotNumber": 3,
+      "duration": 5,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "static",
+      "description": "@image_1 noticing something wrong, confusion starting",
+      "dialogue": "Wait... what?",
+      "emotion": "confusion",
+      "emotionIntensity": 5
+    },
+    {
+      "shotNumber": 4,
+      "duration": 5,
+      "shotType": "scene",
+      "type": "medium",
+      "cameraMovement": "handheld",
+      "description": "Prank triggers - jump scare, fake spider, water bucket",
+      "emotion": "shock",
+      "emotionIntensity": 7
+    },
+    {
+      "shotNumber": 5,
+      "duration": 6,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "handheld",
+      "description": "@image_1 screaming, jumping, genuine fear reaction",
+      "dialogue": "OH MY GOD!",
+      "emotion": "fear",
+      "emotionIntensity": 9
+    },
+    {
+      "shotNumber": 6,
+      "duration": 5,
+      "shotType": "face",
+      "type": "medium",
+      "cameraMovement": "static",
+      "description": "@image_1 realizing it's a prank, laughing despite themselves",
+      "dialogue": "You got me!",
+      "emotion": "laughter",
+      "emotionIntensity": 10
+    }
+  ]
+}

@@ -176,3 +176,114 @@ export const TEMPLATES = [
 export function getTemplate(id: string) {
   return TEMPLATES.find(t => t.id === id) || null
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DirectorIntent Template System
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface DirectorIntentShot {
+  shotNumber: number
+  duration: number
+  shotType: 'face' | 'scene'
+  type: string
+  cameraMovement: string
+  description: string
+  dialogue?: string
+  emotion: string
+  emotionIntensity: number
+  scenePrompt?: string
+}
+
+export interface DirectorIntent {
+  intent: string
+  keywords: string[]
+  archetype: string
+  emotionCurve: number[]
+  shots: DirectorIntentShot[]
+}
+
+// Import all DirectorIntent templates
+import betrayalIntent from './intents/betrayal.json'
+import affairIntent from './intents/affair.json'
+import revengeIntent from './intents/revenge.json'
+import petIntent from './intents/pet.json'
+import timetravelIntent from './intents/timetravel.json'
+import reunionIntent from './intents/reunion.json'
+import prankIntent from './intents/prank.json'
+import secretIntent from './intents/secret.json'
+
+const DIRECTOR_INTENTS: DirectorIntent[] = [
+  betrayalIntent as DirectorIntent,
+  affairIntent as DirectorIntent,
+  revengeIntent as DirectorIntent,
+  petIntent as DirectorIntent,
+  timetravelIntent as DirectorIntent,
+  reunionIntent as DirectorIntent,
+  prankIntent as DirectorIntent,
+  secretIntent as DirectorIntent,
+]
+
+/**
+ * Match story input to a DirectorIntent template based on keywords
+ * Returns the matching intent or null if no match found
+ */
+export function matchDirectorIntent(story: string): DirectorIntent | null {
+  const storyLower = story.toLowerCase()
+  
+  for (const intent of DIRECTOR_INTENTS) {
+    for (const keyword of intent.keywords) {
+      if (storyLower.includes(keyword.toLowerCase())) {
+        console.log(`[DirectorIntent] Matched "${intent.intent}" via keyword "${keyword}"`)
+        return intent
+      }
+    }
+  }
+  
+  console.log('[DirectorIntent] No template match found, using CognitiveCore')
+  return null
+}
+
+/**
+ * Get a specific DirectorIntent by intent name
+ */
+export function getDirectorIntent(intentName: string): DirectorIntent | null {
+  return DIRECTOR_INTENTS.find(i => i.intent === intentName) || null
+}
+
+/**
+ * Convert DirectorIntent shots to the format expected by movie generation
+ * Fills in character details from user input while keeping fixed shot structure
+ */
+export function applyDirectorIntent(
+  intent: DirectorIntent,
+  characterDetails: {
+    mainCharacter?: string
+    secondaryCharacter?: string
+    petName?: string
+    location?: string
+  } = {}
+): DirectorIntentShot[] {
+  return intent.shots.map(shot => {
+    let description = shot.description
+    let dialogue = shot.dialogue
+    
+    // Replace generic placeholders with actual character details if provided
+    if (characterDetails.mainCharacter) {
+      description = description.replace(/main character/gi, characterDetails.mainCharacter)
+      if (dialogue) {
+        dialogue = dialogue.replace(/\[name\]/gi, characterDetails.mainCharacter)
+      }
+    }
+    
+    if (characterDetails.location) {
+      description = description.replace(/location/gi, characterDetails.location)
+    }
+    
+    return {
+      ...shot,
+      description,
+      dialogue,
+      scenePrompt: shot.scenePrompt || description
+    }
+  })
+}

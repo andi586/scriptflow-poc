@@ -1,0 +1,81 @@
+{
+  "intent": "pet",
+  "keywords": ["pet", "dog", "cat", "puppy", "kitten", "animal", "saved me", "rescued"],
+  "archetype": "pet_daily",
+  "emotionCurve": [2, 3, 4, 6, 8, 9, 10],
+  "shots": [
+    {
+      "shotNumber": 1,
+      "duration": 5,
+      "shotType": "scene",
+      "type": "wide",
+      "cameraMovement": "static",
+      "description": "Normal day with @image_2 pet, peaceful domestic scene",
+      "emotion": "calm",
+      "emotionIntensity": 2
+    },
+    {
+      "shotNumber": 2,
+      "duration": 6,
+      "shotType": "scene",
+      "type": "medium",
+      "cameraMovement": "slow-push-in",
+      "description": "@image_2 pet acting strangely, alert, ears up, focused on something",
+      "emotion": "curiosity",
+      "emotionIntensity": 3
+    },
+    {
+      "shotNumber": 3,
+      "duration": 6,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "static",
+      "description": "@image_1 owner confused, not understanding pet's behavior",
+      "dialogue": "What's wrong with you?",
+      "emotion": "confusion",
+      "emotionIntensity": 4
+    },
+    {
+      "shotNumber": 4,
+      "duration": 7,
+      "shotType": "scene",
+      "type": "medium",
+      "cameraMovement": "handheld",
+      "description": "Danger approaching unseen - gas leak, fire, intruder shadow",
+      "emotion": "tension",
+      "emotionIntensity": 6
+    },
+    {
+      "shotNumber": 5,
+      "duration": 7,
+      "shotType": "scene",
+      "type": "wide",
+      "cameraMovement": "handheld",
+      "description": "@image_2 pet takes action - barking, pulling, alerting owner",
+      "emotion": "urgency",
+      "emotionIntensity": 8
+    },
+    {
+      "shotNumber": 6,
+      "duration": 8,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "handheld",
+      "description": "@image_1 sudden realization of danger, eyes wide with shock",
+      "dialogue": "Oh my god!",
+      "emotion": "shock",
+      "emotionIntensity": 9
+    },
+    {
+      "shotNumber": 7,
+      "duration": 11,
+      "shotType": "scene",
+      "type": "wide",
+      "cameraMovement": "static",
+      "description": "@image_1 and @image_2 together safe, owner hugging pet with tears",
+      "dialogue": "You saved me...",
+      "emotion": "gratitude",
+      "emotionIntensity": 10
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "intent": "reunion",
+  "keywords": ["reunion", "see you again", "finally", "after years", "long time", "missed you", "came back"],
+  "archetype": "bittersweet",
+  "emotionCurve": [3, 4, 6, 7, 9, 10],
+  "shots": [
+    {
+      "shotNumber": 1,
+      "duration": 5,
+      "shotType": "scene",
+      "type": "wide",
+      "cameraMovement": "slow-push-in",
+      "description": "Familiar place from the past, empty, waiting",
+      "emotion": "anticipation",
+      "emotionIntensity": 3
+    },
+    {
+      "shotNumber": 2,
+      "duration": 6,
+      "shotType": "face",
+      "type": "medium",
+      "cameraMovement": "static",
+      "description": "@image_1 waiting, nervous, checking time, heart racing",
+      "dialogue": "It's been so long...",
+      "emotion": "nervousness",
+      "emotionIntensity": 4
+    },
+    {
+      "shotNumber": 3,
+      "duration": 7,
+      "shotType": "scene",
+      "type": "wide",
+      "cameraMovement": "tracking",
+      "description": "Figure approaching in distance, recognition moment",
+      "emotion": "recognition",
+      "emotionIntensity": 6
+    },
+    {
+      "shotNumber": 4,
+      "duration": 7,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "static",
+      "description": "@image_1 eyes welling up, smile breaking through tears",
+      "dialogue": "You came back.",
+      "emotion": "joy",
+      "emotionIntensity": 7
+    },
+    {
+      "shotNumber": 5,
+      "duration": 8,
+      "shotType": "scene",
+      "type": "medium",
+      "cameraMovement": "slow-push-in",
+      "description": "Embrace moment, years of separation melting away",
+      "emotion": "relief",
+      "emotionIntensity": 9
+    },
+    {
+      "shotNumber": 6,
+      "duration": 9,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "static",
+      "description": "@image_1 holding on, tears of happiness, finally complete",
+      "dialogue": "I never stopped waiting.",
+      "emotion": "love",
+      "emotionIntensity": 10
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "intent": "affair",
+  "keywords": ["affair", "cheating", "unfaithful", "other woman", "other man", "secret relationship", "caught"],
+  "archetype": "betrayal",
+  "emotionCurve": [2, 4, 6, 8, 9, 10],
+  "shots": [
+    {
+      "shotNumber": 1,
+      "duration": 4,
+      "shotType": "scene",
+      "type": "wide",
+      "cameraMovement": "static",
+      "description": "Happy couple together, intimate moment, false sense of security",
+      "emotion": "love",
+      "emotionIntensity": 2
+    },
+    {
+      "shotNumber": 2,
+      "duration": 5,
+      "shotType": "scene",
+      "type": "medium",
+      "cameraMovement": "slow-push-in",
+      "description": "Phone notification, lipstick stain, or suspicious evidence discovered",
+      "emotion": "curiosity",
+      "emotionIntensity": 4
+    },
+    {
+      "shotNumber": 3,
+      "duration": 5,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "static",
+      "description": "@image_1 reading message or seeing proof, disbelief washing over face",
+      "dialogue": "Who is this?",
+      "emotion": "confusion",
+      "emotionIntensity": 6
+    },
+    {
+      "shotNumber": 4,
+      "duration": 5,
+      "shotType": "scene",
+      "type": "medium",
+      "cameraMovement": "handheld",
+      "description": "More evidence revealed - photos, messages, undeniable truth",
+      "emotion": "shock",
+      "emotionIntensity": 8
+    },
+    {
+      "shotNumber": 5,
+      "duration": 5,
+      "shotType": "face",
+      "type": "close-up",
+      "cameraMovement": "handheld",
+      "description": "@image_1 confronting partner, voice breaking with pain",
+      "dialogue": "How long?",
+      "emotion": "devastation",
+      "emotionIntensity": 9
+    },
+    {
+      "shotNumber": 6,
+      "duration": 6,
+      "shotType": "face",
+      "type": "extreme-close-up",
+      "cameraMovement": "static",
+      "description": "@image_1 tears streaming, world collapsing, silent scream",
+      "dialogue": "Everything was a lie.",
+      "emotion": "heartbreak",
+      "emotionIntensity": 10
+    }
+  ]
+}

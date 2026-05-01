@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { matchDirectorIntent, applyDirectorIntent } from '@/app/lib/templates'
 
 export const maxDuration = 300
 
@@ -62,23 +63,51 @@ export async function POST(req: NextRequest) {
     console.log('[movie/generate] twin found:', twin.id)
     console.log('[movie/generate] twin photo:', twin?.frame_url_front)
 
-    // Step 2: Call Cognitive Core for shot plan
-    const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template: story, personalNote: story })
-    })
-    const scriptData = await scriptRes.json()
-    console.log('[DEBUG scriptData]', scriptData)
-    console.log('[DEBUG shots]', scriptData?.shots)
-    console.log('[DEBUG directionPlan]', scriptData?.directionPlan)
-    console.log('[DEBUG hook]', scriptData?.hook)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Step 2: Check for DirectorIntent template match
+    // ═══════════════════════════════════════════════════════════════════════════
+    const directorIntent = matchDirectorIntent(story)
+    let shots: any[] = []
+    let archetype: string | null = null
+    let hookData: any = null
+    
+    if (directorIntent) {
+      // ✅ DirectorIntent template matched - use fixed shot structure
+      console.log(`[movie/generate] 🎬 DirectorIntent matched: "${directorIntent.intent}"`)
+      console.log(`[movie/generate] Using template shots instead of CognitiveCore`)
+      
+      // Apply template with character details (CognitiveCore only fills in character info)
+      const templateShots = applyDirectorIntent(directorIntent, {
+        mainCharacter: 'character',
+        location: 'scene'
+      })
+      
+      shots = templateShots
+      archetype = directorIntent.archetype
+      hookData = null // DirectorIntent templates have built-in hooks in shot 1
+      
+      console.log('[movie/generate] DirectorIntent shots:', shots.length, 'archetype:', archetype)
+    } else {
+      // ❌ No template match - fall back to CognitiveCore
+      console.log('[movie/generate] No DirectorIntent match, using CognitiveCore')
+      
+      const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: story, personalNote: story })
+      })
+      const scriptData = await scriptRes.json()
+      console.log('[DEBUG scriptData]', scriptData)
+      console.log('[DEBUG shots]', scriptData?.shots)
+      console.log('[DEBUG directionPlan]', scriptData?.directionPlan)
+      console.log('[DEBUG hook]', scriptData?.hook)
 
-    const shots = scriptData?.directionPlan?.shots ?? []
-    const archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
-    const hookData = scriptData?.hook ?? null
+      shots = scriptData?.directionPlan?.shots ?? []
+      archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
+      hookData = scriptData?.hook ?? null
 
-    console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype, 'hook:', !!hookData)
+      console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype, 'hook:', !!hookData)
+    }
 
     // Tier config
     const tierConfig: Record<string, { shots: number; duration: number }> = {
