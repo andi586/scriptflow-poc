@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] twin found:', twin.id)
     console.log('[movie/generate] twin photo:', twin?.frame_url_front)
-    console.log('[movie/generate] additional_images received:', additional_images?.length || 0)
+    console.log('[movie/generate] additional_images received:', additional_images?.length || 0, additional_images)
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Step 2: Check for DirectorIntent template match
@@ -274,8 +274,8 @@ export async function POST(req: NextRequest) {
       : [twin.frame_url_front ?? twin.frame_url_mid]
     
     // Kling API supports maximum 7 images
-    const klingImages = allImages.slice(0, 7)
-    console.log('[movie/generate] sending', klingImages.length, 'images to Kling API')
+    const klingImages = allImages.filter(Boolean).slice(0, 7)
+    console.log('[movie/generate] sending', klingImages.length, 'images to Kling API:', klingImages)
     
     const klingBody = {
       model: 'kling',

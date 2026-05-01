@@ -108,12 +108,16 @@ export default function CreatePage() {
         }
       }
       
+      console.log('[create/page] additionalImages uploaded:', additionalImages.length, additionalImages);
+      
       const body = {
         story: story,
         tier: "30s",
         userId: userId || "2877b339-1f39-4871-92f4-e638d63b5d09",
         ...(additionalImages.length > 0 && { additional_images: additionalImages })
       };
+      
+      console.log('[create/page] sending body:', JSON.stringify(body, null, 2));
       
       const res = await fetch("/api/movie/generate", {
         method: "POST",
