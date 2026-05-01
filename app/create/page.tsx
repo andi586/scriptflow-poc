@@ -116,6 +116,9 @@ export default function CreatePage() {
         
         {/* Main Photo - Big Circle */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
+            ① Upload your photo
+          </p>
           <input
             ref={mainPhotoRef}
             type="file"
@@ -204,6 +207,9 @@ export default function CreatePage() {
 
         {/* Story Input with Keyword Chips */}
         <div style={{ marginBottom: '24px' }}>
+          <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
+            ② Choose a story
+          </p>
           {/* Keyword Chips */}
           <div style={{ 
             background: '#111', 
@@ -253,7 +259,7 @@ export default function CreatePage() {
               setSelectedKeyword('');
             }}
             rows={4}
-            placeholder="Or type your own story here..."
+            placeholder="Or describe your own story here..."
             style={{ 
               width: '100%', 
               background: '#111', 
@@ -287,6 +293,9 @@ export default function CreatePage() {
         )}
 
         {/* Generate Button */}
+        <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
+          ③ Generate your movie
+        </p>
         <button
           onClick={handleGenerate}
           disabled={loading || !mainPhoto.file}
@@ -371,7 +380,7 @@ export default function CreatePage() {
               marginBottom: '20px' 
             }}>
               {extraPhotos.map((photo, index) => (
-                <div key={index}>
+                <div key={index} style={{ textAlign: 'center' }}>
                   <input
                     ref={el => { extraPhotoRefs.current[index] = el }}
                     type="file"
@@ -393,7 +402,8 @@ export default function CreatePage() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       overflow: 'hidden',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.2s',
+                      position: 'relative'
                     }}
                     onMouseEnter={(e) => {
                       if (!photo.url) {
@@ -413,7 +423,10 @@ export default function CreatePage() {
                         alt={`Character ${index + 1}`} 
                       />
                     ) : (
-                      <span style={{ fontSize: '1.8rem', color: '#555' }}>+</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '1.8rem', color: '#555' }}>+</span>
+                        <span style={{ fontSize: '0.7rem', color: '#666' }}>{index + 1}</span>
+                      </div>
                     )}
                   </div>
                 </div>
