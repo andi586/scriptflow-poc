@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const multiShots = shotsForKling.map((shot: any, index: number) => ({
       prompt: buildPrompt(shot, index, shotsForKling.length),
-      duration: forcedDuration, // ALWAYS use this, ignore shot.duration from Cognitive Core
+      duration: shot.duration || forcedDuration, // Use template duration if available, otherwise use tier default
     }))
 
     const totalPromptLength = multiShots.reduce((sum: number, s: { prompt: string; duration: number }) => sum + (s.prompt || '').length, 0)
