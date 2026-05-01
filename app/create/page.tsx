@@ -66,23 +66,14 @@ export default function CreatePage() {
     setError(null);
     
     try {
-      const form = new FormData();
-      form.append("photo", mainPhoto.file);
-      form.append("story", story);
-      form.append("tier", "30s");
-      
-      // Add extra character photos
-      let castIndex = 0;
-      for (const photo of extraPhotos) {
-        if (photo.file) {
-          form.append(`cast_${castIndex}`, photo.file);
-          castIndex++;
-        }
-      }
-      
-      const res = await fetch("/api/create-movie", {
+      const res = await fetch("/api/movie/generate", {
         method: "POST",
-        body: form,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story: story,
+          tier: "30s",
+          userId: "2877b339-1f39-4871-92f4-e638d63b5d09"
+        }),
       });
       
       const data = await res.json();
