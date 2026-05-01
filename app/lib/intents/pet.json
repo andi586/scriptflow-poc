@@ -31,7 +31,7 @@
       "shotType": "scene",
       "type": "wide",
       "cameraMovement": "handheld",
-      "description": "@image_2 pet takes action - barking, pulling, alerting owner to danger",
+      "description": "@image_2 the animal takes urgent action, alerting owner to danger",
       "emotion": "urgency",
       "emotionIntensity": 9
     },

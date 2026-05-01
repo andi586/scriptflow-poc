@@ -18,7 +18,7 @@ const STORY_KEYWORDS = [
   { label: "Revenge", story: "My boss humiliated me in front of everyone, I got revenge..." },
   { label: "Betrayal", story: "My best friend betrayed me after 10 years..." },
   { label: "Time Travel", story: "I met my future self and got a warning..." },
-  { label: "Pet", story: "My dog left me a final message before passing away..." },
+  { label: "Pet", story: "My beloved pet left me a final message before I lost them..." },
   { label: "Reunion", story: "I ran into my ex after 5 years and everything changed..." },
   { label: "Prank", story: "My friends pranked me and it went completely viral..." },
   { label: "Secret", story: "Someone discovered my biggest secret..." },
