@@ -205,77 +205,60 @@ export default function CreatePage() {
           )}
         </div>
 
-        {/* Story Input with Keyword Chips */}
+        {/* Story Input */}
         <div style={{ marginBottom: '24px' }}>
           <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
-            ② Choose a story
+            ② Choose a story or write your own
           </p>
-          {/* Keyword Chips */}
-          <div style={{ 
-            background: '#111', 
-            border: '1px solid #333', 
-            borderRadius: '16px 16px 0 0',
-            padding: '12px',
-            borderBottom: 'none'
-          }}>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(4, 1fr)', 
-              gap: '6px' 
-            }}>
-              {STORY_KEYWORDS.map(keyword => (
-                <button
-                  key={keyword.label}
-                  onClick={() => handleKeywordClick(keyword)}
-                  style={{
-                    background: selectedKeyword === keyword.label ? '#D4A853' : '#1a1a1a',
-                    color: selectedKeyword === keyword.label ? '#000' : '#888',
-                    border: selectedKeyword === keyword.label ? 'none' : '1px solid #333',
-                    borderRadius: '8px',
-                    padding: '6px 4px',
-                    fontSize: '0.7rem',
-                    cursor: 'pointer',
-                    fontWeight: selectedKeyword === keyword.label ? 700 : 500,
-                    transition: 'all 0.2s',
-                    textAlign: 'center',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedKeyword !== keyword.label) {
-                      e.currentTarget.style.background = '#2a2a2a';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedKeyword !== keyword.label) {
-                      e.currentTarget.style.background = '#1a1a1a';
-                    }
-                  }}
-                >
-                  {keyword.label}
-                </button>
-              ))}
-            </div>
-            <p style={{ 
-              color: '#666', 
-              fontSize: '0.75rem', 
-              fontStyle: 'italic', 
-              marginTop: '10px',
-              marginBottom: '10px',
-              paddingLeft: '4px'
-            }}>
-              Or describe your own story here...
-            </p>
-          </div>
           
-          {/* Textarea */}
+          {/* Keyword Chips */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' }}>
+            {STORY_KEYWORDS.map((keyword) => (
+              <button
+                key={keyword.label}
+                type="button"
+                onClick={() => { setStory(keyword.story); setSelectedKeyword(keyword.label); }}
+                style={{
+                  background: selectedKeyword === keyword.label ? '#D4A853' : '#1a1a1a',
+                  color: selectedKeyword === keyword.label ? '#000' : '#fff',
+                  border: '1px solid #333',
+                  borderRadius: '8px',
+                  padding: '8px 4px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                {keyword.label}
+              </button>
+            ))}
+          </div>
+
+          <p style={{ color: '#666', fontSize: '0.75rem', fontStyle: 'italic', marginBottom: '8px' }}>
+            Or describe your own story here...
+          </p>
+
           <textarea
             value={story}
             onChange={(e) => setStory(e.target.value)}
             rows={4}
-            className="w-full p-3 bg-neutral-900 border border-neutral-700 rounded-b-2xl text-white text-sm resize-none focus:outline-none focus:border-yellow-400"
-            style={{ borderTop: 'none' }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: '#111',
+              border: '1px solid #333',
+              borderRadius: '12px',
+              color: 'white',
+              fontSize: '0.875rem',
+              resize: 'none',
+              outline: 'none',
+              boxSizing: 'border-box',
+              fontFamily: 'system-ui',
+              cursor: 'text',
+              pointerEvents: 'auto',
+              position: 'relative',
+              zIndex: 1,
+            }}
           />
         </div>
 
