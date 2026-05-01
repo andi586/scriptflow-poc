@@ -8,14 +8,14 @@ interface CharacterPhoto {
 }
 
 const STORY_KEYWORDS = [
-  { label: "出轨", story: "I caught my partner cheating on me at 3AM and everything changed..." },
-  { label: "复仇", story: "My boss humiliated me in front of everyone, I got revenge..." },
-  { label: "背叛", story: "My best friend betrayed me after 10 years..." },
-  { label: "穿越", story: "I met my future self and got a warning..." },
-  { label: "宠物", story: "My dog left me a final message before passing away..." },
-  { label: "重逢", story: "I ran into my ex after 5 years and everything changed..." },
-  { label: "整蛊", story: "My friends pranked me and it went completely viral..." },
-  { label: "秘密", story: "Someone discovered my biggest secret..." },
+  { label: "Affair", story: "I caught my partner cheating on me at 3AM and everything changed..." },
+  { label: "Revenge", story: "My boss humiliated me in front of everyone, I got revenge..." },
+  { label: "Betrayal", story: "My best friend betrayed me after 10 years..." },
+  { label: "Time Travel", story: "I met my future self and got a warning..." },
+  { label: "Pet", story: "My dog left me a final message before passing away..." },
+  { label: "Reunion", story: "I ran into my ex after 5 years and everything changed..." },
+  { label: "Prank", story: "My friends pranked me and it went completely viral..." },
+  { label: "Secret", story: "Someone discovered my biggest secret..." },
 ];
 
 export default function CreatePage() {
@@ -51,7 +51,6 @@ export default function CreatePage() {
 
   const handleKeywordClick = (keyword: typeof STORY_KEYWORDS[0]) => {
     setStory(keyword.story);
-    setShowModal(false);
   };
 
   const handleGenerate = async () => {
@@ -165,7 +164,7 @@ export default function CreatePage() {
         </div>
 
         {/* Add More Button */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <button
             onClick={() => setShowModal(true)}
             style={{
@@ -198,6 +197,39 @@ export default function CreatePage() {
               {uploadedCount} more added
             </p>
           )}
+        </div>
+
+        {/* Keyword Chips */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+            {STORY_KEYWORDS.map(keyword => (
+              <button
+                key={keyword.label}
+                onClick={() => handleKeywordClick(keyword)}
+                style={{
+                  background: '#1a1a1a',
+                  color: '#D4A853',
+                  border: '1px solid #333',
+                  borderRadius: '10px',
+                  padding: '8px 16px',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#D4A853';
+                  e.currentTarget.style.color = '#000';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#1a1a1a';
+                  e.currentTarget.style.color = '#D4A853';
+                }}
+              >
+                {keyword.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Story Input */}
@@ -314,7 +346,7 @@ export default function CreatePage() {
               display: 'grid', 
               gridTemplateColumns: 'repeat(3, 1fr)', 
               gap: '16px', 
-              marginBottom: '32px' 
+              marginBottom: '24px' 
             }}>
               {extraPhotos.map((photo, index) => (
                 <div key={index}>
@@ -364,42 +396,6 @@ export default function CreatePage() {
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Story Keyword Chips */}
-            <div style={{ marginBottom: '24px' }}>
-              <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '12px' }}>
-                Quick story ideas:
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {STORY_KEYWORDS.map(keyword => (
-                  <button
-                    key={keyword.label}
-                    onClick={() => handleKeywordClick(keyword)}
-                    style={{
-                      background: '#1a1a1a',
-                      color: '#D4A853',
-                      border: '1px solid #333',
-                      borderRadius: '10px',
-                      padding: '8px 16px',
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#D4A853';
-                      e.currentTarget.style.color = '#000';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#1a1a1a';
-                      e.currentTarget.style.color = '#D4A853';
-                    }}
-                  >
-                    {keyword.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Done Button */}
