@@ -11,13 +11,14 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { story, tier = '60s', userId, additional_images, story_category } = await req.json()
+    const { story, tier = '60s', userId, additional_images, story_category, main_photo_url } = await req.json()
 
     if (!story) {
       return NextResponse.json({ error: 'Story is required' }, { status: 400 })
     }
 
     console.log('[movie/generate] story:', story, 'tier:', tier)
+    console.log('[movie/generate] main_photo_url received:', main_photo_url)
 
     // ── Daily cost guard ──────────────────────────────────────────────────────
     const today = new Date()
@@ -57,21 +58,20 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (!twin) {
-      // Guest user without digital twin - use uploaded photo directly
-      console.log('[movie/generate] No twin found, checking for guest photo upload')
-      const guestPhotoUrl = additional_images?.[0] || null
+      // Guest user without digital twin - use main_photo_url
+      console.log('[movie/generate] No twin found, using main_photo_url for guest user')
       
-      if (!guestPhotoUrl) {
+      if (!main_photo_url) {
         return NextResponse.json({ error: 'Please upload your photo' }, { status: 400 })
       }
       
       // Create temporary twin object for guest user
       twin = { 
         id: userId,
-        frame_url_front: guestPhotoUrl,
-        frame_url_mid: guestPhotoUrl
+        frame_url_front: main_photo_url,
+        frame_url_mid: main_photo_url
       }
-      console.log('[movie/generate] Using guest photo as main character:', guestPhotoUrl)
+      console.log('[movie/generate] Using main_photo_url as main character:', main_photo_url)
     } else {
       console.log('[movie/generate] twin found:', twin.id)
       console.log('[movie/generate] twin photo:', twin?.frame_url_front)

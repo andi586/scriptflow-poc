@@ -87,49 +87,60 @@ export default function CreatePage() {
   };
 
   const handleGenerate = async () => {
+    if (loading) return;
+    
     if (!mainPhoto.file) {
       setError("Please upload your photo");
       return;
     }
     
-    if (loading) return;
-    
     setLoading(true);
     setError(null);
     
     try {
-      // Upload extra character photos to Supabase first
+      // Step 1: Upload main photo
+      console.log('[create/page] Uploading main photo...');
+      const mainFormData = new FormData();
+      mainFormData.append('file', mainPhoto.file);
+      const mainUploadRes = await fetch('/api/upload-photo', { 
+        method: 'POST', 
+        body: mainFormData 
+      });
+      const mainUploadData = await mainUploadRes.json();
+      const mainPhotoUrl = mainUploadData.url;
+      
+      if (!mainPhotoUrl) throw new Error('Failed to upload main photo');
+      console.log('[create/page] Main photo uploaded:', mainPhotoUrl);
+      
+      // Step 2: Upload extra photos
+      console.log('[create/page] Uploading extra photos...');
       const additionalImages: string[] = [];
       for (const photo of extraPhotos) {
         if (photo.file) {
-          const formData = new FormData();
-          formData.append('file', photo.file);
-          
-          // Upload to Supabase storage
-          const uploadRes = await fetch('/api/upload-photo', {
-            method: 'POST',
-            body: formData
+          const form = new FormData();
+          form.append('file', photo.file);
+          const res = await fetch('/api/upload-photo', { 
+            method: 'POST', 
+            body: form 
           });
-          
-          if (uploadRes.ok) {
-            const uploadData = await uploadRes.json();
-            if (uploadData.url) {
-              additionalImages.push(uploadData.url);
-            }
+          const data = await res.json();
+          if (data.url) {
+            additionalImages.push(data.url);
           }
         }
       }
+      console.log('[create/page] Extra photos uploaded:', additionalImages.length, additionalImages);
       
-      console.log('[create/page] additionalImages uploaded:', additionalImages.length, additionalImages);
-      
+      // Step 3: Generate movie
       const body = {
-        story: story,
+        story,
         tier: "30s",
-        userId: userId,
-        ...(additionalImages.length > 0 && { additional_images: additionalImages })
+        userId: userId || crypto.randomUUID(),
+        main_photo_url: mainPhotoUrl,
+        additional_images: additionalImages
       };
       
-      console.log('[create/page] sending body:', JSON.stringify(body, null, 2));
+      console.log('[create/page] Sending to /api/movie/generate:', JSON.stringify(body, null, 2));
       
       const res = await fetch("/api/movie/generate", {
         method: "POST",
@@ -142,9 +153,12 @@ export default function CreatePage() {
       if (!res.ok) throw new Error(data.error || "Failed to create movie");
       if (!data.movieId) throw new Error("No movie ID returned");
       
+      console.log('[create/page] Movie created:', data.movieId);
       router.push(`/movie/${data.movieId}`);
     } catch (e: any) {
+      console.error('[create/page] Error:', e.message);
       setError(e.message);
+    } finally {
       setLoading(false);
     }
   };
