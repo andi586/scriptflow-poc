@@ -31,7 +31,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 owner confused, not understanding pet's behavior",
-      "dialogue": "What's wrong with you?",
+      "dialogue": "你怎么了？",
       "emotion": "confusion",
       "emotionIntensity": 4
     },
@@ -62,7 +62,7 @@
       "type": "close-up",
       "cameraMovement": "handheld",
       "description": "@image_1 sudden realization of danger, eyes wide with shock",
-      "dialogue": "Oh my god!",
+      "dialogue": "天啊！",
       "emotion": "shock",
       "emotionIntensity": 9
     },
@@ -73,7 +73,7 @@
       "type": "wide",
       "cameraMovement": "static",
       "description": "@image_1 and @image_2 together safe, owner hugging pet with tears",
-      "dialogue": "You saved me...",
+      "dialogue": "你救了我...",
       "emotion": "gratitude",
       "emotionIntensity": 10
     }

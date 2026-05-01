@@ -11,7 +11,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 remembering the hurt, cold determination in eyes",
-      "dialogue": "You thought I'd forget.",
+      "dialogue": "你以为我会忘记。",
       "emotion": "determination",
       "emotionIntensity": 2
     },
@@ -32,7 +32,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 planning, calculating, cold smile forming",
-      "dialogue": "Now it's my turn.",
+      "dialogue": "现在轮到我了。",
       "emotion": "calculation",
       "emotionIntensity": 5
     },
@@ -53,7 +53,7 @@
       "type": "medium",
       "cameraMovement": "slow-push-in",
       "description": "@image_1 watching them realize what's happening, satisfaction building",
-      "dialogue": "How does it feel?",
+      "dialogue": "感觉如何？",
       "emotion": "satisfaction",
       "emotionIntensity": 8
     },
@@ -64,7 +64,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 final moment of triumph, justice served, walking away",
-      "dialogue": "We're done here.",
+      "dialogue": "我们结束了。",
       "emotion": "triumph",
       "emotionIntensity": 10
     }

@@ -31,7 +31,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 noticing something wrong, confusion starting",
-      "dialogue": "Wait... what?",
+      "dialogue": "等等...什么？",
       "emotion": "confusion",
       "emotionIntensity": 5
     },
@@ -52,7 +52,7 @@
       "type": "close-up",
       "cameraMovement": "handheld",
       "description": "@image_1 screaming, jumping, genuine fear reaction",
-      "dialogue": "OH MY GOD!",
+      "dialogue": "天啊！",
       "emotion": "fear",
       "emotionIntensity": 9
     },
@@ -63,7 +63,7 @@
       "type": "medium",
       "cameraMovement": "static",
       "description": "@image_1 realizing it's a prank, laughing despite themselves",
-      "dialogue": "You got me!",
+      "dialogue": "你吓到我了！",
       "emotion": "laughter",
       "emotionIntensity": 10
     }

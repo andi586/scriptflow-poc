@@ -31,7 +31,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 reading message or seeing proof, disbelief washing over face",
-      "dialogue": "Who is this?",
+      "dialogue": "这是谁？",
       "emotion": "confusion",
       "emotionIntensity": 6
     },
@@ -52,7 +52,7 @@
       "type": "close-up",
       "cameraMovement": "handheld",
       "description": "@image_1 confronting partner, voice breaking with pain",
-      "dialogue": "How long?",
+      "dialogue": "多久了？",
       "emotion": "devastation",
       "emotionIntensity": 9
     },
@@ -63,7 +63,7 @@
       "type": "extreme-close-up",
       "cameraMovement": "static",
       "description": "@image_1 tears streaming, world collapsing, silent scream",
-      "dialogue": "Everything was a lie.",
+      "dialogue": "一切都是谎言。",
       "emotion": "heartbreak",
       "emotionIntensity": 10
     }

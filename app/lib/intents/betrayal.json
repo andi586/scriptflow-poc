@@ -21,7 +21,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 genuine smile, feeling safe and connected",
-      "dialogue": "I trusted you.",
+      "dialogue": "我信任你。",
       "emotion": "warmth",
       "emotionIntensity": 3
     },
@@ -42,7 +42,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 doubt creeping in, eyes narrowing, processing the lie",
-      "dialogue": "Why are you lying?",
+      "dialogue": "你为什么要骗我？",
       "emotion": "doubt",
       "emotionIntensity": 7
     },
@@ -53,7 +53,7 @@
       "type": "close-up",
       "cameraMovement": "handheld",
       "description": "@image_1 confrontation begins, voice trembling with anger",
-      "dialogue": "You knew... didn't you?",
+      "dialogue": "你早就知道了...对吗？",
       "emotion": "anger",
       "emotionIntensity": 8
     },
@@ -64,7 +64,7 @@
       "type": "extreme-close-up",
       "cameraMovement": "static",
       "description": "@image_1 raw emotion, tears or rage, complete breakdown of trust",
-      "dialogue": "Say it.",
+      "dialogue": "说出来。",
       "emotion": "heartbreak",
       "emotionIntensity": 10
     }

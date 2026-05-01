@@ -21,7 +21,7 @@
       "type": "medium",
       "cameraMovement": "static",
       "description": "@image_1 waiting, nervous, checking time, heart racing",
-      "dialogue": "It's been so long...",
+      "dialogue": "好久不见...",
       "emotion": "nervousness",
       "emotionIntensity": 4
     },
@@ -42,7 +42,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 eyes welling up, smile breaking through tears",
-      "dialogue": "You came back.",
+      "dialogue": "你回来了。",
       "emotion": "joy",
       "emotionIntensity": 7
     },
@@ -63,7 +63,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 holding on, tears of happiness, finally complete",
-      "dialogue": "I never stopped waiting.",
+      "dialogue": "我从未停止等待。",
       "emotion": "love",
       "emotionIntensity": 10
     }

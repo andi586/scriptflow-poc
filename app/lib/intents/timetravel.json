@@ -21,7 +21,7 @@
       "type": "close-up",
       "cameraMovement": "slow-push-in",
       "description": "@image_1 eyes closing, remembering, transported to past",
-      "dialogue": "If I could go back...",
+      "dialogue": "如果我能回到过去...",
       "emotion": "longing",
       "emotionIntensity": 4
     },
@@ -42,7 +42,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 reliving the pain, tears forming, what they should have said",
-      "dialogue": "I would tell you...",
+      "dialogue": "我会告诉你...",
       "emotion": "sorrow",
       "emotionIntensity": 7
     },
@@ -63,7 +63,7 @@
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 eyes opening, back to present, tears streaming",
-      "dialogue": "But I can't.",
+      "dialogue": "但我做不到。",
       "emotion": "acceptance",
       "emotionIntensity": 9
     },
