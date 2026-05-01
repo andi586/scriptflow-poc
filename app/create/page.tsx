@@ -257,6 +257,16 @@ export default function CreatePage() {
                 </button>
               ))}
             </div>
+            <p style={{ 
+              color: '#666', 
+              fontSize: '0.75rem', 
+              fontStyle: 'italic', 
+              marginTop: '10px',
+              marginBottom: '10px',
+              paddingLeft: '4px'
+            }}>
+              Or describe your own story here...
+            </p>
           </div>
           
           {/* Textarea */}
@@ -267,6 +277,8 @@ export default function CreatePage() {
               setSelectedKeyword('');
             }}
             rows={4}
+            disabled={false}
+            readOnly={false}
             style={{ 
               width: '100%', 
               background: '#111', 
@@ -278,19 +290,12 @@ export default function CreatePage() {
               resize: 'none', 
               outline: 'none', 
               boxSizing: 'border-box',
-              borderTop: 'none'
+              borderTop: 'none',
+              pointerEvents: 'auto',
+              userSelect: 'text',
+              WebkitUserSelect: 'text'
             }}
           />
-          <p style={{ 
-            color: '#666', 
-            fontSize: '0.75rem', 
-            fontStyle: 'italic', 
-            marginTop: '8px',
-            marginBottom: 0,
-            textAlign: 'center'
-          }}>
-            Or describe your own story here...
-          </p>
         </div>
 
         {/* Error */}
