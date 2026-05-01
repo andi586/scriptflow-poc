@@ -5,14 +5,24 @@ import { useRouter } from "next/navigation";
 interface CharacterPhoto {
   file: File | null;
   url: string | null;
-  role: string;
 }
 
-const ROLES = ["朋友", "宠物", "家人", "恋人", "同事", "其他"];
+const STORY_KEYWORDS = [
+  { label: "出轨", story: "I caught my partner cheating on me at 3AM and everything changed..." },
+  { label: "复仇", story: "My boss humiliated me in front of everyone, I got revenge..." },
+  { label: "背叛", story: "My best friend betrayed me after 10 years..." },
+  { label: "穿越", story: "I met my future self and got a warning..." },
+  { label: "宠物", story: "My dog left me a final message before passing away..." },
+  { label: "重逢", story: "I ran into my ex after 5 years and everything changed..." },
+  { label: "整蛊", story: "My friends pranked me and it went completely viral..." },
+  { label: "秘密", story: "Someone discovered my biggest secret..." },
+];
 
 export default function CreatePage() {
   const [mainPhoto, setMainPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
-  const [extraCharacters, setExtraCharacters] = useState<CharacterPhoto[]>([]);
+  const [extraPhotos, setExtraPhotos] = useState<CharacterPhoto[]>(
+    Array(6).fill(null).map(() => ({ file: null, url: null }))
+  );
   const [showModal, setShowModal] = useState(false);
   const [story, setStory] = useState("I caught my partner cheating on me at 3AM and everything changed...");
   const [loading, setLoading] = useState(false);
@@ -32,29 +42,16 @@ export default function CreatePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    setExtraCharacters(prev => {
+    setExtraPhotos(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], file, url: URL.createObjectURL(file) };
+      updated[index] = { file, url: URL.createObjectURL(file) };
       return updated;
     });
   };
 
-  const addCharacterSlot = () => {
-    if (extraCharacters.length < 7) {
-      setExtraCharacters(prev => [...prev, { file: null, url: null, role: "朋友" }]);
-    }
-  };
-
-  const removeCharacterSlot = (index: number) => {
-    setExtraCharacters(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const updateCharacterRole = (index: number, role: string) => {
-    setExtraCharacters(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], role };
-      return updated;
-    });
+  const handleKeywordClick = (keyword: typeof STORY_KEYWORDS[0]) => {
+    setStory(keyword.story);
+    setShowModal(false);
   };
 
   const handleGenerate = async () => {
@@ -75,9 +72,9 @@ export default function CreatePage() {
       
       // Add extra character photos
       let castIndex = 0;
-      for (const char of extraCharacters) {
-        if (char.file) {
-          form.append(`cast_${castIndex}`, char.file);
+      for (const photo of extraPhotos) {
+        if (photo.file) {
+          form.append(`cast_${castIndex}`, photo.file);
           castIndex++;
         }
       }
@@ -98,6 +95,8 @@ export default function CreatePage() {
       setLoading(false);
     }
   };
+
+  const uploadedCount = extraPhotos.filter(p => p.file).length;
 
   return (
     <div style={{ 
@@ -165,7 +164,7 @@ export default function CreatePage() {
           )}
         </div>
 
-        {/* Add Characters Button */}
+        {/* Add More Button */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <button
             onClick={() => setShowModal(true)}
@@ -194,9 +193,9 @@ export default function CreatePage() {
           >
             +
           </button>
-          {extraCharacters.length > 0 && (
+          {uploadedCount > 0 && (
             <p style={{ color: '#888', fontSize: '0.8rem', marginTop: '8px' }}>
-              {extraCharacters.length} character{extraCharacters.length > 1 ? 's' : ''} added
+              {uploadedCount} more added
             </p>
           )}
         </div>
@@ -264,7 +263,7 @@ export default function CreatePage() {
         </p>
       </div>
 
-      {/* Modal for Extra Characters */}
+      {/* Modal */}
       {showModal && (
         <div 
           style={{
@@ -288,7 +287,7 @@ export default function CreatePage() {
               border: '1px solid #333',
               borderRadius: '20px',
               padding: '32px',
-              maxWidth: '600px',
+              maxWidth: '500px',
               width: '100%',
               maxHeight: '80vh',
               overflowY: 'auto'
@@ -296,7 +295,7 @@ export default function CreatePage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ color: '#D4A853', fontSize: '1.5rem', margin: 0 }}>Add Characters</h2>
+              <h2 style={{ color: '#D4A853', fontSize: '1.3rem', margin: 0 }}>Add More</h2>
               <button
                 onClick={() => setShowModal(false)}
                 style={{
@@ -310,35 +309,15 @@ export default function CreatePage() {
               >✕</button>
             </div>
 
-            {/* Character Slots */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {extraCharacters.map((char, index) => (
-                <div key={index} style={{
-                  background: '#111',
-                  border: '1px solid #333',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  display: 'flex',
-                  gap: '16px',
-                  alignItems: 'center'
-                }}>
-                  {/* Number Badge */}
-                  <div style={{
-                    background: '#D4A853',
-                    color: '#000',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    flexShrink: 0
-                  }}>
-                    {index + 1}
-                  </div>
-
-                  {/* Photo Upload Circle */}
+            {/* Photo Upload Circles */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gap: '16px', 
+              marginBottom: '32px' 
+            }}>
+              {extraPhotos.map((photo, index) => (
+                <div key={index}>
                   <input
                     ref={el => { extraPhotoRefs.current[index] = el }}
                     type="file"
@@ -351,98 +330,77 @@ export default function CreatePage() {
                     onClick={() => extraPhotoRefs.current[index]?.click()}
                     style={{
                       cursor: 'pointer',
-                      width: '70px',
-                      height: '70px',
+                      width: '100%',
+                      aspectRatio: '1',
                       borderRadius: '50%',
-                      background: char.url ? 'transparent' : '#1a1a1a',
-                      border: char.url ? '2px solid #555' : '2px dashed #333',
+                      background: photo.url ? 'transparent' : '#1a1a1a',
+                      border: photo.url ? '2px solid #555' : '2px dashed #333',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       overflow: 'hidden',
-                      flexShrink: 0
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!photo.url) {
+                        e.currentTarget.style.borderColor = '#D4A853';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!photo.url) {
+                        e.currentTarget.style.borderColor = '#333';
+                      }
                     }}
                   >
-                    {char.url ? (
-                      <img src={char.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={`Character ${index + 1}`} />
+                    {photo.url ? (
+                      <img 
+                        src={photo.url} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        alt={`Character ${index + 1}`} 
+                      />
                     ) : (
-                      <span style={{ fontSize: '1.5rem', color: '#555' }}>📷</span>
+                      <span style={{ fontSize: '2rem', color: '#555' }}>+</span>
                     )}
                   </div>
-
-                  {/* Role Selection */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {ROLES.map(role => (
-                        <button
-                          key={role}
-                          onClick={() => updateCharacterRole(index, role)}
-                          style={{
-                            background: char.role === role ? '#D4A853' : '#1a1a1a',
-                            color: char.role === role ? '#000' : '#888',
-                            border: char.role === role ? 'none' : '1px solid #333',
-                            borderRadius: '8px',
-                            padding: '6px 12px',
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            fontWeight: char.role === role ? 600 : 400,
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {role}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Remove Button */}
-                  <button
-                    onClick={() => removeCharacterSlot(index)}
-                    style={{
-                      background: '#1a1a1a',
-                      border: '1px solid #333',
-                      borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
-                      color: '#888',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      flexShrink: 0
-                    }}
-                  >✕</button>
                 </div>
               ))}
             </div>
 
-            {/* Add Character Button */}
-            {extraCharacters.length < 7 && (
-              <button
-                onClick={addCharacterSlot}
-                style={{
-                  width: '100%',
-                  background: '#1a1a1a',
-                  border: '2px dashed #333',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  color: '#888',
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                  fontWeight: 600,
-                  marginTop: '20px',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#D4A853';
-                  e.currentTarget.style.color = '#D4A853';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#333';
-                  e.currentTarget.style.color = '#888';
-                }}
-              >
-                + Add Character ({extraCharacters.length}/7)
-              </button>
-            )}
+            {/* Story Keyword Chips */}
+            <div style={{ marginBottom: '24px' }}>
+              <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '12px' }}>
+                Quick story ideas:
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {STORY_KEYWORDS.map(keyword => (
+                  <button
+                    key={keyword.label}
+                    onClick={() => handleKeywordClick(keyword)}
+                    style={{
+                      background: '#1a1a1a',
+                      color: '#D4A853',
+                      border: '1px solid #333',
+                      borderRadius: '10px',
+                      padding: '8px 16px',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#D4A853';
+                      e.currentTarget.style.color = '#000';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#1a1a1a';
+                      e.currentTarget.style.color = '#D4A853';
+                    }}
+                  >
+                    {keyword.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Done Button */}
             <button
@@ -456,8 +414,7 @@ export default function CreatePage() {
                 padding: '16px',
                 fontSize: '1rem',
                 fontWeight: 700,
-                cursor: 'pointer',
-                marginTop: '20px'
+                cursor: 'pointer'
               }}
             >
               Done
