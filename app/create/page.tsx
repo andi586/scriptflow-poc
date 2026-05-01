@@ -42,12 +42,22 @@ export default function CreatePage() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (session?.user?.id) {
+        // Real user session
         setUserId(session.user.id);
         console.log('[create/page] userId from session:', session.user.id);
       } else {
-        console.warn('[create/page] No session found - user needs to login');
-        setUserId(null);
+        // Anonymous user - generate or retrieve guest ID
+        let guestId = localStorage.getItem('guestId');
+        if (!guestId) {
+          guestId = crypto.randomUUID();
+          localStorage.setItem('guestId', guestId);
+          console.log('[create/page] generated new guestId:', guestId);
+        } else {
+          console.log('[create/page] using existing guestId:', guestId);
+        }
+        setUserId(guestId);
       }
     };
     getUser();
@@ -79,11 +89,6 @@ export default function CreatePage() {
   const handleGenerate = async () => {
     if (!mainPhoto.file) {
       setError("Please upload your photo");
-      return;
-    }
-    
-    if (!userId) {
-      setError("Please login to create a movie");
       return;
     }
     
