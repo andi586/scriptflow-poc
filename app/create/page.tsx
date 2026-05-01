@@ -1,6 +1,12 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface CharacterPhoto {
   file: File | null;
@@ -28,9 +34,23 @@ export default function CreatePage() {
   const [selectedKeyword, setSelectedKeyword] = useState("Affair");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const mainPhotoRef = useRef<HTMLInputElement>(null);
   const extraPhotoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+      } else {
+        // Create guest session or use fallback
+        setUserId("2877b339-1f39-4871-92f4-e638d63b5d09");
+      }
+    };
+    getUser();
+  }, []);
 
   const handleMainPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,7 +111,7 @@ export default function CreatePage() {
       const body = {
         story: story,
         tier: "30s",
-        userId: "2877b339-1f39-4871-92f4-e638d63b5d09",
+        userId: userId || "2877b339-1f39-4871-92f4-e638d63b5d09",
         ...(additionalImages.length > 0 && { additional_images: additionalImages })
       };
       
