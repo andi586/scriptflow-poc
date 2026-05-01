@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
 
     console.log('[movie/generate] twin found:', twin.id)
     console.log('[movie/generate] twin photo:', twin?.frame_url_front)
+    console.log('[movie/generate] additional_images received:', additional_images?.length || 0)
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Step 2: Check for DirectorIntent template match
@@ -267,6 +268,15 @@ export async function POST(req: NextRequest) {
     console.log('[movie/generate] movie created:', movie.id)
 
     // Step 4: Call Kling 3.0 Omni - ONE API call with native audio
+    // Prepare images array with 7-image limit for Kling API
+    const allImages = additional_images && additional_images.length > 0
+      ? [twin.frame_url_front ?? twin.frame_url_mid, ...additional_images]
+      : [twin.frame_url_front ?? twin.frame_url_mid]
+    
+    // Kling API supports maximum 7 images
+    const klingImages = allImages.slice(0, 7)
+    console.log('[movie/generate] sending', klingImages.length, 'images to Kling API')
+    
     const klingBody = {
       model: 'kling',
       task_type: 'omni_video_generation',
@@ -275,9 +285,7 @@ export async function POST(req: NextRequest) {
         resolution: '720p',
         aspect_ratio: '9:16',
         enable_audio: true,
-        images: additional_images && additional_images.length > 0
-          ? [twin.frame_url_front ?? twin.frame_url_mid, ...additional_images]
-          : [twin.frame_url_front ?? twin.frame_url_mid],
+        images: klingImages,
         multi_shots: multiShots
       },
       config: {
