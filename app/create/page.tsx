@@ -44,9 +44,10 @@ export default function CreatePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.id) {
         setUserId(session.user.id);
+        console.log('[create/page] userId from session:', session.user.id);
       } else {
-        // Create guest session or use fallback
-        setUserId("2877b339-1f39-4871-92f4-e638d63b5d09");
+        console.warn('[create/page] No session found - user needs to login');
+        setUserId(null);
       }
     };
     getUser();
@@ -80,6 +81,12 @@ export default function CreatePage() {
       setError("Please upload your photo");
       return;
     }
+    
+    if (!userId) {
+      setError("Please login to create a movie");
+      return;
+    }
+    
     if (loading) return;
     
     setLoading(true);
@@ -113,7 +120,7 @@ export default function CreatePage() {
       const body = {
         story: story,
         tier: "30s",
-        userId: userId || "2877b339-1f39-4871-92f4-e638d63b5d09",
+        userId: userId,
         ...(additionalImages.length > 0 && { additional_images: additionalImages })
       };
       
