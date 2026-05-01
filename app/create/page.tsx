@@ -272,29 +272,10 @@ export default function CreatePage() {
           {/* Textarea */}
           <textarea
             value={story}
-            onChange={(e) => {
-              setStory(e.target.value);
-              setSelectedKeyword('');
-            }}
+            onChange={(e) => setStory(e.target.value)}
             rows={4}
-            disabled={false}
-            readOnly={false}
-            style={{ 
-              width: '100%', 
-              background: '#111', 
-              border: '1px solid #333', 
-              borderRadius: '0 0 16px 16px',
-              color: 'white', 
-              padding: '14px', 
-              fontSize: '0.9rem', 
-              resize: 'none', 
-              outline: 'none', 
-              boxSizing: 'border-box',
-              borderTop: 'none',
-              pointerEvents: 'auto',
-              userSelect: 'text',
-              WebkitUserSelect: 'text'
-            }}
+            className="w-full p-3 bg-neutral-900 border border-neutral-700 rounded-b-2xl text-white text-sm resize-none focus:outline-none focus:border-yellow-400"
+            style={{ borderTop: 'none' }}
           />
         </div>
 
