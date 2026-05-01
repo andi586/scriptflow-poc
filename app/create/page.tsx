@@ -211,55 +211,61 @@ export default function CreatePage() {
             ② Choose a story or write your own
           </p>
           
-          {/* Keyword Chips */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' }}>
-            {STORY_KEYWORDS.map((keyword) => (
-              <button
-                key={keyword.label}
-                type="button"
-                onClick={() => { setStory(keyword.story); setSelectedKeyword(keyword.label); }}
-                style={{
-                  background: selectedKeyword === keyword.label ? '#D4A853' : '#1a1a1a',
-                  color: selectedKeyword === keyword.label ? '#000' : '#fff',
-                  border: '1px solid #333',
-                  borderRadius: '8px',
-                  padding: '8px 4px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                }}
-              >
-                {keyword.label}
-              </button>
-            ))}
+          {/* Unified Story Box */}
+          <div style={{
+            background: '#111',
+            border: '1px solid #333',
+            borderRadius: '16px',
+            padding: '12px',
+          }}>
+            {/* Keyword Chips */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' }}>
+              {STORY_KEYWORDS.map((keyword) => (
+                <button
+                  key={keyword.label}
+                  type="button"
+                  onClick={() => { setStory(keyword.story); setSelectedKeyword(keyword.label); }}
+                  style={{
+                    background: selectedKeyword === keyword.label ? '#D4A853' : '#1a1a1a',
+                    color: selectedKeyword === keyword.label ? '#000' : '#fff',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '8px 4px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  {keyword.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Hint Text */}
+            <p style={{ color: '#666', fontSize: '0.75rem', fontStyle: 'italic', marginBottom: '8px', marginTop: 0 }}>
+              Or describe your own story here...
+            </p>
+
+            {/* Textarea */}
+            <textarea
+              value={story}
+              onChange={(e) => setStory(e.target.value)}
+              rows={4}
+              style={{
+                width: '100%',
+                padding: '8px',
+                background: 'transparent',
+                border: 'none',
+                color: 'white',
+                fontSize: '0.875rem',
+                resize: 'none',
+                outline: 'none',
+                boxSizing: 'border-box',
+                fontFamily: 'system-ui',
+                cursor: 'text',
+              }}
+            />
           </div>
-
-          <p style={{ color: '#666', fontSize: '0.75rem', fontStyle: 'italic', marginBottom: '8px' }}>
-            Or describe your own story here...
-          </p>
-
-          <textarea
-            value={story}
-            onChange={(e) => setStory(e.target.value)}
-            rows={4}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: '#111',
-              border: '1px solid #333',
-              borderRadius: '12px',
-              color: 'white',
-              fontSize: '0.875rem',
-              resize: 'none',
-              outline: 'none',
-              boxSizing: 'border-box',
-              fontFamily: 'system-ui',
-              cursor: 'text',
-              pointerEvents: 'auto',
-              position: 'relative',
-              zIndex: 1,
-            }}
-          />
         </div>
 
         {/* Error */}
