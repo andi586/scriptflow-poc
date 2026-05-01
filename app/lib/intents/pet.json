@@ -2,21 +2,11 @@
   "intent": "pet",
   "keywords": ["pet", "dog", "cat", "puppy", "kitten", "animal", "saved me", "rescued"],
   "archetype": "pet_daily",
-  "emotionCurve": [2, 3, 4, 6, 8, 9, 10],
+  "emotionCurve": [3, 6, 9, 10],
   "shots": [
     {
       "shotNumber": 1,
-      "duration": 5,
-      "shotType": "scene",
-      "type": "wide",
-      "cameraMovement": "static",
-      "description": "Normal day with @image_2 pet, peaceful domestic scene",
-      "emotion": "calm",
-      "emotionIntensity": 2
-    },
-    {
-      "shotNumber": 2,
-      "duration": 6,
+      "duration": 3,
       "shotType": "scene",
       "type": "medium",
       "cameraMovement": "slow-push-in",
@@ -25,54 +15,33 @@
       "emotionIntensity": 3
     },
     {
-      "shotNumber": 3,
-      "duration": 6,
+      "shotNumber": 2,
+      "duration": 4,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 owner confused, not understanding pet's behavior",
       "dialogue": "你怎么了？",
       "emotion": "confusion",
-      "emotionIntensity": 4
-    },
-    {
-      "shotNumber": 4,
-      "duration": 7,
-      "shotType": "scene",
-      "type": "medium",
-      "cameraMovement": "handheld",
-      "description": "Danger approaching unseen - gas leak, fire, intruder shadow",
-      "emotion": "tension",
       "emotionIntensity": 6
     },
     {
-      "shotNumber": 5,
-      "duration": 7,
+      "shotNumber": 3,
+      "duration": 4,
       "shotType": "scene",
       "type": "wide",
       "cameraMovement": "handheld",
-      "description": "@image_2 pet takes action - barking, pulling, alerting owner",
+      "description": "@image_2 pet takes action - barking, pulling, alerting owner to danger",
       "emotion": "urgency",
-      "emotionIntensity": 8
-    },
-    {
-      "shotNumber": 6,
-      "duration": 8,
-      "shotType": "face",
-      "type": "close-up",
-      "cameraMovement": "handheld",
-      "description": "@image_1 sudden realization of danger, eyes wide with shock",
-      "dialogue": "天啊！",
-      "emotion": "shock",
       "emotionIntensity": 9
     },
     {
-      "shotNumber": 7,
-      "duration": 11,
-      "shotType": "scene",
-      "type": "wide",
+      "shotNumber": 4,
+      "duration": 4,
+      "shotType": "face",
+      "type": "close-up",
       "cameraMovement": "static",
-      "description": "@image_1 and @image_2 together safe, owner hugging pet with tears",
+      "description": "@image_1 sudden realization, hugging pet with tears of gratitude",
       "dialogue": "你救了我...",
       "emotion": "gratitude",
       "emotionIntensity": 10

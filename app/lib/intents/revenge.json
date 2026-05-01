@@ -2,32 +2,22 @@
   "intent": "revenge",
   "keywords": ["revenge", "payback", "get back", "retaliate", "vengeance", "karma", "justice"],
   "archetype": "comeback_story",
-  "emotionCurve": [2, 3, 5, 7, 8, 10],
+  "emotionCurve": [3, 5, 8, 10],
   "shots": [
     {
       "shotNumber": 1,
-      "duration": 4,
+      "duration": 3,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 remembering the hurt, cold determination in eyes",
       "dialogue": "你以为我会忘记。",
       "emotion": "determination",
-      "emotionIntensity": 2
-    },
-    {
-      "shotNumber": 2,
-      "duration": 5,
-      "shotType": "scene",
-      "type": "medium",
-      "cameraMovement": "slow-push-in",
-      "description": "Flashback visual - the moment of betrayal or hurt",
-      "emotion": "pain",
       "emotionIntensity": 3
     },
     {
-      "shotNumber": 3,
-      "duration": 5,
+      "shotNumber": 2,
+      "duration": 4,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "static",
@@ -37,18 +27,8 @@
       "emotionIntensity": 5
     },
     {
-      "shotNumber": 4,
-      "duration": 5,
-      "shotType": "scene",
-      "type": "wide",
-      "cameraMovement": "tracking",
-      "description": "Executing the plan - confrontation or reveal moment",
-      "emotion": "action",
-      "emotionIntensity": 7
-    },
-    {
-      "shotNumber": 5,
-      "duration": 5,
+      "shotNumber": 3,
+      "duration": 4,
       "shotType": "face",
       "type": "medium",
       "cameraMovement": "slow-push-in",
@@ -58,8 +38,8 @@
       "emotionIntensity": 8
     },
     {
-      "shotNumber": 6,
-      "duration": 6,
+      "shotNumber": 4,
+      "duration": 4,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "static",

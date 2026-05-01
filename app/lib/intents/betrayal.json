@@ -2,42 +2,21 @@
   "intent": "betrayal",
   "keywords": ["betrayal", "betray", "trust", "lie", "lied", "backstab", "deceive", "cheat"],
   "archetype": "betrayal",
-  "emotionCurve": [2, 3, 5, 7, 8, 10],
+  "emotionCurve": [3, 7, 9, 10],
   "shots": [
     {
       "shotNumber": 1,
-      "duration": 4,
+      "duration": 3,
       "shotType": "scene",
       "type": "wide",
       "cameraMovement": "slow-push-in",
       "description": "Two people together, warm lighting, trust visible in body language",
       "emotion": "trust",
-      "emotionIntensity": 2
-    },
-    {
-      "shotNumber": 2,
-      "duration": 5,
-      "shotType": "face",
-      "type": "close-up",
-      "cameraMovement": "static",
-      "description": "@image_1 genuine smile, feeling safe and connected",
-      "dialogue": "我信任你。",
-      "emotion": "warmth",
       "emotionIntensity": 3
     },
     {
-      "shotNumber": 3,
-      "duration": 5,
-      "shotType": "scene",
-      "type": "medium",
-      "cameraMovement": "slow-push-in",
-      "description": "Suspicious detail noticed - phone screen, message, or object that reveals truth",
-      "emotion": "suspicion",
-      "emotionIntensity": 5
-    },
-    {
-      "shotNumber": 4,
-      "duration": 5,
+      "shotNumber": 2,
+      "duration": 4,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "static",
@@ -47,19 +26,19 @@
       "emotionIntensity": 7
     },
     {
-      "shotNumber": 5,
-      "duration": 5,
+      "shotNumber": 3,
+      "duration": 4,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "handheld",
       "description": "@image_1 confrontation begins, voice trembling with anger",
       "dialogue": "你早就知道了...对吗？",
       "emotion": "anger",
-      "emotionIntensity": 8
+      "emotionIntensity": 9
     },
     {
-      "shotNumber": 6,
-      "duration": 6,
+      "shotNumber": 4,
+      "duration": 4,
       "shotType": "face",
       "type": "extreme-close-up",
       "cameraMovement": "static",

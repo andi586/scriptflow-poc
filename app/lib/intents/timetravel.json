@@ -2,21 +2,11 @@
   "intent": "timetravel",
   "keywords": ["time travel", "past", "future", "went back", "if I could go back", "rewind", "do over"],
   "archetype": "self_discovery",
-  "emotionCurve": [2, 4, 5, 7, 8, 9, 10],
+  "emotionCurve": [4, 7, 9, 10],
   "shots": [
     {
       "shotNumber": 1,
-      "duration": 5,
-      "shotType": "scene",
-      "type": "wide",
-      "cameraMovement": "static",
-      "description": "Present day, normal environment, something triggers memory",
-      "emotion": "nostalgia",
-      "emotionIntensity": 2
-    },
-    {
-      "shotNumber": 2,
-      "duration": 6,
+      "duration": 3,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "slow-push-in",
@@ -26,54 +16,34 @@
       "emotionIntensity": 4
     },
     {
-      "shotNumber": 3,
-      "duration": 7,
+      "shotNumber": 2,
+      "duration": 4,
       "shotType": "scene",
       "type": "medium",
       "cameraMovement": "dreamy-drift",
       "description": "Flashback scene - the moment they wish they could change",
       "emotion": "regret",
-      "emotionIntensity": 5
+      "emotionIntensity": 7
     },
     {
-      "shotNumber": 4,
-      "duration": 7,
+      "shotNumber": 3,
+      "duration": 4,
       "shotType": "face",
       "type": "close-up",
       "cameraMovement": "static",
       "description": "@image_1 reliving the pain, tears forming, what they should have said",
       "dialogue": "我会告诉你...",
       "emotion": "sorrow",
-      "emotionIntensity": 7
-    },
-    {
-      "shotNumber": 5,
-      "duration": 8,
-      "shotType": "scene",
-      "type": "wide",
-      "cameraMovement": "slow-pull-back",
-      "description": "Alternate reality visualization - how things could have been",
-      "emotion": "hope",
-      "emotionIntensity": 8
-    },
-    {
-      "shotNumber": 6,
-      "duration": 8,
-      "shotType": "face",
-      "type": "close-up",
-      "cameraMovement": "static",
-      "description": "@image_1 eyes opening, back to present, tears streaming",
-      "dialogue": "但我做不到。",
-      "emotion": "acceptance",
       "emotionIntensity": 9
     },
     {
-      "shotNumber": 7,
-      "duration": 9,
-      "shotType": "scene",
-      "type": "wide",
+      "shotNumber": 4,
+      "duration": 4,
+      "shotType": "face",
+      "type": "close-up",
       "cameraMovement": "static",
-      "description": "Present day, alone with memories, bittersweet peace",
+      "description": "@image_1 eyes opening, back to present, tears streaming, acceptance",
+      "dialogue": "但我做不到。",
       "emotion": "bittersweet",
       "emotionIntensity": 10
     }
