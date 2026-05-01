@@ -25,6 +25,7 @@ export default function CreatePage() {
   );
   const [showModal, setShowModal] = useState(false);
   const [story, setStory] = useState("I caught my partner cheating on me at 3AM and everything changed...");
+  const [selectedKeyword, setSelectedKeyword] = useState("Affair");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mainPhotoRef = useRef<HTMLInputElement>(null);
@@ -51,6 +52,7 @@ export default function CreatePage() {
 
   const handleKeywordClick = (keyword: typeof STORY_KEYWORDS[0]) => {
     setStory(keyword.story);
+    setSelectedKeyword(keyword.label);
   };
 
   const handleGenerate = async () => {
@@ -106,14 +108,14 @@ export default function CreatePage() {
       flexDirection: 'column', 
       alignItems: 'center', 
       justifyContent: 'center',
-      padding: '40px 20px', 
+      padding: '20px', 
       fontFamily: 'system-ui',
       position: 'relative'
     }}>
-      <div style={{ maxWidth: '600px', width: '100%' }}>
+      <div style={{ maxWidth: '600px', width: '100%', padding: '0 16px' }}>
         
         {/* Main Photo - Big Circle */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <input
             ref={mainPhotoRef}
             type="file"
@@ -126,8 +128,8 @@ export default function CreatePage() {
             onClick={() => mainPhotoRef.current?.click()}
             style={{
               cursor: 'pointer',
-              width: '180px',
-              height: '180px',
+              width: '120px',
+              height: '120px',
               borderRadius: '50%',
               background: mainPhoto.url ? 'transparent' : '#111',
               border: mainPhoto.url ? '4px solid #D4A853' : '4px dashed #D4A853',
@@ -139,6 +141,7 @@ export default function CreatePage() {
               overflow: 'hidden',
               transition: 'all 0.2s'
             }}
+            className="md:w-32 md:h-32"
           >
             {mainPhoto.url ? (
               <img 
@@ -148,8 +151,8 @@ export default function CreatePage() {
               />
             ) : (
               <>
-                <div style={{ fontSize: '4rem', marginBottom: '8px' }}>📷</div>
-                <p style={{ color: '#D4A853', fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>
+                <div style={{ fontSize: '3rem', marginBottom: '4px' }}>📷</div>
+                <p style={{ color: '#D4A853', fontSize: '0.8rem', fontWeight: 600, margin: 0 }}>
                   You
                 </p>
               </>
@@ -157,25 +160,25 @@ export default function CreatePage() {
           </div>
           
           {mainPhoto.url && (
-            <p style={{ color: '#4ade80', fontSize: '0.85rem', marginTop: '12px' }}>
+            <p style={{ color: '#4ade80', fontSize: '0.75rem', marginTop: '8px' }}>
               ✓ Uploaded - Click to change
             </p>
           )}
         </div>
 
         {/* Add More Button */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <button
             onClick={() => setShowModal(true)}
             style={{
               background: '#1a1a1a',
               border: '2px dashed #333',
               borderRadius: '50%',
-              width: '60px',
-              height: '60px',
+              width: '50px',
+              height: '50px',
               color: '#888',
               cursor: 'pointer',
-              fontSize: '2rem',
+              fontSize: '1.5rem',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -193,63 +196,76 @@ export default function CreatePage() {
             +
           </button>
           {uploadedCount > 0 && (
-            <p style={{ color: '#888', fontSize: '0.8rem', marginTop: '8px' }}>
+            <p style={{ color: '#888', fontSize: '0.75rem', marginTop: '6px' }}>
               {uploadedCount} more added
             </p>
           )}
         </div>
 
-        {/* Keyword Chips */}
+        {/* Story Input with Keyword Chips */}
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-            {STORY_KEYWORDS.map(keyword => (
-              <button
-                key={keyword.label}
-                onClick={() => handleKeywordClick(keyword)}
-                style={{
-                  background: '#1a1a1a',
-                  color: '#D4A853',
-                  border: '1px solid #333',
-                  borderRadius: '10px',
-                  padding: '8px 16px',
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#D4A853';
-                  e.currentTarget.style.color = '#000';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#1a1a1a';
-                  e.currentTarget.style.color = '#D4A853';
-                }}
-              >
-                {keyword.label}
-              </button>
-            ))}
+          {/* Keyword Chips */}
+          <div style={{ 
+            background: '#111', 
+            border: '1px solid #333', 
+            borderRadius: '16px 16px 0 0',
+            padding: '12px',
+            borderBottom: 'none'
+          }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {STORY_KEYWORDS.map(keyword => (
+                <button
+                  key={keyword.label}
+                  onClick={() => handleKeywordClick(keyword)}
+                  style={{
+                    background: selectedKeyword === keyword.label ? '#D4A853' : '#1a1a1a',
+                    color: selectedKeyword === keyword.label ? '#000' : '#888',
+                    border: selectedKeyword === keyword.label ? 'none' : '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    fontWeight: selectedKeyword === keyword.label ? 700 : 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedKeyword !== keyword.label) {
+                      e.currentTarget.style.background = '#2a2a2a';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedKeyword !== keyword.label) {
+                      e.currentTarget.style.background = '#1a1a1a';
+                    }
+                  }}
+                >
+                  {keyword.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Story Input */}
-        <div style={{ marginBottom: '32px' }}>
+          
+          {/* Textarea */}
           <textarea
             value={story}
-            onChange={(e) => setStory(e.target.value)}
+            onChange={(e) => {
+              setStory(e.target.value);
+              setSelectedKeyword('');
+            }}
             rows={4}
-            placeholder="Your story..."
+            placeholder="Or type your own story here..."
             style={{ 
               width: '100%', 
               background: '#111', 
               border: '1px solid #333', 
-              borderRadius: '16px', 
+              borderRadius: '0 0 16px 16px',
               color: 'white', 
-              padding: '18px', 
-              fontSize: '1rem', 
+              padding: '14px', 
+              fontSize: '0.9rem', 
               resize: 'none', 
               outline: 'none', 
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              borderTop: 'none'
             }}
           />
         </div>
@@ -260,10 +276,10 @@ export default function CreatePage() {
             background: '#1a0a0a',
             border: '1px solid #ff4444',
             borderRadius: '12px',
-            padding: '14px',
+            padding: '12px',
             color: '#ff4444',
-            fontSize: '0.9rem',
-            marginBottom: '24px',
+            fontSize: '0.85rem',
+            marginBottom: '20px',
             textAlign: 'center'
           }}>
             {error}
@@ -280,17 +296,18 @@ export default function CreatePage() {
             color: loading || !mainPhoto.file ? '#666' : '#000',
             border: 'none',
             borderRadius: '16px',
-            padding: '22px',
-            fontSize: '1.3rem',
+            padding: '18px',
+            fontSize: '1.1rem',
             fontWeight: 700,
             cursor: loading || !mainPhoto.file ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s'
+            transition: 'all 0.2s',
+            opacity: loading || !mainPhoto.file ? 0.5 : 1
           }}
         >
           {loading ? '✨ Creating...' : '🎬 Create My Movie'}
         </button>
 
-        <p style={{ textAlign: 'center', color: '#555', fontSize: '0.8rem', marginTop: '16px' }}>
+        <p style={{ textAlign: 'center', color: '#555', fontSize: '0.75rem', marginTop: '12px' }}>
           ⚡ Ready in 60 seconds
         </p>
       </div>
@@ -318,7 +335,7 @@ export default function CreatePage() {
               background: '#0a0a0a',
               border: '1px solid #333',
               borderRadius: '20px',
-              padding: '32px',
+              padding: '24px',
               maxWidth: '500px',
               width: '100%',
               maxHeight: '80vh',
@@ -326,8 +343,8 @@ export default function CreatePage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ color: '#D4A853', fontSize: '1.3rem', margin: 0 }}>Add More</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h2 style={{ color: '#D4A853', fontSize: '1.2rem', margin: 0 }}>Add More</h2>
               <button
                 onClick={() => setShowModal(false)}
                 style={{
@@ -340,13 +357,18 @@ export default function CreatePage() {
                 }}
               >✕</button>
             </div>
+            
+            {/* Hint Text */}
+            <p style={{ color: '#666', fontSize: '0.8rem', marginBottom: '20px', marginTop: '4px' }}>
+              Add up to 6 photos of characters or scenes
+            </p>
 
             {/* Photo Upload Circles */}
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: '16px', 
-              marginBottom: '24px' 
+              gap: '12px', 
+              marginBottom: '20px' 
             }}>
               {extraPhotos.map((photo, index) => (
                 <div key={index}>
@@ -391,7 +413,7 @@ export default function CreatePage() {
                         alt={`Character ${index + 1}`} 
                       />
                     ) : (
-                      <span style={{ fontSize: '2rem', color: '#555' }}>+</span>
+                      <span style={{ fontSize: '1.8rem', color: '#555' }}>+</span>
                     )}
                   </div>
                 </div>
@@ -407,7 +429,7 @@ export default function CreatePage() {
                 color: '#000',
                 border: 'none',
                 borderRadius: '12px',
-                padding: '16px',
+                padding: '14px',
                 fontSize: '1rem',
                 fontWeight: 700,
                 cursor: 'pointer'
