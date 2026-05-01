@@ -218,7 +218,11 @@ export default function CreatePage() {
             padding: '12px',
             borderBottom: 'none'
           }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(4, 1fr)', 
+              gap: '6px' 
+            }}>
               {STORY_KEYWORDS.map(keyword => (
                 <button
                   key={keyword.label}
@@ -228,11 +232,15 @@ export default function CreatePage() {
                     color: selectedKeyword === keyword.label ? '#000' : '#888',
                     border: selectedKeyword === keyword.label ? 'none' : '1px solid #333',
                     borderRadius: '8px',
-                    padding: '6px 12px',
-                    fontSize: '0.75rem',
+                    padding: '6px 4px',
+                    fontSize: '0.7rem',
                     cursor: 'pointer',
                     fontWeight: selectedKeyword === keyword.label ? 700 : 500,
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
                   }}
                   onMouseEnter={(e) => {
                     if (selectedKeyword !== keyword.label) {
@@ -252,6 +260,13 @@ export default function CreatePage() {
           </div>
           
           {/* Textarea */}
+          <style>{`
+            textarea::placeholder {
+              color: #666;
+              font-size: 0.85rem;
+              font-style: italic;
+            }
+          `}</style>
           <textarea
             value={story}
             onChange={(e) => {
