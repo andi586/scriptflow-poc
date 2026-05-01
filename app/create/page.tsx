@@ -103,6 +103,40 @@ export default function CreatePage() {
       fontFamily: 'system-ui',
       position: 'relative'
     }}>
+      {/* My Videos Button - Top Right */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '20px', 
+        right: '20px',
+        zIndex: 10
+      }}>
+        <a 
+          href="/my-videos" 
+          style={{ 
+            color: '#888', 
+            fontSize: '0.85rem', 
+            textDecoration: 'none', 
+            padding: '8px 16px', 
+            border: '1px solid #333', 
+            borderRadius: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#D4A853';
+            e.currentTarget.style.color = '#D4A853';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#333';
+            e.currentTarget.style.color = '#888';
+          }}
+        >
+          📁 My Videos
+        </a>
+      </div>
+
       <div style={{ maxWidth: '600px', width: '100%', padding: '0 16px' }}>
         
         {/* Main Photo - Big Circle */}
