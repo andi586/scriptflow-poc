@@ -50,18 +50,33 @@ export async function POST(req: NextRequest) {
     // Step 1: Get digital twin photo (query by id, since frontend passes twinId as userId)
     console.log('[movie/generate] userId received:', userId)
     console.log('[movie/generate] looking for twin id:', userId)
-    const { data: twin } = await supabase
+    let { data: twin } = await supabase
       .from('digital_twins')
       .select('id, frame_url_mid, frame_url_front')
       .eq('id', userId)
       .single()
 
     if (!twin) {
-      return NextResponse.json({ error: 'Digital twin not found. Please create your digital twin first.' }, { status: 400 })
+      // Guest user without digital twin - use uploaded photo directly
+      console.log('[movie/generate] No twin found, checking for guest photo upload')
+      const guestPhotoUrl = additional_images?.[0] || null
+      
+      if (!guestPhotoUrl) {
+        return NextResponse.json({ error: 'Please upload your photo' }, { status: 400 })
+      }
+      
+      // Create temporary twin object for guest user
+      twin = { 
+        id: userId,
+        frame_url_front: guestPhotoUrl,
+        frame_url_mid: guestPhotoUrl
+      }
+      console.log('[movie/generate] Using guest photo as main character:', guestPhotoUrl)
+    } else {
+      console.log('[movie/generate] twin found:', twin.id)
+      console.log('[movie/generate] twin photo:', twin?.frame_url_front)
     }
-
-    console.log('[movie/generate] twin found:', twin.id)
-    console.log('[movie/generate] twin photo:', twin?.frame_url_front)
+    
     console.log('[movie/generate] additional_images received:', additional_images?.length || 0, additional_images)
 
     // ═══════════════════════════════════════════════════════════════════════════
