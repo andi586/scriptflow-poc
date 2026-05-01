@@ -257,15 +257,6 @@ export default function CreatePage() {
                 </button>
               ))}
             </div>
-            <p style={{ 
-              color: '#666', 
-              fontSize: '0.75rem', 
-              fontStyle: 'italic', 
-              marginTop: '10px',
-              marginBottom: 0 
-            }}>
-              Or describe your own story here...
-            </p>
           </div>
           
           {/* Textarea */}
@@ -290,6 +281,16 @@ export default function CreatePage() {
               borderTop: 'none'
             }}
           />
+          <p style={{ 
+            color: '#666', 
+            fontSize: '0.75rem', 
+            fontStyle: 'italic', 
+            marginTop: '8px',
+            marginBottom: 0,
+            textAlign: 'center'
+          }}>
+            Or describe your own story here...
+          </p>
         </div>
 
         {/* Error */}
