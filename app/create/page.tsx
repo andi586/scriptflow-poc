@@ -2,36 +2,47 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-const CATEGORIES = [
-  { id: "prank", label: "整蛊朋友", story: "My friends pranked me and it went completely viral..." },
-  { id: "pet", label: "宠物故事", story: "My dog left me a final message before passing away..." },
-  { id: "love", label: "感情剧情", story: "I caught my partner cheating on me at 3AM..." },
-];
+interface CharacterPhoto {
+  file: File | null;
+  url: string | null;
+}
 
 export default function CreatePage() {
-  const [showUpload, setShowUpload] = useState(false);
-  const [story, setStory] = useState("");
-  const [photo, setPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
+  const [mainPhoto, setMainPhoto] = useState<CharacterPhoto>({ file: null, url: null });
+  const [extraPhotos, setExtraPhotos] = useState<CharacterPhoto[]>([
+    { file: null, url: null },
+    { file: null, url: null },
+    { file: null, url: null },
+    { file: null, url: null },
+  ]);
+  const [story, setStory] = useState("I caught my partner cheating on me at 3AM and everything changed...");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
+  const mainPhotoRef = useRef<HTMLInputElement>(null);
+  const extraPhotoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
 
-  const handleCategoryClick = (category: typeof CATEGORIES[0]) => {
-    setStory(category.story);
-    setShowUpload(true);
-  };
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMainPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPhoto({ file, url: URL.createObjectURL(file) });
+    setMainPhoto({ file, url: URL.createObjectURL(file) });
     setError(null);
   };
 
+  const handleExtraPhotoChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setExtraPhotos(prev => {
+      const updated = [...prev];
+      updated[index] = { file, url: URL.createObjectURL(file) };
+      return updated;
+    });
+  };
+
   const handleGenerate = async () => {
-    if (!photo.file) {
-      setError("Please upload your photo first!");
+    if (!mainPhoto.file) {
+      setError("请上传您的照片 / Please upload your photo");
       return;
     }
     if (loading) return;
@@ -41,9 +52,18 @@ export default function CreatePage() {
     
     try {
       const form = new FormData();
-      form.append("photo", photo.file);
+      form.append("photo", mainPhoto.file);
       form.append("story", story);
       form.append("tier", "30s");
+      
+      // Add extra character photos
+      let castIndex = 0;
+      for (const photo of extraPhotos) {
+        if (photo.file) {
+          form.append(`cast_${castIndex}`, photo.file);
+          castIndex++;
+        }
+      }
       
       const res = await fetch("/api/create-movie", {
         method: "POST",
@@ -62,88 +82,6 @@ export default function CreatePage() {
     }
   };
 
-  if (!showUpload) {
-    // Landing view
-    return (
-      <div style={{ 
-        background: '#0a0a0a', 
-        minHeight: '100vh', 
-        color: 'white', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        padding: '20px', 
-        fontFamily: 'system-ui' 
-      }}>
-        <div style={{ textAlign: 'center', maxWidth: '500px', width: '100%' }}>
-          <h1 style={{ color: '#D4A853', fontSize: '2.5rem', marginBottom: '48px', fontWeight: 700 }}>
-            ScriptFlow
-          </h1>
-
-          {/* Big Primary Button */}
-          <button
-            onClick={() => setShowUpload(true)}
-            style={{
-              width: '100%',
-              background: '#D4A853',
-              color: '#000',
-              border: 'none',
-              borderRadius: '16px',
-              padding: '28px',
-              fontSize: '1.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              marginBottom: '20px',
-              transition: 'transform 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            🎬 Be the Star
-          </button>
-
-          {/* Small Category Buttons */}
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => handleCategoryClick(cat)}
-                style={{
-                  flex: 1,
-                  background: '#1a1a1a',
-                  color: '#D4A853',
-                  border: '1px solid #333',
-                  borderRadius: '10px',
-                  padding: '12px 8px',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#D4A853';
-                  e.currentTarget.style.color = '#000';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#1a1a1a';
-                  e.currentTarget.style.color = '#D4A853';
-                }}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          <p style={{ color: '#555', fontSize: '0.85rem', marginTop: '48px' }}>
-            ⚡ Ready in 60 seconds
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Upload flow
   return (
     <div style={{ 
       background: '#0a0a0a', 
@@ -152,102 +90,136 @@ export default function CreatePage() {
       display: 'flex', 
       flexDirection: 'column', 
       alignItems: 'center', 
-      padding: '48px 20px', 
+      justifyContent: 'center',
+      padding: '40px 20px', 
       fontFamily: 'system-ui' 
     }}>
-      <div style={{ maxWidth: '500px', width: '100%' }}>
-        {/* Back button */}
-        <button
-          onClick={() => setShowUpload(false)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#888',
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            marginBottom: '32px',
-            padding: 0
-          }}
-        >
-          ← Back
-        </button>
-
-        {/* Photo Upload */}
-        <div style={{ marginBottom: '32px' }}>
+      <div style={{ maxWidth: '600px', width: '100%' }}>
+        
+        {/* Main Photo - Big Circle */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <input
-            ref={photoRef}
+            ref={mainPhotoRef}
             type="file"
             accept="image/jpeg,image/jpg,image/png,image/webp"
-            onChange={handlePhotoChange}
+            onChange={handleMainPhotoChange}
             style={{ display: 'none' }}
           />
           
           <div
-            onClick={() => photoRef.current?.click()}
+            onClick={() => mainPhotoRef.current?.click()}
             style={{
               cursor: 'pointer',
-              background: '#111',
-              border: photo.url ? '3px solid #D4A853' : '3px dashed #D4A853',
-              borderRadius: '20px',
-              padding: '48px',
+              width: '180px',
+              height: '180px',
+              borderRadius: '50%',
+              background: mainPhoto.url ? 'transparent' : '#111',
+              border: mainPhoto.url ? '4px solid #D4A853' : '4px dashed #D4A853',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '20px',
+              justifyContent: 'center',
+              margin: '0 auto',
+              overflow: 'hidden',
               transition: 'all 0.2s'
             }}
           >
-            {photo.url ? (
-              <>
-                <img 
-                  src={photo.url} 
-                  style={{ 
-                    width: '140px', 
-                    height: '140px', 
-                    borderRadius: '50%', 
-                    objectFit: 'cover',
-                    border: '4px solid #D4A853'
-                  }} 
-                  alt="Your photo" 
-                />
-                <p style={{ color: '#4ade80', fontSize: '1rem', margin: 0, fontWeight: 600 }}>
-                  ✓ Photo uploaded - Click to change
-                </p>
-              </>
+            {mainPhoto.url ? (
+              <img 
+                src={mainPhoto.url} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                alt="Main character" 
+              />
             ) : (
               <>
-                <div style={{ fontSize: '5rem' }}>📷</div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#D4A853', fontSize: '1.3rem', margin: 0, fontWeight: 700 }}>
-                    Upload Your Photo
-                  </p>
-                  <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '8px' }}>
-                    Required
-                  </p>
-                </div>
+                <div style={{ fontSize: '4rem', marginBottom: '8px' }}>📷</div>
+                <p style={{ color: '#D4A853', fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>
+                  你 / You
+                </p>
               </>
             )}
           </div>
+          
+          {mainPhoto.url && (
+            <p style={{ color: '#4ade80', fontSize: '0.85rem', marginTop: '12px' }}>
+              ✓ 已上传 - 点击更换
+            </p>
+          )}
+        </div>
+
+        {/* Extra Photos - Small Circles Row */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '16px', 
+          justifyContent: 'center', 
+          marginBottom: '40px',
+          flexWrap: 'wrap'
+        }}>
+          {extraPhotos.map((photo, index) => (
+            <div key={index}>
+              <input
+                ref={el => { extraPhotoRefs.current[index] = el }}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={(e) => handleExtraPhotoChange(index, e)}
+                style={{ display: 'none' }}
+              />
+              
+              <div
+                onClick={() => extraPhotoRefs.current[index]?.click()}
+                style={{
+                  cursor: 'pointer',
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  background: photo.url ? 'transparent' : '#1a1a1a',
+                  border: photo.url ? '2px solid #555' : '2px dashed #333',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!photo.url) {
+                    e.currentTarget.style.borderColor = '#D4A853';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!photo.url) {
+                    e.currentTarget.style.borderColor = '#333';
+                  }
+                }}
+              >
+                {photo.url ? (
+                  <img 
+                    src={photo.url} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    alt={`Character ${index + 2}`} 
+                  />
+                ) : (
+                  <span style={{ fontSize: '2rem', color: '#555' }}>+</span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Story Input */}
         <div style={{ marginBottom: '32px' }}>
-          <label style={{ color: '#888', fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>
-            Your Story (Optional)
-          </label>
           <textarea
             value={story}
             onChange={(e) => setStory(e.target.value)}
             rows={4}
-            placeholder="Describe your story..."
+            placeholder="你的故事..."
             style={{ 
               width: '100%', 
               background: '#111', 
               border: '1px solid #333', 
-              borderRadius: '12px', 
+              borderRadius: '16px', 
               color: 'white', 
-              padding: '16px', 
-              fontSize: '0.95rem', 
+              padding: '18px', 
+              fontSize: '1rem', 
               resize: 'none', 
               outline: 'none', 
               boxSizing: 'border-box'
@@ -274,25 +246,25 @@ export default function CreatePage() {
         {/* Generate Button */}
         <button
           onClick={handleGenerate}
-          disabled={loading || !photo.file}
+          disabled={loading || !mainPhoto.file}
           style={{
             width: '100%',
-            background: loading || !photo.file ? '#333' : '#D4A853',
-            color: loading || !photo.file ? '#666' : '#000',
+            background: loading || !mainPhoto.file ? '#333' : '#D4A853',
+            color: loading || !mainPhoto.file ? '#666' : '#000',
             border: 'none',
             borderRadius: '16px',
-            padding: '20px',
-            fontSize: '1.2rem',
+            padding: '22px',
+            fontSize: '1.3rem',
             fontWeight: 700,
-            cursor: loading || !photo.file ? 'not-allowed' : 'pointer',
+            cursor: loading || !mainPhoto.file ? 'not-allowed' : 'pointer',
             transition: 'all 0.2s'
           }}
         >
-          {loading ? '✨ Creating...' : '🎬 Create My Movie'}
+          {loading ? '✨ 生成中...' : '🎬 生成我的电影'}
         </button>
 
         <p style={{ textAlign: 'center', color: '#555', fontSize: '0.8rem', marginTop: '16px' }}>
-          ⚡ Ready in 60 seconds
+          ⚡ 60秒生成 • 免费试用
         </p>
       </div>
     </div>
