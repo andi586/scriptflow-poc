@@ -270,6 +270,17 @@ ${ENDING_FORMULAS.map(e => `${e.type}: ${e.description} | music: ${e.music} | ex
 EMOTION TRANSITIONS (use when shifting between emotions):
 ${EMOTION_TRANSITIONS.map(t => `${t.from}->${t.to}: ${t.transition} | camera: ${t.camera} | ${t.duration}`).join('\n')}
 
+PHOTO REFERENCE SYSTEM (CRITICAL - READ CAREFULLY):
+Character photos are referenced as @image_1, @image_2, @image_3, etc. in Kling prompts.
+- @image_1 = main user (always the protagonist)
+- @image_2 = second person (partner, friend, pet, etc.)
+- @image_3 = third person (if uploaded)
+- @image_4 to @image_7 = additional characters/pets
+
+NEVER use numbers like "1号", "2号", "第一个人", "第二个人" in dialogue or descriptions.
+Instead use character descriptions: "你" (you), "他" (him/her), "我的朋友" (my friend), "我的宠物" (my pet), etc.
+The @image_N references are ONLY for Kling's internal photo mapping, not for human-readable text.
+
 EMOTION PROGRESSION (follow this curve exactly):
 ${emotionCurve.map(s => `Shot ${s.shot}: ${s.emotion} intensity:${s.intensity} type:${s.type}`).join('\n')}
 

@@ -166,11 +166,15 @@ export async function POST(req: NextRequest) {
 
       if (shot.shotType === 'face') {
         const emotion = shot.emotion || 'contemplative'
-        const dialogue = shot.dialogue || ''
+        let dialogue = shot.dialogue || ''
         const frameType = shot.frameType || shot.type || 'close-up'
         const cameraMovement = shot.cameraMovement || movement
         const lighting = shot.lighting || 'soft cinematic'
-        const visualDesc = shot.visualDescription || shot.description || ''
+        let visualDesc = shot.visualDescription || shot.description || ''
+
+        // Fix character numbering: replace "1号"/"2号" with @image_N
+        dialogue = dialogue.replace(/1号/g, '@image_1').replace(/2号/g, '@image_2').replace(/3号/g, '@image_3')
+        visualDesc = visualDesc.replace(/1号/g, '@image_1').replace(/2号/g, '@image_2').replace(/3号/g, '@image_3')
 
         const dialogueInstruction = dialogue
           ? `character speaks quietly with restraint: "${dialogue}", voice barely above whisper, emotion held back`
@@ -183,7 +187,11 @@ export async function POST(req: NextRequest) {
         const frameType = shot.frameType || shot.type || 'wide'
         const cameraMovement = shot.cameraMovement || movement
         const lighting = shot.lighting || 'natural'
-        const rawDesc = shot.scenePrompt || shot.visualDescription || shot.description || environment
+        let rawDesc = shot.scenePrompt || shot.visualDescription || shot.description || environment
+        
+        // Fix character numbering: replace "1号"/"2号" with @image_N
+        rawDesc = rawDesc.replace(/1号/g, '@image_1').replace(/2号/g, '@image_2').replace(/3号/g, '@image_3')
+        
         const visualDesc = rawDesc.length > 150 ? rawDesc.substring(0, 150) : rawDesc
 
         return `Cinematic 9:16, ${frameType}, ${cameraMovement}, ${petRef}${visualDesc}, emotion: ${shot.emotion || 'melancholic'}, ${lighting} light with soft shadows, no people, smooth dissolve transition`
