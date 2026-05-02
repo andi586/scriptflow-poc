@@ -341,6 +341,16 @@ export async function POST(req: NextRequest) {
       throw new Error('Kling task creation failed: ' + JSON.stringify(klingData).slice(0, 200))
     }
 
+    // Fire and forget hook generation
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
+    fetch(`${baseUrl}/api/hook/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movieId: movie.id })
+    }).catch(err => console.error('[movie/generate] hook trigger failed:', err))
+
+    console.log('[movie/generate] hook generation triggered for:', movie.id)
+
     // Step 5: Update movie with task_id and archetype
     await supabase
       .from('movies')
