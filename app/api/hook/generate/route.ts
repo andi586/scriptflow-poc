@@ -201,23 +201,19 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!twin) {
-      // Try to use photo from movie's additional context
-      console.log('[hook/generate] Digital twin not found, checking movie for photo')
-      const photoUrl = movie.twin_photo_url || movie.main_photo_url || movie.thumbnail_url || null
+      const photoUrl = movie.twin_photo_url || null
       
       if (!photoUrl) {
-        return NextResponse.json({ error: 'No photo found for hook generation' }, { status: 404 })
+        return NextResponse.json({ error: 'No photo found for hook' }, { status: 404 })
       }
       
-      console.log('[hook/generate] Using movie photo:', photoUrl)
-      
-      // Create a fake twin object
       twin = {
         id: movie.user_id,
         frame_url_front: photoUrl,
         frame_url_mid: photoUrl,
         voice_id: null
       }
+      console.log('[hook/generate] using twin_photo_url from movie:', photoUrl)
     } else {
       console.log('[hook/generate] twin found:', twin.id, 'voice_id:', twin.voice_id)
     }
