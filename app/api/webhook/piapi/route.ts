@@ -153,6 +153,18 @@ console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.
     })
     .eq('kling_task_id', taskId)
 
+  // Trigger hook generation after movie is complete
+  if (movie?.id) {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
+    fetch(`${baseUrl}/api/hook/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movieId: movie.id })
+    }).catch(err => console.error('[webhook] hook trigger failed:', err))
+
+    console.log('[webhook] hook generation triggered for:', movie.id)
+  }
+
   console.log('[webhook/piapi] updated task:', taskId)
   return NextResponse.json({ ok: true })
 }
