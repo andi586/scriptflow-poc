@@ -118,9 +118,21 @@ export default function MoviePage() {
                 Unlock the full movie now
               </p>
               <button
-                onClick={() => {
-                  // TODO: wire up Stripe checkout
-                  alert('Stripe checkout coming soon!')
+                onClick={async () => {
+                  const res = await fetch('/api/stripe/movie-checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      movieId: movie.id,
+                      userId: movie.user_id 
+                    })
+                  })
+                  const data = await res.json()
+                  if (data.url) {
+                    window.location.href = data.url
+                  } else {
+                    alert('Payment error: ' + (data.error || 'Unknown error'))
+                  }
                 }}
                 style={{
                   background:'#D4A853',
