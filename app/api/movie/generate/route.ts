@@ -300,6 +300,7 @@ export async function POST(req: NextRequest) {
         resolution: '720p',
         aspect_ratio: '9:16',
         enable_audio: true,
+        language: 'zh-CN',  // Force Chinese TTS for all dialogue
         images: klingImages,
         multi_shots: multiShots
       },
@@ -311,6 +312,8 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+    
+    console.log('[movie/generate] Kling API language set to: zh-CN (Chinese)')
 
     const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
       method: 'POST',
