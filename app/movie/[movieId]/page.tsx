@@ -54,7 +54,7 @@ export default function MoviePage() {
 
   // Show paywall after 13 seconds if hook video is playing and not paid
   useEffect(() => {
-    if (movie?.hook_video_url && !movie?.paid && !movie?.final_video_url) {
+    if (movie?.hook_video_url && !movie?.paid) {
       paywallTimerRef.current = setTimeout(() => {
         setShowPaywall(true)
       }, 13000)
@@ -62,7 +62,7 @@ export default function MoviePage() {
     return () => {
       if (paywallTimerRef.current) clearTimeout(paywallTimerRef.current)
     }
-  }, [movie?.hook_video_url, movie?.paid, movie?.final_video_url])
+  }, [movie?.hook_video_url, movie?.paid])
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) return (
@@ -81,8 +81,8 @@ export default function MoviePage() {
     </div>
   )
 
-  // ── Hook video + paywall (paid=false, hook ready, final not ready) ─────────
-  if (movie?.hook_video_url && !movie?.paid && !movie?.final_video_url) {
+  // ── Hook video + paywall (paid=false, hook ready) ─────────
+  if (movie?.hook_video_url && !movie?.paid) {
     return (
       <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',padding:'48px 20px 120px',color:'white',fontFamily:'system-ui'}}>
         <h1 style={{color:'#D4A853',fontSize:'1.3rem',marginBottom:'4px'}}>🎬 Your Preview is Ready</h1>
