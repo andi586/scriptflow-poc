@@ -128,8 +128,8 @@ export default function MoviePage() {
                     })
                   })
                   const data = await res.json()
-                  if (data.url) {
-                    window.location.href = data.url
+                  if (data.checkoutUrl || data.url) {
+                    window.location.href = data.checkoutUrl || data.url
                   } else {
                     alert('Payment error: ' + (data.error || 'Unknown error'))
                   }
