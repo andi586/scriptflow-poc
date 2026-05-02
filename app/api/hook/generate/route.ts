@@ -194,15 +194,33 @@ export async function POST(request: NextRequest) {
     console.log('[hook/generate] movie found:', movie.id, 'archetype:', movie.archetype)
 
     // Step 2: Get digital twin record
-    const { data: twin } = await supabase
+    let { data: twin } = await supabase
       .from('digital_twins')
       .select('id, frame_url_front, frame_url_mid, voice_id')
       .eq('id', movie.user_id)
       .single()
 
-    if (!twin) return NextResponse.json({ error: 'Digital twin not found' }, { status: 404 })
-
-    console.log('[hook/generate] twin found:', twin.id, 'voice_id:', twin.voice_id)
+    if (!twin) {
+      // Try to use photo from movie's additional context
+      console.log('[hook/generate] Digital twin not found, checking movie for photo')
+      const photoUrl = movie.twin_photo_url || movie.main_photo_url || movie.thumbnail_url || null
+      
+      if (!photoUrl) {
+        return NextResponse.json({ error: 'No photo found for hook generation' }, { status: 404 })
+      }
+      
+      console.log('[hook/generate] Using movie photo:', photoUrl)
+      
+      // Create a fake twin object
+      twin = {
+        id: movie.user_id,
+        frame_url_front: photoUrl,
+        frame_url_mid: photoUrl,
+        voice_id: null
+      }
+    } else {
+      console.log('[hook/generate] twin found:', twin.id, 'voice_id:', twin.voice_id)
+    }
 
     const voiceId: string = twin.voice_id || DEFAULT_VOICE_ID
     const archetype: string | null = movie.archetype ?? null
