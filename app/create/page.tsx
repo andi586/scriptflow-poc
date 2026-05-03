@@ -58,9 +58,10 @@ const TEMPLATES = [
   },
   {
     id: "breaking_news",
-    title: "🔥 Your Friend Is On The News",
+    title: "🔥 Prank Your Friend",
     emoji: "📰",
-    outcome: "This just got out of control.",
+    outcome: "They'll never see this coming 😂",
+    description: "Add your friend's photo — put them on the news",
     story: "Breaking news intro with police lights. The uploaded person appears as central figure in developing situation. Witnesses react. Close-up of confused face. Twist reveal - harmless misunderstanding. Reporter awkward smile. End: 'Send this to them 😂'"
   }
 ];
@@ -71,6 +72,8 @@ export default function CreatePage() {
     Array(6).fill(null).map(() => ({ file: null, url: null }))
   );
   const [showExtraModal, setShowExtraModal] = useState(false);
+  const [showFriendModal, setShowFriendModal] = useState(false);
+  const [friendPhoto, setFriendPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
   const [story, setStory] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -121,6 +124,12 @@ export default function CreatePage() {
     setStory(template.story);
     setSelectedTemplate(template.id);
     
+    // Special handling for prank template - show friend modal
+    if (template.id === 'breaking_news' && !friendPhoto.file) {
+      setShowFriendModal(true);
+      return;
+    }
+    
     // AUTO-ADVANCE: Scroll to upload area if no photo yet
     if (!mainPhoto.file && uploadAreaRef.current) {
       uploadAreaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -132,6 +141,15 @@ export default function CreatePage() {
         }
       }, 1500);
     }
+  };
+
+  const handleFriendPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFriendPhoto({ file, url: URL.createObjectURL(file) });
+    // Set as main photo for prank template
+    setMainPhoto({ file, url: URL.createObjectURL(file) });
+    setShowFriendModal(false);
   };
 
   const handleGenerate = async () => {
@@ -567,6 +585,125 @@ export default function CreatePage() {
           )}
         </button>
       </div>
+
+      {/* Friend Photo Modal (for Prank Template) */}
+      {showFriendModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.95)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+          onClick={() => setShowFriendModal(false)}
+        >
+          <div 
+            style={{
+              background: '#0a0a0a',
+              border: '1px solid #333',
+              borderRadius: '20px',
+              padding: '40px',
+              maxWidth: '450px',
+              width: '100%'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ 
+              color: '#D4A853', 
+              fontSize: '1.8rem', 
+              margin: '0 0 8px 0',
+              textAlign: 'center'
+            }}>
+              Who's getting pranked? 😂
+            </h2>
+            
+            <p style={{ 
+              color: '#888', 
+              fontSize: '1rem', 
+              marginBottom: '24px',
+              textAlign: 'center'
+            }}>
+              Add Your Friend's Photo (Required)
+            </p>
+
+            <input
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              onChange={handleFriendPhotoChange}
+              style={{ display: 'none' }}
+              id="friend-photo-input"
+            />
+            
+            <label
+              htmlFor="friend-photo-input"
+              style={{
+                cursor: 'pointer',
+                width: '100%',
+                height: '300px',
+                borderRadius: '20px',
+                background: friendPhoto.url ? `url(${friendPhoto.url})` : '#111',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                border: '4px dashed #D4A853',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                marginBottom: '16px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#F4D03F';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#D4A853';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              {!friendPhoto.url && (
+                <>
+                  <div style={{ fontSize: '5rem', marginBottom: '16px' }}>👤</div>
+                  <p style={{ color: '#D4A853', fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>
+                    Click to Upload
+                  </p>
+                  <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '8px' }}>
+                    Your friend will be the star of this video
+                  </p>
+                </>
+              )}
+            </label>
+
+            {friendPhoto.file && (
+              <button
+                onClick={() => {
+                  setShowFriendModal(false);
+                }}
+                style={{
+                  width: '100%',
+                  background: '#D4A853',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  fontSize: '1.1rem',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                Continue →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Extra Photos Modal */}
       {showExtraModal && (
