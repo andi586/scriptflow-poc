@@ -55,6 +55,13 @@ const TEMPLATES = [
     emoji: "🌠",
     outcome: "Watch yourself in the life you didn't choose",
     story: "You see another version of yourself living a different life. You watch them with longing. The final moment: you realize what could have been."
+  },
+  {
+    id: "breaking_news",
+    title: "Breaking News: It's You",
+    emoji: "🔥",
+    outcome: "Watch your friend appear in a shocking news report",
+    story: "Breaking news intro with police lights. The uploaded person appears as central figure in developing situation. Witnesses react. Close-up of confused face. Twist reveal - harmless misunderstanding. Reporter awkward smile. End: 'Send this to them 😂'"
   }
 ];
 
@@ -381,11 +388,24 @@ export default function CreatePage() {
                     }
                   }}
                 >
-                  <div style={{ 
-                    fontSize: '2.2rem',
-                    marginBottom: '6px'
-                  }}>
-                    {template.emoji}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '2.2rem' }}>
+                      {template.emoji}
+                    </div>
+                    {template.id === 'breaking_news' && (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #ff4444 0%, #ff6b6b 100%)',
+                        color: '#fff',
+                        fontSize: '0.65rem',
+                        fontWeight: '700',
+                        padding: '3px 8px',
+                        borderRadius: '10px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        🔥 Viral
+                      </div>
+                    )}
                   </div>
                   <h3 style={{ 
                     margin: '0 0 6px 0', 
