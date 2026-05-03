@@ -1,23 +1,26 @@
-# Survey Page Setup Instructions
+# Post-Movie Feedback Survey Setup
 
 ## Overview
-A beautiful survey page has been created to collect user preferences and reward them with a free movie generation link.
+A beautiful post-movie feedback survey that rewards users with 1 FREE movie credit for completing it.
 
-## Files Created
+## Files Created/Modified
 
 1. **`app/survey/page.tsx`** - Survey page component with:
-   - 6 engaging questions about movie preferences
+   - 5 feedback questions about the movie experience
    - Beautiful gradient UI with animations
-   - Email collection
-   - Thank you page with generation link
+   - Optional email collection
+   - Thank you page with credit confirmation
+   - Accepts `movieId` query parameter
 
 2. **`app/api/survey/submit/route.ts`** - API endpoint that:
    - Validates survey responses
    - Saves to Supabase
-   - Generates unique token
-   - Sends email with generation link (if configured)
+   - Awards 1 credit to user automatically
+   - Prevents duplicate submissions per movie
 
 3. **`supabase/migrations/20260503000001_create_survey_responses.sql`** - Database schema
+
+4. **`app/movie/[movieId]/page.tsx`** - Modified to show survey prompt after movie is unlocked
 
 ## Database Migration
 
@@ -41,44 +44,88 @@ Or apply manually in Supabase SQL Editor by running the migration file.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key
 
-### Optional (for email functionality)
-- `RESEND_API_KEY` - Your Resend API key for sending emails
-- `RESEND_FROM_EMAIL` - From email address (default: "ScriptFlow <onboarding@resend.dev>")
-- `NEXT_PUBLIC_BASE_URL` - Your app's base URL (default: "http://localhost:3000")
-
 ## Features
 
 ### Survey Questions
-1. What kind of story would you like to star in?
-2. What's your dream role?
-3. Pick your movie vibe
-4. How do you want your character to look?
-5. What's your character's superpower?
-6. One word to describe your movie
+1. **What would you like to create next?**
+   - Another movie with different story
+   - Same story, different character
+   - Photo-to-video content
+   - Music video
+   - Series/Multiple episodes
+   - Custom creative project
+
+2. **What did you like most about your movie?**
+   - The character/acting
+   - The story/script
+   - Visual quality
+   - Voice/audio
+   - Speed of creation
+   - The price
+
+3. **Was the price fair for what you got?**
+   - Great value!
+   - Fair price
+   - A bit expensive
+   - Too expensive
+   - Would prefer subscription
+   - Would pay more for premium
+
+4. **How was the voice quality?**
+   - Perfect!
+   - Good enough
+   - Could be better
+   - Not great
+   - Want to use my own voice
+   - Prefer no voice
+
+5. **Would you share this with friends?**
+   - Already shared!
+   - Yes, definitely
+   - Maybe
+   - Probably not
+   - Too personal
+   - After some edits
 
 ### Database Schema
 The `survey_responses` table includes:
 - `id` - UUID primary key
-- `email` - User's email
-- `question_1` through `question_6` - Survey answers
-- `free_generation_token` - Unique UUID for free generation
-- `token_used` - Boolean flag to track if token was used
+- `user_id` - References auth.users (from movie)
+- `movie_id` - References movies table
+- `email` - Optional user email
+- `q1_create` through `q5_share` - Survey answers
+- `credit_awarded` - Boolean flag (always true when submitted)
 - `created_at` / `updated_at` - Timestamps
 
 ### Security
 - Row Level Security (RLS) enabled
-- Anonymous users can insert (for survey submission)
+- Anonymous and authenticated users can insert
 - Service role can read/update all records
-- Unique token per submission
+- Prevents duplicate submissions per movie
 
-## Usage
+### Credit System
+- Uses existing `increment_user_credits` function
+- Automatically awards 1 credit upon survey completion
+- Credits are added to user's profile
+- No credit awarded if user_id is not available
 
-1. Visit `/survey` to access the survey page
-2. Users answer 6 questions
-3. Users enter their email
-4. System generates unique token and link
-5. Email sent with generation link (if configured)
-6. User can use link to create free movie
+## User Flow
+
+1. User creates and pays for a movie
+2. After movie is unlocked, survey prompt appears on movie page
+3. User clicks "Take Survey" button
+4. User answers 5 questions
+5. User optionally enters email
+6. System saves responses and awards 1 credit
+7. User sees thank you message with credit confirmation
+8. User can immediately create a free movie with the credit
+
+## Movie Page Integration
+
+The survey prompt appears at the bottom of the movie page when:
+- Movie is unlocked (`paid=true`)
+- Beautiful gradient card with clear CTA
+- Links to `/survey?movieId={movieId}`
 
 ## Testing
 
@@ -87,21 +134,22 @@ To test locally:
 npm run dev
 ```
 
-Then visit: `http://localhost:3000/survey`
+Then:
+1. Create and unlock a movie
+2. See survey prompt on movie page
+3. Click "Take Survey"
+4. Complete the survey
+5. Check that credit was added to user profile
 
-## Email Template
+## Preventing Duplicate Submissions
 
-The email includes:
-- Beautiful HTML template with gradient design
-- Clear CTA button
-- Plain text fallback
-- Unique generation link
-- Professional branding
+The API checks if a survey response already exists for the given `movie_id` before allowing submission. This prevents users from gaming the system by submitting multiple surveys for the same movie.
 
 ## Next Steps
 
-1. Apply the database migration
-2. Configure environment variables (especially for email)
-3. Test the survey flow
-4. Implement token validation in `/create` page
-5. Track token usage to prevent reuse
+1. ✅ Apply the database migration
+2. ✅ Test the survey flow end-to-end
+3. ✅ Verify credit is awarded correctly
+4. Consider adding analytics to track survey responses
+5. Consider A/B testing different survey questions
+6. Consider adding survey completion rate tracking

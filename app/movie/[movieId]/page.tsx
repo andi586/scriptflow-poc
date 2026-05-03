@@ -296,6 +296,34 @@ export default function MoviePage() {
         <a href="/create" style={{display:'block',background:'transparent',color:'#555',padding:'16px',borderRadius:'100px',fontWeight:'600',fontSize:'0.9rem',textDecoration:'none',textAlign:'center',border:'1px solid #222'}}>
           🎬 Make Another Movie
         </a>
+
+        {/* Survey Prompt */}
+        {movie?.paid && (
+          <div style={{marginTop:'32px',background:'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',padding:'24px',borderRadius:'20px',textAlign:'center'}}>
+            <p style={{color:'white',fontSize:'1.1rem',fontWeight:'700',marginBottom:'12px'}}>
+              🎬 Enjoying your movie?
+            </p>
+            <p style={{color:'rgba(255,255,255,0.9)',fontSize:'0.9rem',marginBottom:'16px'}}>
+              Share your feedback and get 1 FREE movie!
+            </p>
+            <a
+              href={`/survey?movieId=${movie.id}`}
+              style={{
+                display:'inline-block',
+                background:'white',
+                color:'#667eea',
+                padding:'14px 32px',
+                borderRadius:'100px',
+                fontWeight:'800',
+                fontSize:'1rem',
+                textDecoration:'none',
+                boxShadow:'0 4px 15px rgba(0,0,0,0.2)'
+              }}
+            >
+              Take Survey →
+            </a>
+          </div>
+        )}
       </div>
     </div>
   )

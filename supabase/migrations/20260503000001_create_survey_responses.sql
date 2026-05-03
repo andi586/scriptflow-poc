@@ -1,33 +1,32 @@
--- Create survey_responses table
+-- Create survey_responses table for post-movie feedback
 CREATE TABLE IF NOT EXISTS survey_responses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT NOT NULL,
-  question_1 TEXT NOT NULL, -- What kind of story would you like to star in?
-  question_2 TEXT NOT NULL, -- What's your dream role?
-  question_3 TEXT NOT NULL, -- Pick your movie vibe
-  question_4 TEXT NOT NULL, -- How do you want your character to look?
-  question_5 TEXT NOT NULL, -- What's your character's superpower?
-  question_6 TEXT NOT NULL, -- One word to describe your movie
-  free_generation_token UUID UNIQUE DEFAULT gen_random_uuid(),
-  token_used BOOLEAN DEFAULT FALSE,
+  user_id UUID REFERENCES auth.users(id),
+  movie_id UUID REFERENCES movies(id),
+  email TEXT,
+  q1_create TEXT NOT NULL, -- What would you like to create next?
+  q2_preference TEXT NOT NULL, -- What did you like most?
+  q3_price TEXT NOT NULL, -- Was the price fair?
+  q4_voice TEXT NOT NULL, -- How was the voice quality?
+  q5_share TEXT NOT NULL, -- Would you share with friends?
+  credit_awarded BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create index on email for faster lookups
+-- Create indexes for faster lookups
+CREATE INDEX IF NOT EXISTS idx_survey_responses_user_id ON survey_responses(user_id);
+CREATE INDEX IF NOT EXISTS idx_survey_responses_movie_id ON survey_responses(movie_id);
 CREATE INDEX IF NOT EXISTS idx_survey_responses_email ON survey_responses(email);
-
--- Create index on free_generation_token for faster lookups
-CREATE INDEX IF NOT EXISTS idx_survey_responses_token ON survey_responses(free_generation_token);
 
 -- Enable RLS
 ALTER TABLE survey_responses ENABLE ROW LEVEL SECURITY;
 
--- Allow anonymous inserts (for survey submission)
-CREATE POLICY "Allow anonymous insert survey responses"
+-- Allow authenticated and anonymous inserts (for survey submission)
+CREATE POLICY "Allow insert survey responses"
   ON survey_responses
   FOR INSERT
-  TO anon
+  TO anon, authenticated
   WITH CHECK (true);
 
 -- Allow service role to read all

@@ -1,91 +1,86 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 
 const questions = [
   {
-    id: "question_1",
-    question: "What kind of story would you like to star in?",
+    id: "q1_create",
+    question: "What would you like to create next?",
     options: [
-      "🦸 Epic Adventure",
-      "💕 Romance",
-      "😂 Comedy",
-      "🔮 Fantasy",
-      "🕵️ Mystery/Thriller",
-      "🚀 Sci-Fi",
+      "🎬 Another movie with different story",
+      "🎭 Same story, different character",
+      "📸 Photo-to-video content",
+      "🎵 Music video",
+      "📺 Series/Multiple episodes",
+      "🎨 Custom creative project",
     ],
   },
   {
-    id: "question_2",
-    question: "What's your dream role?",
+    id: "q2_preference",
+    question: "What did you like most about your movie?",
     options: [
-      "🦸 The Hero",
-      "🧙 The Wise Mentor",
-      "😈 The Villain",
-      "🤡 The Comic Relief",
-      "💔 The Tragic Figure",
-      "🎭 The Mysterious Stranger",
+      "🎭 The character/acting",
+      "📝 The story/script",
+      "🎨 Visual quality",
+      "🎵 Voice/audio",
+      "⚡ Speed of creation",
+      "💰 The price",
     ],
   },
   {
-    id: "question_3",
-    question: "Pick your movie vibe",
+    id: "q3_price",
+    question: "Was the price fair for what you got?",
     options: [
-      "🌅 Bright & Uplifting",
-      "🌙 Dark & Moody",
-      "✨ Magical & Whimsical",
-      "⚡ Fast-paced & Intense",
-      "🎨 Artistic & Thoughtful",
-      "🎪 Wild & Unpredictable",
+      "💎 Great value!",
+      "👍 Fair price",
+      "🤔 A bit expensive",
+      "💸 Too expensive",
+      "🎁 Would prefer subscription",
+      "💳 Would pay more for premium",
     ],
   },
   {
-    id: "question_4",
-    question: "How do you want your character to look?",
+    id: "q4_voice",
+    question: "How was the voice quality?",
     options: [
-      "👔 Sharp & Professional",
-      "🧥 Casual & Relatable",
-      "👗 Elegant & Glamorous",
-      "🦹 Bold & Edgy",
-      "🧙 Mystical & Otherworldly",
-      "🤠 Rugged & Adventurous",
+      "🌟 Perfect!",
+      "👍 Good enough",
+      "🤔 Could be better",
+      "😕 Not great",
+      "🎤 Want to use my own voice",
+      "🔇 Prefer no voice",
     ],
   },
   {
-    id: "question_5",
-    question: "What's your character's superpower?",
+    id: "q5_share",
+    question: "Would you share this with friends?",
     options: [
-      "🧠 Genius-level Intelligence",
-      "💪 Superhuman Strength",
-      "🗣️ Persuasion & Charm",
-      "🔮 Magical Abilities",
-      "⚡ Lightning Speed",
-      "❤️ Empathy & Healing",
-    ],
-  },
-  {
-    id: "question_6",
-    question: "One word to describe your movie",
-    options: [
-      "🔥 Epic",
-      "💖 Heartwarming",
-      "😱 Thrilling",
-      "😂 Hilarious",
-      "😢 Emotional",
-      "🤯 Mind-bending",
+      "🔥 Already shared!",
+      "✅ Yes, definitely",
+      "🤔 Maybe",
+      "😅 Probably not",
+      "🙈 Too personal",
+      "💡 After some edits",
     ],
   },
 ];
 
 export default function SurveyPage() {
+  const searchParams = useSearchParams();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [email, setEmail] = useState("");
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
-  const [generationLink, setGenerationLink] = useState("");
+  const [movieId, setMovieId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = searchParams?.get("movieId") || null;
+    setMovieId(id);
+  }, [searchParams]);
 
   const handleAnswer = (answer: string) => {
     const questionId = questions[currentQuestion].id;
@@ -100,8 +95,8 @@ export default function SurveyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email || isSubmitting) return;
+
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
 
@@ -112,7 +107,8 @@ export default function SurveyPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email,
+          movieId,
+          email: email || undefined,
           ...answers,
         }),
       });
@@ -120,7 +116,6 @@ export default function SurveyPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setGenerationLink(data.generationLink);
         setShowThankYou(true);
       } else {
         alert(data.error || "Something went wrong. Please try again.");
@@ -160,26 +155,31 @@ export default function SurveyPage() {
             🎉
           </motion.div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            You're All Set!
+            Thank You!
           </h1>
           <p className="text-xl text-gray-700 mb-8">
-            Check your email for your FREE movie generation link! 🎬
+            You've earned 1 FREE movie credit! 🎬
           </p>
           <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-6 mb-8">
-            <p className="text-sm text-gray-600 mb-2">Your unique link:</p>
-            <code className="text-sm bg-white px-4 py-2 rounded-lg block break-all">
-              {generationLink}
-            </code>
+            <p className="text-2xl font-bold text-purple-600 mb-2">+1 Credit</p>
+            <p className="text-sm text-gray-600">
+              Your feedback helps us improve ScriptFlow for everyone!
+            </p>
           </div>
-          <p className="text-gray-600 mb-8">
-            We can't wait to see you become the star of your own AI movie! 🌟
-          </p>
-          <a
-            href="/"
-            className="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105"
-          >
-            Go to Homepage
-          </a>
+          <div className="flex flex-col gap-4">
+            <a
+              href="/create"
+              className="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              🎬 Create Your Free Movie Now
+            </a>
+            <a
+              href={movieId ? `/movie/${movieId}` : "/"}
+              className="text-gray-600 hover:text-gray-800 font-semibold"
+            >
+              ← Back to your movie
+            </a>
+          </div>
         </motion.div>
       </div>
     );
@@ -195,10 +195,10 @@ export default function SurveyPage() {
           className="text-center mb-8"
         >
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-            🎬 Be the Main Character
+            🎬 Enjoying your movie?
           </h1>
           <h2 className="text-2xl md:text-3xl font-semibold text-white/90">
-            in Your Own AI Movie
+            Share your feedback and get 1 FREE movie!
           </h2>
         </motion.div>
 
@@ -268,18 +268,17 @@ export default function SurveyPage() {
                 exit={{ opacity: 0, x: -20 }}
               >
                 <h3 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4 text-center">
-                  Almost there! 🎉
+                  Almost done! 🎉
                 </h3>
                 <p className="text-gray-600 text-center mb-8">
-                  Enter your email to get your FREE movie generation link
+                  Email is optional - submit to claim your FREE credit!
                 </p>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    required
+                    placeholder="your@email.com (optional)"
                     className="w-full px-6 py-4 rounded-2xl border-2 border-gray-300 focus:border-purple-600 focus:outline-none text-lg"
                   />
                   <button
@@ -287,7 +286,7 @@ export default function SurveyPage() {
                     disabled={isSubmitting}
                     className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-xl"
                   >
-                    {isSubmitting ? "Submitting..." : "🎬 Get My FREE Movie"}
+                    {isSubmitting ? "Submitting..." : "🎁 Claim My FREE Credit"}
                   </button>
                 </form>
               </motion.div>
@@ -314,7 +313,7 @@ export default function SurveyPage() {
           transition={{ delay: 0.3 }}
           className="text-white text-center mt-8 text-sm"
         >
-          Your responses help us create the perfect movie experience for you ✨
+          Your feedback helps us make ScriptFlow better for everyone ✨
         </motion.p>
       </div>
     </div>
