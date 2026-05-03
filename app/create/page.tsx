@@ -58,9 +58,9 @@ const TEMPLATES = [
   },
   {
     id: "breaking_news",
-    title: "Breaking News: It's You",
-    emoji: "🔥",
-    outcome: "Watch your friend appear in a shocking news report",
+    title: "🔥 Your Friend Is On The News",
+    emoji: "📰",
+    outcome: "This just got out of control.",
     story: "Breaking news intro with police lights. The uploaded person appears as central figure in developing situation. Witnesses react. Close-up of confused face. Twist reveal - harmless misunderstanding. Reporter awkward smile. End: 'Send this to them 😂'"
   }
 ];
@@ -77,6 +77,7 @@ export default function CreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const mainPhotoRef = useRef<HTMLInputElement>(null);
+  const uploadAreaRef = useRef<HTMLDivElement>(null);
   const extraPhotoRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
 
@@ -119,6 +120,18 @@ export default function CreatePage() {
   const handleTemplateClick = (template: typeof TEMPLATES[0]) => {
     setStory(template.story);
     setSelectedTemplate(template.id);
+    
+    // AUTO-ADVANCE: Scroll to upload area if no photo yet
+    if (!mainPhoto.file && uploadAreaRef.current) {
+      uploadAreaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Add pulse highlight animation
+      uploadAreaRef.current.style.animation = 'pulse-highlight 1.5s ease-in-out';
+      setTimeout(() => {
+        if (uploadAreaRef.current) {
+          uploadAreaRef.current.style.animation = '';
+        }
+      }, 1500);
+    }
   };
 
   const handleGenerate = async () => {
@@ -286,6 +299,7 @@ export default function CreatePage() {
             />
             
             <div
+              ref={uploadAreaRef}
               onClick={() => mainPhotoRef.current?.click()}
               style={{
                 cursor: 'pointer',
@@ -681,6 +695,16 @@ export default function CreatePage() {
         @keyframes pulse {
           0%, 100% { box-shadow: 0 10px 40px rgba(212,168,83,0.5); }
           50% { box-shadow: 0 10px 40px rgba(212,168,83,0.7); }
+        }
+        @keyframes pulse-highlight {
+          0%, 100% { 
+            border-color: #D4A853;
+            box-shadow: 0 0 0 rgba(212,168,83,0);
+          }
+          50% { 
+            border-color: #F4D03F;
+            box-shadow: 0 0 30px rgba(244,208,63,0.6);
+          }
         }
       `}</style>
     </div>
