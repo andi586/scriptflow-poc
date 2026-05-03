@@ -115,6 +115,12 @@ const ARCHETYPE_BGM_LOCK: Record<string, string> = {
   'reconciliation': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3',
   'spring_festival': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-鞭炮回响-a8dab44d-4f85-4524-8a21-194aaefc19c2.mp3',
   'christmas': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-dd16ffbd-1798-47bc-b484-934095a07e37.mp3',
+  // New emotional templates
+  'parallel_universe': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
+  'she_didnt_choose_you': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
+  'future_you': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Triumphant_No-Vocal-0249cc79-3054-483b-8a4f-8c211e555672.mp3',
+  'lost_someone': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
+  'last_person': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
 }
 
 // EXECUTION AUTHORITY: Lock BGM by archetype
