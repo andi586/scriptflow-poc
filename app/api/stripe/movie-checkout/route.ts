@@ -4,6 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Log Stripe mode for debugging
+    const stripeMode = process.env.STRIPE_SECRET_KEY?.startsWith('sk_live') ? 'LIVE' : 'TEST'
+    console.log('[stripe-checkout] Mode:', stripeMode)
+    
     const { movieId, userId } = await request.json()
     
     // Try to get user from session, but allow userId from request body as fallback

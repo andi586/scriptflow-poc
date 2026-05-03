@@ -123,6 +123,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Log Stripe mode for debugging
+  const stripeMode = process.env.STRIPE_SECRET_KEY?.startsWith('sk_live') ? 'LIVE' : 'TEST'
+  console.log('[stripe-webhook] Mode:', stripeMode)
+  
   const webhookSecret = getRequiredEnv('STRIPE_WEBHOOK_SECRET')
   const signature = request.headers.get('stripe-signature')
 
