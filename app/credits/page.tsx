@@ -67,6 +67,7 @@ function CreditsContent() {
       const data = await res.json()
       
       if (data.checkoutUrl) {
+        // Redirect to checkout (loading state will be cleared on page unload)
         window.location.href = data.checkoutUrl
       } else {
         alert('Payment error: ' + (data.error || 'Unknown error'))
@@ -183,11 +184,16 @@ function CreditsContent() {
               <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '16px' }}>
                 movie credits
               </p>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#D4A853' }}>
+              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#D4A853', marginBottom: '8px' }}>
                 ${pkg.price}
               </div>
-              <p style={{ color: '#666', fontSize: '0.8rem', marginTop: '4px' }}>
-                ${(pkg.price / pkg.credits).toFixed(2)} per movie
+              <p style={{ 
+                color: pkg.popular ? '#4ade80' : '#666', 
+                fontSize: '0.85rem', 
+                fontWeight: pkg.popular ? '600' : '400',
+                marginTop: '4px' 
+              }}>
+                ${(pkg.price / pkg.credits).toFixed(2)}/movie{pkg.popular ? ' - BEST VALUE' : ''}
               </p>
             </div>
 
