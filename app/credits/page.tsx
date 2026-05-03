@@ -53,7 +53,7 @@ function CreditsContent() {
   }, [])
 
   const handlePurchase = async (packageId: string) => {
-    if (loading) return
+    if (loading) return // prevent double click
     
     setLoading(packageId)
     
@@ -66,17 +66,16 @@ function CreditsContent() {
       
       const data = await res.json()
       
-      if (data.checkoutUrl) {
-        // Redirect to checkout (loading state will be cleared on page unload)
-        window.location.href = data.checkoutUrl
+      if (data.checkoutUrl || data.url) {
+        window.location.href = data.checkoutUrl || data.url
       } else {
         alert('Payment error: ' + (data.error || 'Unknown error'))
-        setLoading(null)
       }
     } catch (error) {
       console.error('Purchase error:', error)
       alert('Failed to initiate purchase')
-      setLoading(null)
+    } finally {
+      setLoading(null) // always reset loading state
     }
   }
 
