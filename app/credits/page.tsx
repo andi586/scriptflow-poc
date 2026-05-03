@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -14,7 +14,7 @@ const PACKAGES = [
   { id: 'pack_10', credits: 10, price: 34.9, name: '10 Movies', popular: false }
 ]
 
-export default function CreditsPage() {
+function CreditsContent() {
   const [userId, setUserId] = useState<string | null>(null)
   const [userCredits, setUserCredits] = useState<number>(0)
   const [loading, setLoading] = useState<string | null>(null)
@@ -252,5 +252,26 @@ export default function CreditsPage() {
         </a>
       </div>
     </div>
+  )
+}
+
+export default function CreditsPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        background: '#0a0a0a',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#D4A853',
+        fontSize: '1.2rem',
+        fontFamily: 'system-ui'
+      }}>
+        Loading...
+      </div>
+    }>
+      <CreditsContent />
+    </Suspense>
   )
 }
