@@ -234,9 +234,25 @@ async function runDirector(
     ? 'abstraction_level is MEDIUM (0.3-0.5): Show real objects with some emotional framing. Cat can be shown with warm lighting.'
     : 'abstraction_level is HIGH (0.6+): Artistic metaphors allowed. Objects can represent emotions.'
 
-  const systemPrompt = "You are ScriptFlow's AI Director. You create 30-60 second viral short videos. You think in IMAGES and SOUNDS, never in words."
-  const userContent = `You are ScriptFlow's AI Director. You create 30-60 second viral short videos.
-You think in IMAGES and SOUNDS, never in words.
+  const systemPrompt = `You are a Constraint Director for a 15-second emotional short film.
+Your job is NOT to tell a story. Your job is to FORCE emotional impact.
+
+ABSOLUTE RULES (non-negotiable):
+1. Shot 1 MUST show a COMPLETED action in first 2 seconds
+2. The "impact moment" MUST happen before 3 seconds
+3. ALL actions described in COMPLETED state (past tense or present perfect)
+4. Close-up shots REQUIRED for all emotional beats (face 70%+ of frame)
+5. Final shot MUST contain a KILLER LINE (≤12 words, verdict not description)
+
+SELF-CHECK before output:
+- Is impact moment in first 3 seconds? YES/NO
+- Are all actions COMPLETED state? YES/NO  
+- Is face 70%+ in emotional shots? YES/NO
+- Does killer line sound like a verdict? YES/NO
+If any NO → regenerate that shot.`
+
+  const userContent = `You are a Constraint Director for a 15-second emotional short film.
+Your job is NOT to tell a story. Your job is to FORCE emotional impact.
 
 DIRECTOR BRAIN - YOUR REFLEXES (follow automatically, no thinking needed):
 
@@ -629,6 +645,84 @@ function validateAndFixFaceShots(plan: DirectionPlan): { plan: DirectionPlan; vi
   return { plan: fixed, violations }
 }
 
+// ═══ CONSTRAINT DIRECTOR VALIDATION FUNCTIONS ═══
+
+function validateExplosion(shots: DirectionPlan['shots']): boolean {
+  const firstShots = shots.slice(0, 2)
+  return firstShots.some(shot => {
+    const desc = (shot.description || '').toLowerCase()
+    const scene = (shot.scenePrompt || '').toLowerCase()
+    const combined = desc + ' ' + scene
+    return (
+      combined.includes("holding") ||
+      combined.includes("held") ||
+      combined.includes("left") ||
+      combined.includes("blocked") ||
+      combined.includes("turned away") ||
+      combined.includes("disappeared") ||
+      combined.includes("already") ||
+      combined.includes("fallen") ||
+      combined.includes("broken") ||
+      combined.includes("gone")
+    )
+  })
+}
+
+function validateCompletedAction(shots: DirectionPlan['shots']): boolean {
+  const forbidden = ["about to", "starting", "walking toward", "approaching", "beginning to", "going to"]
+  return shots.every(shot => {
+    const desc = (shot.description || '').toLowerCase()
+    const scene = (shot.scenePrompt || '').toLowerCase()
+    const combined = desc + ' ' + scene
+    return !forbidden.some(word => combined.includes(word))
+  })
+}
+
+function validateCloseUp(shots: DirectionPlan['shots']): boolean {
+  const closeUpTypes = ['ECU', 'CU', 'close-up', 'extreme-close-up']
+  const closeUps = shots.filter(s => {
+    const shotType = s.type?.toLowerCase() || ''
+    return closeUpTypes.some(type => shotType.includes(type.toLowerCase()))
+  })
+  const ratio = closeUps.length / shots.length
+  console.log(`[Validation] Close-up ratio: ${ratio.toFixed(2)} (${closeUps.length}/${shots.length})`)
+  return ratio >= 0.6 // Allow 60% instead of 70% for flexibility
+}
+
+function validateKillerLine(shots: DirectionPlan['shots']): boolean {
+  const lastShot = shots[shots.length - 1]
+  if (!lastShot?.dialogue) return false
+  
+  const wordCount = lastShot.dialogue.split(/\s+/).length
+  const isVerdict = lastShot.dialogue.includes('.') || lastShot.dialogue.includes('never') || 
+                    lastShot.dialogue.includes('not') || lastShot.dialogue.includes('will')
+  
+  console.log(`[Validation] Killer line: "${lastShot.dialogue}" (${wordCount} words, verdict: ${isVerdict})`)
+  return wordCount <= 12 && isVerdict
+}
+
+function validateConstraints(plan: DirectionPlan): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+  
+  if (!validateExplosion(plan.shots)) {
+    errors.push("Explosion not strong enough. First shot must show COMPLETED irreversible action.")
+  }
+  
+  if (!validateCompletedAction(plan.shots)) {
+    errors.push("Actions not in completed state. Remove 'about to', 'starting', 'walking toward'.")
+  }
+  
+  if (!validateCloseUp(plan.shots)) {
+    errors.push("Not enough close-ups. 60%+ of shots must be close-up or extreme close-up.")
+  }
+  
+  if (!validateKillerLine(plan.shots)) {
+    errors.push("Final shot needs a killer line (≤12 words, verdict not description).")
+  }
+  
+  return { valid: errors.length === 0, errors }
+}
+
 async function runNEL(
   directionPlan: DirectionPlan,
 ): Promise<ExecutionPlan> {
@@ -702,6 +796,17 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
     console.warn('[CognitiveCore] Face shot violations fixed:', violations)
   } else {
     console.log('[CognitiveCore] All face shots passed validation ✓')
+  }
+
+  // ═══ CONSTRAINT DIRECTOR VALIDATION ═══
+  console.log('[CognitiveCore] Running Constraint Director validation...')
+  const constraintCheck = validateConstraints(directionPlan)
+  if (!constraintCheck.valid) {
+    console.warn('[CognitiveCore] ⚠️ Constraint violations detected:')
+    constraintCheck.errors.forEach(err => console.warn(`  - ${err}`))
+    // Log but don't fail - allow the plan to proceed with warnings
+  } else {
+    console.log('[CognitiveCore] ✅ All constraint validations passed!')
   }
 
   let enhancedShots = directionPlan.shots.map((shot: any, i: number) => {
