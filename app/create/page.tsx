@@ -18,45 +18,35 @@ const TEMPLATES = [
     id: "parallel_universe",
     title: "Your Parallel Life",
     emoji: "🌌",
-    emotion: "curious + melancholy",
-    description: "What if you lived a completely different life?",
-    ending_line: "I could have lived like this.",
+    outcome: "Watch yourself living a completely different life",
     story: "You see another version of yourself living a different life. You watch them with longing. The final moment: you realize what could have been."
   },
   {
     id: "she_didnt_choose_you", 
     title: "She Didn't Choose You",
     emoji: "💔",
-    emotion: "heartbreak + regret",
-    description: "You were ready. She wasn't.",
-    ending_line: "She smiled. Just not at you.",
+    outcome: "Watch yourself in a cinematic breakup scene",
     story: "You prepare to confess your feelings. She walks toward someone else. Her smile breaks your heart."
   },
   {
     id: "future_you",
     title: "Your Future Self Visits",
     emoji: "✨",
-    emotion: "hope + determination", 
-    description: "A better version of you has a message.",
-    ending_line: "You will become me.",
+    outcome: "Watch a stronger version of you deliver a message",
     story: "A stronger, wiser version of you appears. They look at you with knowing eyes. They say one thing before disappearing."
   },
   {
     id: "lost_someone",
     title: "You Lost Them",
     emoji: "🕯️",
-    emotion: "grief + memory",
-    description: "Some people leave footprints that never fade.",
-    ending_line: "Just you. And the silence they left behind.",
+    outcome: "Watch yourself process grief and memory",
     story: "Flashes of memory with someone important. They slowly fade away. You are left alone with the echo of what was."
   },
   {
     id: "last_person",
     title: "The Last Person on Earth",
     emoji: "🌍",
-    emotion: "lonely + philosophical",
-    description: "What if the world went quiet?",
-    ending_line: "No one answered.",
+    outcome: "Watch yourself search an empty world",
     story: "You walk through an empty world. You search for someone, anyone. Silence is the only response."
   }
 ];
@@ -66,9 +56,9 @@ export default function CreatePage() {
   const [extraPhotos, setExtraPhotos] = useState<CharacterPhoto[]>(
     Array(6).fill(null).map(() => ({ file: null, url: null }))
   );
-  const [showModal, setShowModal] = useState(false);
+  const [showExtraPhotos, setShowExtraPhotos] = useState(false);
   const [story, setStory] = useState(TEMPLATES[0].story);
-  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -81,18 +71,12 @@ export default function CreatePage() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user?.id) {
-        // Real user session
         setUserId(session.user.id);
-        console.log('[create/page] userId from session:', session.user.id);
       } else {
-        // Anonymous user - generate or retrieve guest ID
         let guestId = localStorage.getItem('guestId');
         if (!guestId) {
           guestId = crypto.randomUUID();
           localStorage.setItem('guestId', guestId);
-          console.log('[create/page] generated new guestId:', guestId);
-        } else {
-          console.log('[create/page] using existing guestId:', guestId);
         }
         setUserId(guestId);
       }
@@ -130,13 +114,17 @@ export default function CreatePage() {
       setError("Please upload your photo");
       return;
     }
+
+    if (!selectedTemplate) {
+      setError("Please choose your story");
+      return;
+    }
     
     setLoading(true);
     setError(null);
     
     try {
-      // Step 1: Upload main photo
-      console.log('[create/page] Uploading main photo...');
+      // Upload main photo
       const mainFormData = new FormData();
       mainFormData.append('file', mainPhoto.file);
       const mainUploadRes = await fetch('/api/upload-photo', { 
@@ -147,10 +135,8 @@ export default function CreatePage() {
       const mainPhotoUrl = mainUploadData.url;
       
       if (!mainPhotoUrl) throw new Error('Failed to upload main photo');
-      console.log('[create/page] Main photo uploaded:', mainPhotoUrl);
       
-      // Step 2: Upload extra photos
-      console.log('[create/page] Uploading extra photos...');
+      // Upload extra photos
       const additionalImages: string[] = [];
       for (const photo of extraPhotos) {
         if (photo.file) {
@@ -166,9 +152,8 @@ export default function CreatePage() {
           }
         }
       }
-      console.log('[create/page] Extra photos uploaded:', additionalImages.length, additionalImages);
       
-      // Step 3: Generate movie
+      // Generate movie
       const body = {
         story,
         tier: "30s",
@@ -176,8 +161,6 @@ export default function CreatePage() {
         main_photo_url: mainPhotoUrl,
         additional_images: additionalImages
       };
-      
-      console.log('[create/page] Sending to /api/movie/generate:', JSON.stringify(body, null, 2));
       
       const res = await fetch("/api/movie/generate", {
         method: "POST",
@@ -190,16 +173,17 @@ export default function CreatePage() {
       if (!res.ok) throw new Error(data.error || "Failed to create movie");
       if (!data.movieId) throw new Error("No movie ID returned");
       
-      console.log('[create/page] Movie created:', data.movieId);
       router.push(`/movie/${data.movieId}`);
     } catch (e: any) {
-      console.error('[create/page] Error:', e.message);
       setError(e.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const step1Complete = !!mainPhoto.file;
+  const step2Complete = !!selectedTemplate;
+  const canGenerate = step1Complete && step2Complete;
   const uploadedCount = extraPhotos.filter(p => p.file).length;
 
   return (
@@ -210,12 +194,11 @@ export default function CreatePage() {
       display: 'flex', 
       flexDirection: 'column', 
       alignItems: 'center', 
-      justifyContent: 'center',
-      padding: '20px', 
+      padding: '40px 20px', 
       fontFamily: 'system-ui',
       position: 'relative'
     }}>
-      {/* My Videos Button - Top Right */}
+      {/* My Videos Button */}
       <div style={{ 
         position: 'absolute', 
         top: '20px', 
@@ -249,13 +232,40 @@ export default function CreatePage() {
         </a>
       </div>
 
-      <div style={{ maxWidth: '600px', width: '100%', padding: '0 16px' }}>
+      <div style={{ maxWidth: '700px', width: '100%' }}>
         
-        {/* Main Photo - Big Circle */}
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
-            ① Upload your photo
-          </p>
+        {/* STEP 1: Upload Photo */}
+        <div style={{ marginBottom: '48px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px', 
+            marginBottom: '20px' 
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: step1Complete ? '#D4A853' : '#333',
+              color: step1Complete ? '#000' : '#666',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: '700',
+              fontSize: '1rem'
+            }}>
+              {step1Complete ? '✓' : '1'}
+            </div>
+            <h2 style={{ 
+              margin: 0, 
+              fontSize: '1.5rem', 
+              fontWeight: '700',
+              color: step1Complete ? '#fff' : '#666'
+            }}>
+              Upload Your Photo
+            </h2>
+          </div>
+
           <input
             ref={mainPhotoRef}
             type="file"
@@ -268,60 +278,169 @@ export default function CreatePage() {
             onClick={() => mainPhotoRef.current?.click()}
             style={{
               cursor: 'pointer',
-              width: '120px',
-              height: '120px',
-              borderRadius: '50%',
-              background: mainPhoto.url ? 'transparent' : '#111',
-              border: mainPhoto.url ? '4px solid #D4A853' : '4px dashed #D4A853',
+              width: '100%',
+              height: '200px',
+              borderRadius: '16px',
+              background: mainPhoto.url ? `url(${mainPhoto.url})` : '#111',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              border: mainPhoto.url ? '3px solid #D4A853' : '3px dashed #333',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto',
-              overflow: 'hidden',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              position: 'relative'
             }}
-            className="md:w-32 md:h-32"
+            onMouseEnter={(e) => {
+              if (!mainPhoto.url) {
+                e.currentTarget.style.borderColor = '#D4A853';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!mainPhoto.url) {
+                e.currentTarget.style.borderColor = '#333';
+              }
+            }}
           >
-            {mainPhoto.url ? (
-              <img 
-                src={mainPhoto.url} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                alt="Main character" 
-              />
-            ) : (
+            {!mainPhoto.url && (
               <>
-                <div style={{ fontSize: '3rem', marginBottom: '4px' }}>📷</div>
-                <p style={{ color: '#D4A853', fontSize: '0.8rem', fontWeight: 600, margin: 0 }}>
-                  You
+                <div style={{ fontSize: '4rem', marginBottom: '12px' }}>📷</div>
+                <p style={{ color: '#D4A853', fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>
+                  Click to upload your photo
+                </p>
+                <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '8px' }}>
+                  JPG, PNG, or WEBP
                 </p>
               </>
             )}
+            {mainPhoto.url && (
+              <div style={{
+                position: 'absolute',
+                bottom: '12px',
+                right: '12px',
+                background: 'rgba(0,0,0,0.8)',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '0.85rem',
+                color: '#4ade80'
+              }}>
+                ✓ Uploaded - Click to change
+              </div>
+            )}
           </div>
-          
-          {mainPhoto.url && (
-            <p style={{ color: '#4ade80', fontSize: '0.75rem', marginTop: '8px' }}>
-              ✓ Uploaded - Click to change
-            </p>
-          )}
         </div>
 
-        {/* Add More Button */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <button
-            onClick={() => setShowModal(true)}
-            style={{
-              background: '#1a1a1a',
-              border: '2px dashed #333',
+        {/* STEP 2: Choose Story */}
+        <div style={{ 
+          marginBottom: '48px',
+          opacity: step1Complete ? 1 : 0.4,
+          pointerEvents: step1Complete ? 'auto' : 'none',
+          transition: 'opacity 0.3s'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px', 
+            marginBottom: '20px' 
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              color: '#888',
-              cursor: 'pointer',
-              fontSize: '1.5rem',
-              display: 'inline-flex',
+              background: step2Complete ? '#D4A853' : '#333',
+              color: step2Complete ? '#000' : '#666',
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              fontWeight: '700',
+              fontSize: '1rem'
+            }}>
+              {step2Complete ? '✓' : '2'}
+            </div>
+            <h2 style={{ 
+              margin: 0, 
+              fontSize: '1.5rem', 
+              fontWeight: '700',
+              color: step1Complete ? (step2Complete ? '#fff' : '#666') : '#444'
+            }}>
+              Choose Your Story
+            </h2>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {TEMPLATES.map((template) => (
+              <div
+                key={template.id}
+                onClick={() => step1Complete && handleTemplateClick(template)}
+                style={{
+                  background: selectedTemplate === template.id ? 'linear-gradient(135deg, #D4A853 0%, #B8923F 100%)' : '#111',
+                  border: selectedTemplate === template.id ? '2px solid #D4A853' : '1px solid #333',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  cursor: step1Complete ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (step1Complete && selectedTemplate !== template.id) {
+                    e.currentTarget.style.borderColor = '#555';
+                    e.currentTarget.style.background = '#1a1a1a';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (step1Complete && selectedTemplate !== template.id) {
+                    e.currentTarget.style.borderColor = '#333';
+                    e.currentTarget.style.background = '#111';
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ 
+                    fontSize: '2.5rem',
+                    filter: selectedTemplate === template.id ? 'none' : 'grayscale(0.5)'
+                  }}>
+                    {template.emoji}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ 
+                      margin: '0 0 8px 0', 
+                      fontSize: '1.2rem', 
+                      fontWeight: '700',
+                      color: selectedTemplate === template.id ? '#000' : '#fff'
+                    }}>
+                      {template.title}
+                    </h3>
+                    <p style={{ 
+                      margin: 0, 
+                      fontSize: '0.95rem',
+                      color: selectedTemplate === template.id ? 'rgba(0,0,0,0.8)' : '#aaa',
+                      lineHeight: 1.4
+                    }}>
+                      {template.outcome}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Optional: Add Characters (Collapsible) */}
+        <div style={{ marginBottom: '32px' }}>
+          <button
+            onClick={() => setShowExtraPhotos(!showExtraPhotos)}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: '1px dashed #333',
+              borderRadius: '12px',
+              padding: '16px',
+              color: '#888',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               transition: 'all 0.2s'
             }}
             onMouseEnter={(e) => {
@@ -333,102 +452,81 @@ export default function CreatePage() {
               e.currentTarget.style.color = '#888';
             }}
           >
-            +
+            <span>+ Add Characters (Optional) — More photos = richer story</span>
+            <span>{showExtraPhotos ? '▼' : '▶'}</span>
           </button>
-          {uploadedCount > 0 && (
-            <p style={{ color: '#888', fontSize: '0.75rem', marginTop: '6px' }}>
-              {uploadedCount} more added
-            </p>
-          )}
-        </div>
 
-        {/* Template Selection */}
-        <div style={{ marginBottom: '24px' }}>
-          <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
-            ② Choose your emotional story
-          </p>
-          
-          {/* Template Cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {TEMPLATES.map((template) => (
-              <div
-                key={template.id}
-                onClick={() => handleTemplateClick(template)}
-                style={{
-                  background: selectedTemplate === template.id ? 'linear-gradient(135deg, #D4A853 0%, #B8923F 100%)' : '#111',
-                  border: selectedTemplate === template.id ? '2px solid #D4A853' : '1px solid #333',
-                  borderRadius: '16px',
-                  padding: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedTemplate !== template.id) {
-                    e.currentTarget.style.borderColor = '#555';
-                    e.currentTarget.style.background = '#1a1a1a';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedTemplate !== template.id) {
-                    e.currentTarget.style.borderColor = '#333';
-                    e.currentTarget.style.background = '#111';
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ 
-                    fontSize: '2.5rem', 
-                    lineHeight: 1,
-                    filter: selectedTemplate === template.id ? 'none' : 'grayscale(0.5)'
-                  }}>
-                    {template.emoji}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ 
-                      margin: '0 0 6px 0', 
-                      fontSize: '1.1rem', 
-                      fontWeight: 700,
-                      color: selectedTemplate === template.id ? '#000' : '#fff'
-                    }}>
-                      {template.title}
-                    </h3>
-                    <div style={{ 
-                      display: 'inline-block',
-                      background: selectedTemplate === template.id ? 'rgba(0,0,0,0.2)' : 'rgba(212,168,83,0.15)',
-                      color: selectedTemplate === template.id ? '#000' : '#D4A853',
-                      padding: '4px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.7rem',
-                      fontWeight: 600,
-                      marginBottom: '8px'
-                    }}>
-                      {template.emotion}
+          {showExtraPhotos && (
+            <div style={{ 
+              marginTop: '16px',
+              padding: '20px',
+              background: '#111',
+              borderRadius: '12px',
+              border: '1px solid #222'
+            }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gap: '12px',
+                marginBottom: '16px'
+              }}>
+                {extraPhotos.map((photo, index) => (
+                  <div key={index}>
+                    <input
+                      ref={el => { extraPhotoRefs.current[index] = el }}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={(e) => handleExtraPhotoChange(index, e)}
+                      style={{ display: 'none' }}
+                    />
+                    
+                    <div
+                      onClick={() => extraPhotoRefs.current[index]?.click()}
+                      style={{
+                        cursor: 'pointer',
+                        width: '100%',
+                        aspectRatio: '1',
+                        borderRadius: '12px',
+                        background: photo.url ? `url(${photo.url})` : '#1a1a1a',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        border: photo.url ? '2px solid #555' : '2px dashed #333',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!photo.url) {
+                          e.currentTarget.style.borderColor = '#D4A853';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!photo.url) {
+                          e.currentTarget.style.borderColor = '#333';
+                        }
+                      }}
+                    >
+                      {!photo.url && (
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '2rem', color: '#555' }}>+</div>
+                          <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '4px' }}>
+                            {index + 1}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <p style={{ 
-                      margin: '0 0 8px 0', 
-                      fontSize: '0.85rem',
-                      color: selectedTemplate === template.id ? '#000' : '#aaa',
-                      lineHeight: 1.4
-                    }}>
-                      {template.description}
-                    </p>
-                    <p style={{ 
-                      margin: 0, 
-                      fontSize: '0.75rem',
-                      fontStyle: 'italic',
-                      color: selectedTemplate === template.id ? 'rgba(0,0,0,0.7)' : '#666',
-                      borderLeft: selectedTemplate === template.id ? '2px solid rgba(0,0,0,0.3)' : '2px solid #333',
-                      paddingLeft: '8px'
-                    }}>
-                      "{template.ending_line}"
-                    </p>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+              
+              {uploadedCount > 0 && (
+                <p style={{ color: '#4ade80', fontSize: '0.85rem', textAlign: 'center', margin: 0 }}>
+                  ✓ {uploadedCount} character{uploadedCount > 1 ? 's' : ''} added
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Error */}
@@ -447,167 +545,51 @@ export default function CreatePage() {
           </div>
         )}
 
-        {/* Generate Button */}
-        <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
-          ③ Generate your movie
-        </p>
+        {/* STEP 3: Generate Button */}
         <button
           onClick={handleGenerate}
-          disabled={loading || !mainPhoto.file}
+          disabled={loading || !canGenerate}
           style={{
             width: '100%',
-            background: loading || !mainPhoto.file ? '#333' : '#D4A853',
-            color: loading || !mainPhoto.file ? '#666' : '#000',
+            background: canGenerate && !loading ? '#D4A853' : '#333',
+            color: canGenerate && !loading ? '#000' : '#666',
             border: 'none',
             borderRadius: '16px',
-            padding: '18px',
-            fontSize: '1.1rem',
-            fontWeight: 700,
-            cursor: loading || !mainPhoto.file ? 'not-allowed' : 'pointer',
+            padding: '20px',
+            fontSize: '1.2rem',
+            fontWeight: '700',
+            cursor: canGenerate && !loading ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s',
-            opacity: loading || !mainPhoto.file ? 0.5 : 1
+            opacity: canGenerate && !loading ? 1 : 0.5,
+            boxShadow: canGenerate && !loading ? '0 4px 20px rgba(212,168,83,0.3)' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            if (canGenerate && !loading) {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 25px rgba(212,168,83,0.4)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (canGenerate && !loading) {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 20px rgba(212,168,83,0.3)';
+            }
           }}
         >
-          {loading ? '✨ Creating...' : '🎬 See Your Story'}
+          {loading ? '✨ Creating Your Movie...' : '🎬 Generate Your AI Movie ($2.9) — Ready in 60 seconds'}
         </button>
 
-        <p style={{ textAlign: 'center', color: '#555', fontSize: '0.75rem', marginTop: '12px' }}>
-          ⚡ Ready in 60 seconds
-        </p>
+        {!canGenerate && (
+          <p style={{ 
+            textAlign: 'center', 
+            color: '#666', 
+            fontSize: '0.85rem', 
+            marginTop: '12px' 
+          }}>
+            {!step1Complete ? '↑ Upload your photo to continue' : '↑ Choose your story to continue'}
+          </p>
+        )}
       </div>
-
-      {/* Modal */}
-      {showModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px'
-          }}
-          onClick={() => setShowModal(false)}
-        >
-          <div 
-            style={{
-              background: '#0a0a0a',
-              border: '1px solid #333',
-              borderRadius: '20px',
-              padding: '24px',
-              maxWidth: '500px',
-              width: '100%',
-              maxHeight: '80vh',
-              overflowY: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h2 style={{ color: '#D4A853', fontSize: '1.2rem', margin: 0 }}>Add More</h2>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#888',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >✕</button>
-            </div>
-            
-            {/* Hint Text */}
-            <p style={{ color: '#666', fontSize: '0.8rem', marginBottom: '20px', marginTop: '4px' }}>
-              Add up to 6 photos of characters or scenes
-            </p>
-
-            {/* Photo Upload Circles */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: '12px', 
-              marginBottom: '20px' 
-            }}>
-              {extraPhotos.map((photo, index) => (
-                <div key={index} style={{ textAlign: 'center' }}>
-                  <input
-                    ref={el => { extraPhotoRefs.current[index] = el }}
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    onChange={(e) => handleExtraPhotoChange(index, e)}
-                    style={{ display: 'none' }}
-                  />
-                  
-                  <div
-                    onClick={() => extraPhotoRefs.current[index]?.click()}
-                    style={{
-                      cursor: 'pointer',
-                      width: '100%',
-                      aspectRatio: '1',
-                      borderRadius: '50%',
-                      background: photo.url ? 'transparent' : '#1a1a1a',
-                      border: photo.url ? '2px solid #555' : '2px dashed #333',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      transition: 'all 0.2s',
-                      position: 'relative'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!photo.url) {
-                        e.currentTarget.style.borderColor = '#D4A853';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!photo.url) {
-                        e.currentTarget.style.borderColor = '#333';
-                      }
-                    }}
-                  >
-                    {photo.url ? (
-                      <img 
-                        src={photo.url} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        alt={`Character ${index + 1}`} 
-                      />
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '1.8rem', color: '#555' }}>+</span>
-                        <span style={{ fontSize: '0.7rem', color: '#666' }}>{index + 1}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Done Button */}
-            <button
-              onClick={() => setShowModal(false)}
-              style={{
-                width: '100%',
-                background: '#D4A853',
-                color: '#000',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '14px',
-                fontSize: '1rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
