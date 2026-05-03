@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 
@@ -67,7 +67,7 @@ const questions = [
   },
 ];
 
-export default function SurveyPage() {
+function SurveyContent() {
   const searchParams = useSearchParams();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -317,5 +317,25 @@ export default function SurveyPage() {
         </motion.p>
       </div>
     </div>
+  );
+}
+
+export default function SurveyPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'white',
+        fontSize: '1.2rem'
+      }}>
+        Loading...
+      </div>
+    }>
+      <SurveyContent />
+    </Suspense>
   );
 }
