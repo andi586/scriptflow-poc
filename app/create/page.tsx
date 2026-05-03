@@ -194,9 +194,35 @@ export default function CreatePage() {
       paddingBottom: '120px'
     }}>
       
+      {/* TOP SECTION */}
+      <div style={{
+        textAlign: 'center',
+        padding: '40px 20px 20px 20px',
+        borderBottom: '1px solid #1a1a1a'
+      }}>
+        <h1 style={{
+          fontSize: '2.5rem',
+          fontWeight: '700',
+          marginBottom: '12px',
+          background: 'linear-gradient(135deg, #D4A853 0%, #F4D03F 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text'
+        }}>
+          Turn yourself into a cinematic story
+        </h1>
+        <p style={{
+          fontSize: '1.1rem',
+          color: '#888',
+          margin: 0
+        }}>
+          Upload your photo · Choose your story · Get your movie in 60s
+        </p>
+      </div>
+
       <div style={{ 
         display: 'flex',
-        minHeight: '100vh',
+        minHeight: 'calc(100vh - 200px)',
         flexDirection: 'column'
       }}
       className="md:flex-row"
