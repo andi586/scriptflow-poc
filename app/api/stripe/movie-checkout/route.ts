@@ -12,6 +12,25 @@ export async function POST(request: NextRequest) {
     const effectiveUserId = user?.id || userId || 'anonymous'
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
 
+    // Check if user has previous paid movies
+    const { data: previousPaidMovies, error: queryError } = await supabase
+      .from('movies')
+      .select('id')
+      .eq('user_id', effectiveUserId)
+      .eq('paid', true)
+      .limit(1)
+
+    if (queryError) {
+      console.error('[movie-checkout] Error checking previous movies:', queryError)
+    }
+
+    // Determine pricing: $2.9 for first-time users, $4.9 for returning users
+    const isFirstTime = !previousPaidMovies || previousPaidMovies.length === 0
+    const price = isFirstTime ? 290 : 490 // in cents
+    const priceLabel = isFirstTime ? 'First Movie Special' : 'Standard Price'
+
+    console.log(`[movie-checkout] User ${effectiveUserId}: isFirstTime=${isFirstTime}, price=$${price/100}`)
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
@@ -19,10 +38,10 @@ export async function POST(request: NextRequest) {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: 'ScriptFlow Movie Generation',
+            name: `ScriptFlow Movie Generation${isFirstTime ? ' - First Movie Special' : ''}`,
             description: 'Generate your personalized AI movie'
           },
-          unit_amount: 290
+          unit_amount: price
         },
         quantity: 1
       }],
@@ -32,11 +51,17 @@ export async function POST(request: NextRequest) {
       metadata: {
         supabase_user_id: effectiveUserId,
         movie_id: movieId,
-        type: 'movie_generation'
+        type: 'movie_generation',
+        is_first_time: isFirstTime.toString(),
+        price_tier: priceLabel
       }
     })
 
-    return NextResponse.json({ checkoutUrl: session.url })
+    return NextResponse.json({ 
+      checkoutUrl: session.url,
+      isFirstTime,
+      price: price / 100
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error'
     return NextResponse.json({ error: message }, { status: 500 })

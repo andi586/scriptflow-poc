@@ -13,6 +13,8 @@ export default function MoviePage() {
   const [copied, setCopied] = useState(false)
   const [movieId, setMovieId] = useState<string | null>(null)
   const [showPaywall, setShowPaywall] = useState(false)
+  const [isFirstTime, setIsFirstTime] = useState(true)
+  const [price, setPrice] = useState(2.9)
   const paywallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function MoviePage() {
         <h1 style={{color:'#D4A853',fontSize:'1.3rem',marginBottom:'4px'}}>🎬 Your Preview is Ready</h1>
         <p style={{color:'#555',fontSize:'0.85rem',marginBottom:'24px'}}>Watch the first 15 seconds of your movie</p>
 
-        <div style={{position:'relative',display:'inline-block',marginBottom:'32px'}}>
+        <div style={{position:'relative',display:'inline-block',marginBottom:'8px'}}>
           <video
             src={movie.hook_video_url}
             autoPlay
@@ -112,10 +114,10 @@ export default function MoviePage() {
               gap:'12px'
             }}>
               <p style={{color:'#D4A853',fontWeight:'800',fontSize:'1.1rem',textAlign:'center',margin:0}}>
-                Your movie is being created...
+                🎬 Unlock Your Movie
               </p>
               <p style={{color:'#aaa',fontSize:'0.85rem',textAlign:'center',margin:0}}>
-                Unlock the full movie now
+                {isFirstTime ? '$2.9 - First Movie Special' : '$4.9 - Unlock Full Movie'}
               </p>
               <button
                 onClick={async () => {
@@ -129,6 +131,9 @@ export default function MoviePage() {
                   })
                   const data = await res.json()
                   if (data.checkoutUrl || data.url) {
+                    // Update pricing info from response
+                    if (data.isFirstTime !== undefined) setIsFirstTime(data.isFirstTime)
+                    if (data.price !== undefined) setPrice(data.price)
                     window.location.href = data.checkoutUrl || data.url
                   } else {
                     alert('Payment error: ' + (data.error || 'Unknown error'))
@@ -147,11 +152,16 @@ export default function MoviePage() {
                   maxWidth:'280px'
                 }}
               >
-                🔓 Unlock now → $2.9
+                🔓 Unlock now → ${price}
               </button>
             </div>
           )}
         </div>
+
+        {/* Watermark text below hook video */}
+        <p style={{color:'#555',fontSize:'0.7rem',textAlign:'center',marginBottom:'24px',marginTop:'4px'}}>
+          ScriptFlow.com - Be the star of your own movie
+        </p>
 
         {!showPaywall && (
           <p style={{color:'#555',fontSize:'0.8rem',textAlign:'center'}}>
