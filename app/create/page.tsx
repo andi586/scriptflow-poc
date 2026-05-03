@@ -13,15 +13,52 @@ interface CharacterPhoto {
   url: string | null;
 }
 
-const STORY_KEYWORDS = [
-  { label: "Affair", story: "I caught my partner cheating on me at 3AM and everything changed..." },
-  { label: "Revenge", story: "My boss humiliated me in front of everyone, I got revenge..." },
-  { label: "Betrayal", story: "My best friend betrayed me after 10 years..." },
-  { label: "Time Travel", story: "I met my future self and got a warning..." },
-  { label: "Pet", story: "My beloved pet left me a final message before I lost them..." },
-  { label: "Reunion", story: "I ran into my ex after 5 years and everything changed..." },
-  { label: "Prank", story: "My friends pranked me and it went completely viral..." },
-  { label: "Secret", story: "Someone discovered my biggest secret..." },
+const TEMPLATES = [
+  {
+    id: "parallel_universe",
+    title: "Your Parallel Life",
+    emoji: "🌌",
+    emotion: "curious + melancholy",
+    description: "What if you lived a completely different life?",
+    ending_line: "I could have lived like this.",
+    story: "You see another version of yourself living a different life. You watch them with longing. The final moment: you realize what could have been."
+  },
+  {
+    id: "she_didnt_choose_you", 
+    title: "She Didn't Choose You",
+    emoji: "💔",
+    emotion: "heartbreak + regret",
+    description: "You were ready. She wasn't.",
+    ending_line: "She smiled. Just not at you.",
+    story: "You prepare to confess your feelings. She walks toward someone else. Her smile breaks your heart."
+  },
+  {
+    id: "future_you",
+    title: "Your Future Self Visits",
+    emoji: "✨",
+    emotion: "hope + determination", 
+    description: "A better version of you has a message.",
+    ending_line: "You will become me.",
+    story: "A stronger, wiser version of you appears. They look at you with knowing eyes. They say one thing before disappearing."
+  },
+  {
+    id: "lost_someone",
+    title: "You Lost Them",
+    emoji: "🕯️",
+    emotion: "grief + memory",
+    description: "Some people leave footprints that never fade.",
+    ending_line: "Just you. And the silence they left behind.",
+    story: "Flashes of memory with someone important. They slowly fade away. You are left alone with the echo of what was."
+  },
+  {
+    id: "last_person",
+    title: "The Last Person on Earth",
+    emoji: "🌍",
+    emotion: "lonely + philosophical",
+    description: "What if the world went quiet?",
+    ending_line: "No one answered.",
+    story: "You walk through an empty world. You search for someone, anyone. Silence is the only response."
+  }
 ];
 
 export default function CreatePage() {
@@ -30,8 +67,8 @@ export default function CreatePage() {
     Array(6).fill(null).map(() => ({ file: null, url: null }))
   );
   const [showModal, setShowModal] = useState(false);
-  const [story, setStory] = useState("I caught my partner cheating on me at 3AM and everything changed...");
-  const [selectedKeyword, setSelectedKeyword] = useState("Affair");
+  const [story, setStory] = useState(TEMPLATES[0].story);
+  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -81,9 +118,9 @@ export default function CreatePage() {
     });
   };
 
-  const handleKeywordClick = (keyword: typeof STORY_KEYWORDS[0]) => {
-    setStory(keyword.story);
-    setSelectedKeyword(keyword.label);
+  const handleTemplateClick = (template: typeof TEMPLATES[0]) => {
+    setStory(template.story);
+    setSelectedTemplate(template.id);
   };
 
   const handleGenerate = async () => {
@@ -305,66 +342,92 @@ export default function CreatePage() {
           )}
         </div>
 
-        {/* Story Input */}
+        {/* Template Selection */}
         <div style={{ marginBottom: '24px' }}>
           <p style={{ color: '#888', fontSize: '0.75rem', marginBottom: '12px' }}>
-            ② Choose a story or write your own
+            ② Choose your emotional story
           </p>
           
-          {/* Unified Story Box */}
-          <div style={{
-            background: '#111',
-            border: '1px solid #333',
-            borderRadius: '16px',
-            padding: '12px',
-          }}>
-            {/* Keyword Chips */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' }}>
-              {STORY_KEYWORDS.map((keyword) => (
-                <button
-                  key={keyword.label}
-                  type="button"
-                  onClick={() => { setStory(keyword.story); setSelectedKeyword(keyword.label); }}
-                  style={{
-                    background: selectedKeyword === keyword.label ? '#D4A853' : '#1a1a1a',
-                    color: selectedKeyword === keyword.label ? '#000' : '#fff',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    padding: '8px 4px',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                  }}
-                >
-                  {keyword.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Hint Text */}
-            <p style={{ color: '#666', fontSize: '0.75rem', fontStyle: 'italic', marginBottom: '8px', marginTop: 0 }}>
-              Or describe your own story here...
-            </p>
-
-            {/* Textarea */}
-            <textarea
-              value={story}
-              onChange={(e) => setStory(e.target.value)}
-              rows={4}
-              style={{
-                width: '100%',
-                padding: '8px',
-                background: 'transparent',
-                border: 'none',
-                color: 'white',
-                fontSize: '0.875rem',
-                resize: 'none',
-                outline: 'none',
-                boxSizing: 'border-box',
-                fontFamily: 'system-ui',
-                cursor: 'text',
-              }}
-            />
+          {/* Template Cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {TEMPLATES.map((template) => (
+              <div
+                key={template.id}
+                onClick={() => handleTemplateClick(template)}
+                style={{
+                  background: selectedTemplate === template.id ? 'linear-gradient(135deg, #D4A853 0%, #B8923F 100%)' : '#111',
+                  border: selectedTemplate === template.id ? '2px solid #D4A853' : '1px solid #333',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedTemplate !== template.id) {
+                    e.currentTarget.style.borderColor = '#555';
+                    e.currentTarget.style.background = '#1a1a1a';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedTemplate !== template.id) {
+                    e.currentTarget.style.borderColor = '#333';
+                    e.currentTarget.style.background = '#111';
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ 
+                    fontSize: '2.5rem', 
+                    lineHeight: 1,
+                    filter: selectedTemplate === template.id ? 'none' : 'grayscale(0.5)'
+                  }}>
+                    {template.emoji}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ 
+                      margin: '0 0 6px 0', 
+                      fontSize: '1.1rem', 
+                      fontWeight: 700,
+                      color: selectedTemplate === template.id ? '#000' : '#fff'
+                    }}>
+                      {template.title}
+                    </h3>
+                    <div style={{ 
+                      display: 'inline-block',
+                      background: selectedTemplate === template.id ? 'rgba(0,0,0,0.2)' : 'rgba(212,168,83,0.15)',
+                      color: selectedTemplate === template.id ? '#000' : '#D4A853',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      marginBottom: '8px'
+                    }}>
+                      {template.emotion}
+                    </div>
+                    <p style={{ 
+                      margin: '0 0 8px 0', 
+                      fontSize: '0.85rem',
+                      color: selectedTemplate === template.id ? '#000' : '#aaa',
+                      lineHeight: 1.4
+                    }}>
+                      {template.description}
+                    </p>
+                    <p style={{ 
+                      margin: 0, 
+                      fontSize: '0.75rem',
+                      fontStyle: 'italic',
+                      color: selectedTemplate === template.id ? 'rgba(0,0,0,0.7)' : '#666',
+                      borderLeft: selectedTemplate === template.id ? '2px solid rgba(0,0,0,0.3)' : '2px solid #333',
+                      paddingLeft: '8px'
+                    }}>
+                      "{template.ending_line}"
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -405,7 +468,7 @@ export default function CreatePage() {
             opacity: loading || !mainPhoto.file ? 0.5 : 1
           }}
         >
-          {loading ? '✨ Creating...' : '🎬 Create My Movie'}
+          {loading ? '✨ Creating...' : '🎬 See Your Story'}
         </button>
 
         <p style={{ textAlign: 'center', color: '#555', fontSize: '0.75rem', marginTop: '12px' }}>
