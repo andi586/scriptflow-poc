@@ -379,6 +379,78 @@ These rules apply to ALL archetypes without exception.
 7. ESCALATION: Emotion must build shot by shot. Never flat.
 8. END WITH SILENCE: Final shot = static wide shot OR extreme close-up. Let it breathe.
 
+═══ MANDATORY STORYTELLING RULES - EMOTIONAL ATTACK MODE ═══
+
+These rules are NON-NEGOTIABLE. Every shot must serve the emotional payoff.
+
+1. HOOK (0-2s): Must show RESULT, not process
+   ❌ WRONG: "She is walking toward someone"
+   ✅ CORRECT: "She is already holding his hand"
+   -> Start at the PAIN POINT, not the setup
+
+2. EVERY story must have a LOSS:
+   - A person lost (death, breakup, abandonment)
+   - An opportunity lost (missed chance, rejection)
+   - Time lost (regret, too late)
+   - Self lost (identity crisis, transformation)
+   -> NO STORY WITHOUT LOSS. This is mandatory.
+
+3. ENDING must be a VERDICT, not description:
+   ❌ WRONG: "You feel sad"
+   ✅ CORRECT: "She never chose you. Not even once."
+   -> Final shot dialogue must be a JUDGMENT or TRUTH BOMB
+   -> Make it hurt. Make it stick.
+
+4. CLOSE-UP SHOTS ONLY for emotional moments:
+   - Face + eyes + micro-expressions
+   - No wide shots during emotional beats
+   - Wide shots = isolation/aftermath ONLY
+   -> Emotion = CLOSE. Distance = LOSS.
+
+5. Add one KILLER LINE from this list based on emotion:
+   
+   HEARTBREAK:
+   - "She never loved you. You just showed up at the right time."
+   - "You were convenient. Not chosen."
+   - "She smiled. Just not at you."
+   
+   LOSS:
+   - "You weren't forgotten. You were replaced."
+   - "They moved on. You're still here."
+   - "Just you. And the silence they left behind."
+   
+   REGRET:
+   - "You had one chance. It's gone."
+   - "You could have been everything. You chose nothing."
+   - "I could have lived like this."
+   
+   HOPE:
+   - "You will become everything they doubted."
+   - "You will become me."
+   - "Not yet. But soon."
+   
+   LONELINESS:
+   - "No one answered. No one ever will."
+   - "The world went quiet. So did you."
+   - "You searched. Silence was the only response."
+   
+   -> Pick ONE killer line that matches the story's core emotion
+   -> Use it in the final shot or peak emotional moment
+   -> This line is the VERDICT
+
+6. SHOW THE WOUND, NOT THE HEALING:
+   - Focus on the moment of loss/pain
+   - Don't show recovery or "it gets better"
+   - Leave them in the emotion
+   -> We're making them FEEL, not comforting them
+
+7. NO HOPE WITHOUT COST:
+   - If story has hope, show what was sacrificed
+   - "You will become me" = you had to lose yourself first
+   - Hope must be EARNED through pain
+
+These rules override everything else. Emotion first. Always.
+
 --- 10 CINEMATIC RULES ---
 
 RULE 1: Late in, Early out
