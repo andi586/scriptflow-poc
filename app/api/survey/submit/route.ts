@@ -70,7 +70,6 @@ export async function POST(request: NextRequest) {
         q3_price,
         q4_voice,
         q5_share,
-        credit_awarded: true,
       })
       .select("id")
       .single();
