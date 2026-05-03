@@ -31,6 +31,49 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
   console.log('[stripe webhook] session id:', session.id)
   console.log('[stripe webhook] payment_status:', session.payment_status)
   
+  // Handle credit purchase
+  if (session.metadata?.type === 'credit_purchase') {
+    const userId = session.metadata.supabase_user_id
+    const credits = parseInt(session.metadata.credits || '0', 10)
+    const packageId = session.metadata.package_id
+    
+    console.log('[stripe webhook] credit purchase detected - userId:', userId, 'credits:', credits, 'package:', packageId)
+    
+    if (!userId || !credits) throw new Error('Missing supabase_user_id or credits in metadata')
+
+    // Add credits to user profile
+    const { error: updateError } = await supabaseAdmin.rpc('increment_user_credits', {
+      user_id: userId,
+      credit_amount: credits
+    })
+    
+    if (updateError) {
+      console.error('[stripe webhook] failed to add credits:', updateError.message)
+      // Fallback: try direct update
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('credits')
+        .eq('id', userId)
+        .single()
+      
+      const currentCredits = profile?.credits || 0
+      const { error: fallbackError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({ 
+          id: userId, 
+          credits: currentCredits + credits 
+        }, { onConflict: 'id' })
+      
+      if (fallbackError) {
+        console.error('[stripe webhook] fallback credit update failed:', fallbackError.message)
+        throw fallbackError
+      }
+    }
+    
+    console.log('[stripe webhook] ✅ Credits added:', credits, 'to user:', userId)
+    return
+  }
+
   // Handle one-time movie generation payment
   if (session.metadata?.type === 'movie_generation') {
     const movieId = session.metadata.movie_id
