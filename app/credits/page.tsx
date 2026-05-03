@@ -90,7 +90,7 @@ function CreditsContent() {
       {/* Header */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center', marginBottom: '48px' }}>
         <h1 style={{ color: '#D4A853', fontSize: '2rem', marginBottom: '12px' }}>
-          🎬 Buy Movie Credits
+          🎬 Get More Movies
         </h1>
         <p style={{ color: '#888', fontSize: '1rem', marginBottom: '24px' }}>
           Purchase credits to create multiple movies at a discounted rate

@@ -195,10 +195,10 @@ function SurveyContent() {
           className="text-center mb-8"
         >
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-            🎬 Enjoying your movie?
+            🎬 Be the First to Shape ScriptFlow
           </h1>
           <h2 className="text-2xl md:text-3xl font-semibold text-white/90">
-            Share your feedback and get 1 FREE movie!
+            Get 1 FREE AI Movie ($2.9 value)
           </h2>
         </motion.div>
 
