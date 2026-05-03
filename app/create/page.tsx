@@ -560,8 +560,10 @@ export default function CreatePage() {
         >
           {loading ? (
             '✨ Creating Your Movie...'
+          ) : canGenerate ? (
+            '🎬 Generate Your Movie — $2.9'
           ) : (
-            '🎬 Generate Your Movie — $2.9 · Ready in 60s'
+            'Upload photo to continue'
           )}
         </button>
       </div>
