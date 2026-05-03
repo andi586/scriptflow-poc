@@ -15,6 +15,7 @@ export default function MoviePage() {
   const [showPaywall, setShowPaywall] = useState(false)
   const [isFirstTime, setIsFirstTime] = useState(true)
   const [price, setPrice] = useState(2.9)
+  const [videoLoading, setVideoLoading] = useState(true)
   const paywallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -54,12 +55,12 @@ export default function MoviePage() {
     return () => clearInterval(interval)
   }, [movieId])
 
-  // Show paywall after 13 seconds if hook video is playing and not paid
+  // Show paywall after 5 seconds if hook video is playing and not paid
   useEffect(() => {
     if (movie?.hook_video_url && !movie?.paid) {
       paywallTimerRef.current = setTimeout(() => {
         setShowPaywall(true)
-      }, 13000)
+      }, 5000)
     }
     return () => {
       if (paywallTimerRef.current) clearTimeout(paywallTimerRef.current)
@@ -91,12 +92,39 @@ export default function MoviePage() {
         <p style={{color:'#555',fontSize:'0.85rem',marginBottom:'24px'}}>Watch the first 15 seconds of your movie</p>
 
         <div style={{position:'relative',display:'inline-block',marginBottom:'8px'}}>
+          {/* Loading skeleton */}
+          {videoLoading && (
+            <div style={{
+              width:'360px',
+              height:'640px',
+              maxHeight:'70vh',
+              borderRadius:'16px',
+              background:'linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%)',
+              backgroundSize:'200% 100%',
+              animation:'shimmer 1.5s infinite',
+              display:'flex',
+              alignItems:'center',
+              justifyContent:'center',
+              color:'#666',
+              fontSize:'0.9rem'
+            }}>
+              <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+              Loading preview...
+            </div>
+          )}
           <video
             src={movie.hook_video_url}
             autoPlay
             playsInline
             muted={false}
-            style={{maxHeight:'70vh',maxWidth:'360px',borderRadius:'16px',boxShadow:'0 0 60px rgba(212,168,83,0.2)'}}
+            onLoadedData={() => setVideoLoading(false)}
+            style={{
+              maxHeight:'70vh',
+              maxWidth:'360px',
+              borderRadius:'16px',
+              boxShadow:'0 0 60px rgba(212,168,83,0.2)',
+              display: videoLoading ? 'none' : 'block'
+            }}
           />
 
           {/* Paywall overlay */}
