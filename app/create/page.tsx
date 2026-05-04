@@ -170,6 +170,10 @@ export default function CreatePage() {
       
       if (!mainPhotoUrl) throw new Error('Failed to upload main photo');
       
+      console.log('[create] extraPhotos state:', extraPhotos)
+      console.log('[create] friendPhoto state:', friendPhoto)
+      console.log('[create] selectedTemplate:', selectedTemplate)
+      
       const additionalImages: string[] = [];
       
       // For prank template: upload friend photo as additional image
@@ -204,7 +208,8 @@ export default function CreatePage() {
         tier: "30s",
         userId: userId || crypto.randomUUID(),
         main_photo_url: mainPhotoUrl,
-        additional_images: additionalImages
+        additional_images: additionalImages,
+        story_category: selectedTemplate === 'breaking_news' ? 'breaking_news' : undefined
       };
       
       console.log('[create] SENDING body:', JSON.stringify(body))

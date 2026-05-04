@@ -87,7 +87,12 @@ export async function POST(req: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════════
     // Step 2: Check for DirectorIntent template match
     // ═══════════════════════════════════════════════════════════════════════════
-    // Skip DirectorIntent for prank template - use CognitiveCore with blueprint instead
+    // CRITICAL: Skip DirectorIntent for prank template FIRST (before matching)
+    // DirectorIntent may match keywords in prank story and override the template
+    if (story_category === 'breaking_news' || story_category === 'prank') {
+      console.log('[movie/generate] 🎭 PRANK template detected - skipping DirectorIntent completely')
+    }
+    
     const skipDirectorIntent = story_category === 'breaking_news' || story_category === 'prank'
     const directorIntent = skipDirectorIntent ? null : matchDirectorIntent(story)
     let shots: any[] = []
