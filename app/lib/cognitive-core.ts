@@ -5,6 +5,7 @@ import { getKlingTemplate, getEmotionProgression, DIRECTOR_SELF_CHECK } from './
 import { NEW_ARCHETYPES, matchArchetypeExtended } from './film-os'
 import { getDirectorRules } from './director-rules'
 import { buildGrowthPrompt } from './growth-os'
+import { getTemplateBlueprint, type TemplateBlueprint } from './template-blueprints'
 
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
@@ -223,7 +224,8 @@ async function runDirector(
   klingTemplate: ReturnType<typeof getKlingTemplate>,
   emotionCurve: ReturnType<typeof getEmotionProgression>,
   directorRules: ReturnType<typeof getDirectorRules>,
-  durationFormula: typeof DURATION_FORMULAS[string]
+  durationFormula: typeof DURATION_FORMULAS[string],
+  blueprint?: TemplateBlueprint | null
 ): Promise<DirectionPlan> {
   const { visual_constraints, emotion_profile } = producerOutput
   const abstractionLevel = emotion_profile.abstraction_level
@@ -234,8 +236,65 @@ async function runDirector(
     ? 'abstraction_level is MEDIUM (0.3-0.5): Show real objects with some emotional framing. Cat can be shown with warm lighting.'
     : 'abstraction_level is HIGH (0.6+): Artistic metaphors allowed. Objects can represent emotions.'
 
+  // Build blueprint enforcement section if blueprint exists
+  const blueprintSection = blueprint ? `
+═══ 🔒 LOCKED TEMPLATE BLUEPRINT - NON-NEGOTIABLE ═══
+
+You are given a TEMPLATE BLUEPRINT. You MUST follow it EXACTLY.
+The emotion_arc, hook timing, shot structure, and ending line are LOCKED.
+Your job is to fill in visual details ONLY within these constraints.
+
+BLUEPRINT: ${blueprint.title}
+
+EMOTION ARC (MUST FOLLOW):
+- Start: ${blueprint.emotion_arc.start}
+- Middle: ${blueprint.emotion_arc.middle}
+- Climax: ${blueprint.emotion_arc.climax}
+- End: ${blueprint.emotion_arc.end}
+
+HOOK (FIRST 2 SECONDS - MANDATORY):
+Timing: ${blueprint.hook.timing}
+Must Show: ${blueprint.hook.must_show}
+Emotion: ${blueprint.hook.emotion}
+
+SHOT STRUCTURE (EXACTLY ${blueprint.shots.length} SHOTS):
+${blueprint.shots.map(s => `
+Shot ${s.shot_number} (${s.duration}):
+- Must Have: ${s.must_have.join(', ')}
+- Emotion Beat: ${s.emotion_beat}
+- Visual Style: ${s.visual_style}
+`).join('')}
+
+ENDING (MANDATORY KILLER LINE):
+Line: "${blueprint.ending.killer_line}"
+Final Emotion: ${blueprint.ending.final_emotion}
+Visual Requirement: ${blueprint.ending.visual_requirement}
+
+BGM TAGS: ${blueprint.bgm_tags.join(', ')}
+
+DIRECTOR INSTRUCTIONS:
+${blueprint.director_prompt}
+
+CRITICAL RULES:
+1. You CANNOT change the emotion arc
+2. You CANNOT skip the hook requirement
+3. You MUST include all "must_have" elements in each shot
+4. You MUST use the exact killer line: "${blueprint.ending.killer_line}"
+5. You CANNOT add or remove shots (exactly ${blueprint.shots.length} shots)
+
+Your creative freedom is LIMITED to:
+- Specific camera angles and movements
+- Lighting details
+- Additional visual flourishes that support (not replace) must_have elements
+- Exact wording of other dialogue (not the killer line)
+
+═══ END BLUEPRINT ═══
+` : ''
+
   const systemPrompt = `You are a Constraint Director for a 15-second emotional short film.
 Your job is NOT to tell a story. Your job is to FORCE emotional impact.
+
+${blueprintSection}
 
 ABSOLUTE RULES (non-negotiable):
 1. Shot 1 MUST show a COMPLETED action in first 2 seconds
@@ -749,8 +808,18 @@ async function runNEL(
   }
 }
 
-export async function runCognitiveCore(userInput: string, template: string): Promise<CognitiveCoreOutput> {
+export async function runCognitiveCore(userInput: string, template: string, templateId?: string): Promise<CognitiveCoreOutput> {
   console.log('[CognitiveCore] Starting Producer...')
+  
+  // Check if we have a locked template blueprint
+  const blueprint = templateId ? getTemplateBlueprint(templateId) : null
+  if (blueprint) {
+    console.log('[CognitiveCore] 🔒 LOCKED TEMPLATE DETECTED:', blueprint.title)
+    console.log('[CognitiveCore] Emotion arc:', blueprint.emotion_arc)
+    console.log('[CognitiveCore] Hook requirement:', blueprint.hook.must_show)
+    console.log('[CognitiveCore] Ending line:', blueprint.ending.killer_line)
+  }
+  
   const producerOutput = await runProducer(userInput)
   console.log('[CognitiveCore] mode:', producerOutput.mode, 'story_category:', producerOutput.story_category)
   console.log('[CognitiveCore] must_show:', producerOutput.visual_constraints.must_show)
@@ -785,7 +854,7 @@ export async function runCognitiveCore(userInput: string, template: string): Pro
   console.log('[CognitiveCore] klingTemplate hookShot:', klingTemplate.hookShot.slice(0, 60))
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula)
+  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint)
 
   console.log('[CognitiveCore] Checking reality anchors...')
   const anchoredPlan = checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
