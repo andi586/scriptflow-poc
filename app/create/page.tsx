@@ -148,8 +148,6 @@ export default function CreatePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setFriendPhoto({ file, url: URL.createObjectURL(file) });
-    // For prank template: friend photo becomes the main display photo
-    setMainPhoto({ file, url: URL.createObjectURL(file) });
     setShowFriendModal(false);
   };
   
@@ -186,22 +184,24 @@ export default function CreatePage() {
       
       const additionalImages: string[] = [];
       
-      // For prank template: upload user's own photo as additional image
-      if (selectedTemplate === 'breaking_news' && userSelfPhoto.file) {
-        console.log('[create] uploading user self photo for prank...')
+      // For prank template: upload friend's photo as additional image
+      // User's photo is already uploaded as mainPhotoUrl (@image_1)
+      // Friend's photo goes to additional_images[0] (@image_2)
+      if (selectedTemplate === 'breaking_news' && friendPhoto.file) {
+        console.log('[create] uploading friend photo for prank...')
         const formData = new FormData()
-        formData.append('file', userSelfPhoto.file)
+        formData.append('file', friendPhoto.file)
         const res = await fetch('/api/upload-photo', { method: 'POST', body: formData })
         const data = await res.json()
-        console.log('[create] user self photo upload response:', data)
+        console.log('[create] friend photo upload response:', data)
         if (data.url) {
           additionalImages.push(data.url)
-          console.log('[create] user self photo uploaded as additional_images[0]:', data.url)
+          console.log('[create] friend photo uploaded as additional_images[0]:', data.url)
         } else {
-          console.error('[create] user self photo upload failed - no URL returned')
+          console.error('[create] friend photo upload failed - no URL returned')
         }
       } else if (selectedTemplate === 'breaking_news') {
-        console.log('[create] Prank template but no userSelfPhoto - only friend will appear')
+        console.log('[create] Prank template but no friendPhoto - only user will appear')
       }
       
       for (const photo of extraPhotos) {
