@@ -225,6 +225,55 @@ export default function CreatePage() {
       paddingBottom: '120px'
     }}>
       
+      {/* NAVIGATION BAR */}
+      <nav style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '16px 32px',
+        borderBottom: '1px solid #1a1a1a',
+        background: '#0a0a0a',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50
+      }}>
+        <a href="/" style={{
+          color: '#D4A853',
+          fontSize: '1.5rem',
+          fontWeight: '700',
+          textDecoration: 'none',
+          letterSpacing: '0.05em'
+        }}>
+          ScriptFlow
+        </a>
+        
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+          <a href="/my-videos" style={{
+            color: '#888',
+            fontSize: '1rem',
+            textDecoration: 'none',
+            transition: 'color 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.color = '#D4A853'}
+          onMouseLeave={(e) => e.currentTarget.style.color = '#888'}
+          >
+            My Movies
+          </a>
+          
+          <a href="/credits" style={{
+            color: '#888',
+            fontSize: '1rem',
+            textDecoration: 'none',
+            transition: 'color 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.color = '#D4A853'}
+          onMouseLeave={(e) => e.currentTarget.style.color = '#888'}
+          >
+            Credits
+          </a>
+        </div>
+      </nav>
+      
       {/* TOP SECTION */}
       <div style={{
         textAlign: 'center',
