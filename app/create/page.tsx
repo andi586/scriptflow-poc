@@ -74,6 +74,7 @@ export default function CreatePage() {
   const [showExtraModal, setShowExtraModal] = useState(false);
   const [showFriendModal, setShowFriendModal] = useState(false);
   const [friendPhoto, setFriendPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
+  const [userSelfPhoto, setUserSelfPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
   const [story, setStory] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -147,9 +148,15 @@ export default function CreatePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setFriendPhoto({ file, url: URL.createObjectURL(file) });
-    // Set as main photo for prank template
+    // For prank template: friend photo becomes the main display photo
     setMainPhoto({ file, url: URL.createObjectURL(file) });
     setShowFriendModal(false);
+  };
+  
+  const handleUserSelfPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUserSelfPhoto({ file, url: URL.createObjectURL(file) });
   };
 
   const handleGenerate = async () => {
@@ -179,22 +186,22 @@ export default function CreatePage() {
       
       const additionalImages: string[] = [];
       
-      // For prank template: upload friend photo as additional image
-      if (selectedTemplate === 'breaking_news' && friendPhoto.file) {
-        console.log('[create] uploading friend photo...')
+      // For prank template: upload user's own photo as additional image
+      if (selectedTemplate === 'breaking_news' && userSelfPhoto.file) {
+        console.log('[create] uploading user self photo for prank...')
         const formData = new FormData()
-        formData.append('file', friendPhoto.file)
+        formData.append('file', userSelfPhoto.file)
         const res = await fetch('/api/upload-photo', { method: 'POST', body: formData })
         const data = await res.json()
-        console.log('[create] friend photo upload response:', data)
+        console.log('[create] user self photo upload response:', data)
         if (data.url) {
           additionalImages.push(data.url)
-          console.log('[create] friend photo uploaded as additional_images[0]:', data.url)
+          console.log('[create] user self photo uploaded as additional_images[0]:', data.url)
         } else {
-          console.error('[create] friend photo upload failed - no URL returned')
+          console.error('[create] user self photo upload failed - no URL returned')
         }
-      } else {
-        console.log('[create] NOT uploading friend photo. selectedTemplate:', selectedTemplate, 'friendPhoto.file:', !!friendPhoto.file)
+      } else if (selectedTemplate === 'breaking_news') {
+        console.log('[create] Prank template but no userSelfPhoto - only friend will appear')
       }
       
       for (const photo of extraPhotos) {
@@ -763,24 +770,88 @@ export default function CreatePage() {
             </label>
 
             {friendPhoto.file && (
-              <button
-                onClick={() => {
-                  setShowFriendModal(false);
-                }}
-                style={{
-                  width: '100%',
-                  background: '#D4A853',
-                  color: '#000',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  fontSize: '1.1rem',
-                  fontWeight: '700',
-                  cursor: 'pointer'
-                }}
-              >
-                Continue →
-              </button>
+              <>
+                <div style={{ marginTop: '24px', marginBottom: '16px' }}>
+                  <p style={{ 
+                    color: '#D4A853', 
+                    fontSize: '1rem', 
+                    fontWeight: '700',
+                    marginBottom: '8px',
+                    textAlign: 'center'
+                  }}>
+                    Add YOUR photo (optional)
+                  </p>
+                  <p style={{ 
+                    color: '#666', 
+                    fontSize: '0.85rem', 
+                    marginBottom: '12px',
+                    textAlign: 'center'
+                  }}>
+                    Appear in the scene laughing at the prank
+                  </p>
+                  
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleUserSelfPhotoChange}
+                    style={{ display: 'none' }}
+                    id="user-self-photo-input"
+                  />
+                  
+                  <label
+                    htmlFor="user-self-photo-input"
+                    style={{
+                      cursor: 'pointer',
+                      width: '100%',
+                      height: '150px',
+                      borderRadius: '12px',
+                      background: userSelfPhoto.url ? `url(${userSelfPhoto.url})` : '#1a1a1a',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      border: '2px dashed #666',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#D4A853';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#666';
+                    }}
+                  >
+                    {!userSelfPhoto.url && (
+                      <>
+                        <div style={{ fontSize: '3rem', marginBottom: '8px' }}>😂</div>
+                        <p style={{ color: '#666', fontSize: '0.9rem', margin: 0 }}>
+                          Click to add yourself
+                        </p>
+                      </>
+                    )}
+                  </label>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setShowFriendModal(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: '#D4A853',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    fontSize: '1.1rem',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Continue →
+                </button>
+              </>
             )}
           </div>
         </div>
