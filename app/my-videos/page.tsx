@@ -60,7 +60,7 @@ export default function MyVideosPage() {
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
   const statusLabel = (status: string) => {
