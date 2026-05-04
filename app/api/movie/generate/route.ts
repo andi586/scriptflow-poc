@@ -107,10 +107,17 @@ export async function POST(req: NextRequest) {
       // ❌ No template match - fall back to CognitiveCore
       console.log('[movie/generate] No DirectorIntent match, using CognitiveCore')
       
+      // Add prank template context if breaking_news category
+      let enhancedStory = story
+      if (story_category === 'prank' || story_category === 'breaking_news') {
+        enhancedStory = `${story}\n\nThis is a prank video. @image_1 is the friend being pranked (main character). @image_2 is the user who set up the prank. Both must appear in the video. @image_1 appears shocked/confused. @image_2 appears amused/laughing.`
+        console.log('[movie/generate] 🎭 Prank template detected - adding two-character context')
+      }
+      
       const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: story, personalNote: story })
+        body: JSON.stringify({ template: enhancedStory, personalNote: enhancedStory })
       })
       const scriptData = await scriptRes.json()
       console.log('[DEBUG scriptData]', scriptData)
