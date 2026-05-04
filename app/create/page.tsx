@@ -171,6 +171,19 @@ export default function CreatePage() {
       if (!mainPhotoUrl) throw new Error('Failed to upload main photo');
       
       const additionalImages: string[] = [];
+      
+      // For prank template: upload friend photo as additional image
+      if (selectedTemplate === 'breaking_news' && friendPhoto.file) {
+        const formData = new FormData()
+        formData.append('file', friendPhoto.file)
+        const res = await fetch('/api/upload-photo', { method: 'POST', body: formData })
+        const data = await res.json()
+        if (data.url) {
+          additionalImages.push(data.url)
+          console.log('[create] friend photo uploaded as additional_images[0]:', data.url)
+        }
+      }
+      
       for (const photo of extraPhotos) {
         if (photo.file) {
           const form = new FormData();
