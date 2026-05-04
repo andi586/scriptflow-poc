@@ -194,6 +194,10 @@ export default function CreatePage() {
         additional_images: additionalImages
       };
       
+      console.log('[create] SENDING body:', JSON.stringify(body))
+      console.log('[create] additional_images count:', additionalImages?.length || 0)
+      console.log('[create] additional_images:', additionalImages)
+      
       const res = await fetch("/api/movie/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

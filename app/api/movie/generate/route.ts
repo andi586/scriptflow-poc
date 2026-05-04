@@ -11,7 +11,12 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { story, tier = '60s', userId, additional_images, story_category, main_photo_url } = await req.json()
+    const body = await req.json()
+    console.log('[DEBUG] Request body keys:', Object.keys(body))
+    console.log('[DEBUG] additional_images raw:', body.additional_images)
+    console.log('[DEBUG] story_category:', body.story_category)
+    
+    const { story, tier = '60s', userId, additional_images, story_category, main_photo_url } = body
 
     if (!story) {
       return NextResponse.json({ error: 'Story is required' }, { status: 400 })
