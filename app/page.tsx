@@ -19,8 +19,8 @@ const ScriptFlowHome = () => {
           {/* Main Title - Emotional */}
           <div className="space-y-4">
             <h2 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight">
-              This is <span className="text-[#D4A853]">YOU</span>.<br />
-              In a movie you never lived.
+              Someone made a movie about <span className="text-[#D4A853]">you</span>.<br />
+              You were never supposed to see it.
             </h2>
             
             <p className="text-gray-300 text-xl md:text-2xl font-light max-w-2xl mx-auto leading-relaxed">
@@ -62,31 +62,36 @@ const ScriptFlowHome = () => {
           {/* Story Template Previews */}
           <div className="mt-16 pt-8 border-t border-[#222]">
             <h3 className="text-2xl font-bold mb-8 text-gray-300">Pick a story about you</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
               <a href="/create" className="bg-[#111] border border-[#222] rounded-xl p-4 hover:border-[#D4A853] transition-all cursor-pointer">
                 <div className="text-3xl mb-2">🌌</div>
-                <p className="text-sm font-semibold text-gray-300">Your Parallel Life</p>
+                <p className="text-sm font-semibold text-gray-300">You met your future self… and he warned you</p>
               </a>
               
               <a href="/create" className="bg-[#111] border border-[#222] rounded-xl p-4 hover:border-[#D4A853] transition-all cursor-pointer">
                 <div className="text-3xl mb-2">💔</div>
-                <p className="text-sm font-semibold text-gray-300">She Didn't Choose You</p>
+                <p className="text-sm font-semibold text-gray-300">She checked your phone at 3AM</p>
               </a>
               
               <a href="/create" className="bg-[#111] border border-[#222] rounded-xl p-4 hover:border-[#D4A853] transition-all cursor-pointer">
                 <div className="text-3xl mb-2">✨</div>
-                <p className="text-sm font-semibold text-gray-300">Your Future Self Visits</p>
+                <p className="text-sm font-semibold text-gray-300">Your future self came back… with a warning</p>
               </a>
               
               <a href="/create" className="bg-[#111] border border-[#222] rounded-xl p-4 hover:border-[#D4A853] transition-all cursor-pointer">
                 <div className="text-3xl mb-2">🕯️</div>
-                <p className="text-sm font-semibold text-gray-300">You Lost Them</p>
+                <p className="text-sm font-semibold text-gray-300">Your dog spoke to you one last time</p>
+              </a>
+              
+              <a href="/create" className="bg-[#111] border border-[#222] rounded-xl p-4 hover:border-[#D4A853] transition-all cursor-pointer">
+                <div className="text-3xl mb-2">💬</div>
+                <p className="text-sm font-semibold text-gray-300">The group chat after you left</p>
               </a>
               
               <a href="/create" className="bg-[#111] border border-[#222] rounded-xl p-4 hover:border-[#D4A853] transition-all cursor-pointer relative">
                 <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">🔥</div>
                 <div className="text-3xl mb-2">📰</div>
-                <p className="text-sm font-semibold text-gray-300">Prank Your Friend</p>
+                <p className="text-sm font-semibold text-gray-300">Your friend betrayed you (and you saw it happen)</p>
               </a>
             </div>
           </div>

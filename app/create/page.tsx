@@ -16,37 +16,37 @@ interface CharacterPhoto {
 const TEMPLATES = [
   {
     id: "parallel_universe",
-    title: "Your Parallel Life",
+    title: "You met your future self… and he warned you",
     emoji: "🌌",
-    outcome: "Watch yourself living a completely different life",
+    outcome: "A glimpse of what could have been",
     story: "You see another version of yourself living a different life. You watch them with longing. The final moment: you realize what could have been."
   },
   {
     id: "she_didnt_choose_you", 
-    title: "She Didn't Choose You",
+    title: "She checked your phone at 3AM",
     emoji: "💔",
-    outcome: "Watch yourself in a cinematic breakup scene",
+    outcome: "Everything changed in one moment",
     story: "You prepare to confess your feelings. She walks toward someone else. Her smile breaks your heart."
   },
   {
     id: "future_you",
-    title: "Your Future Self Visits",
+    title: "Your future self came back… with a warning",
     emoji: "✨",
-    outcome: "Watch a stronger version of you deliver a message",
+    outcome: "The message you needed to hear",
     story: "A stronger, wiser version of you appears. They look at you with knowing eyes. They say one thing before disappearing."
   },
   {
     id: "lost_someone",
-    title: "You Lost Them",
+    title: "Your dog spoke to you one last time",
     emoji: "🕯️",
-    outcome: "Watch yourself process grief and memory",
+    outcome: "A goodbye you'll never forget",
     story: "Flashes of memory with someone important. They slowly fade away. You are left alone with the echo of what was."
   },
   {
     id: "last_person",
-    title: "The Last Person on Earth",
-    emoji: "🌍",
-    outcome: "Watch yourself search an empty world",
+    title: "The group chat after you left",
+    emoji: "💬",
+    outcome: "What they really said about you",
     story: "You walk through an empty world. You search for someone, anyone. Silence is the only response."
   },
   {
@@ -58,9 +58,9 @@ const TEMPLATES = [
   },
   {
     id: "breaking_news",
-    title: "🔥 Prank Your Friend",
+    title: "Your friend betrayed you (and you saw it happen)",
     emoji: "📰",
-    outcome: "They'll never see this coming 😂",
+    outcome: "The truth you weren't ready for",
     description: "Add your friend's photo — put them on the news",
     story: "Breaking news intro with police lights. The uploaded person appears as central figure in developing situation. Witnesses react. Close-up of confused face. Twist reveal - harmless misunderstanding. Reporter awkward smile. End: 'Send this to them 😂'"
   }
