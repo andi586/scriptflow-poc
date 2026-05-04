@@ -236,64 +236,103 @@ export default function MoviePage() {
         </a>
       </div>
 
+      {/* Share Message */}
+      <div style={{textAlign:'center',marginBottom:'24px',maxWidth:'360px'}}>
+        <p style={{color:'#D4A853',fontSize:'1.1rem',fontWeight:'700',marginBottom:'4px'}}>
+          Share your movie and get 1 FREE generation!
+        </p>
+        <p style={{color:'#666',fontSize:'0.8rem'}}>
+          Tag @ScriptFlow for a chance to be featured
+        </p>
+      </div>
+
       <div style={{display:'flex',flexDirection:'column',gap:'12px',width:'100%',maxWidth:'360px'}}>
-        <a
-          href={movie.final_video_url}
-          download="my-movie.mp4"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'block',
-            background: '#D4A853',
-            color: '#000',
-            padding: '16px',
-            borderRadius: '100px',
-            fontWeight: '800',
-            fontSize: '1rem',
-            textAlign: 'center',
-            textDecoration: 'none',
-            width: '100%',
-            boxSizing: 'border-box' as const
-          }}
-        >
-          ⬇️ Download Movie
-        </a>
-        <p style={{color:'#888',fontSize:'0.75rem',textAlign:'center',marginTop:'8px'}}>
-          iPhone: Long press video → Save to Photos
+        {/* Share Buttons Row */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:'8px',marginBottom:'8px'}}>
+          <a
+            href={movie.final_video_url}
+            download="my-movie.mp4"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#D4A853',
+              color: '#000',
+              padding: '14px 8px',
+              borderRadius: '12px',
+              fontWeight: '700',
+              fontSize: '0.85rem',
+              textAlign: 'center',
+              textDecoration: 'none',
+              gap: '4px'
+            }}
+          >
+            <span style={{fontSize:'1.5rem'}}>📥</span>
+            <span>Download</span>
+          </a>
+
+          <button
+            onClick={() => {
+              // Try to open TikTok app or web
+              const tiktokUrl = `https://www.tiktok.com/upload`;
+              window.open(tiktokUrl, '_blank');
+            }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#000',
+              color: '#fff',
+              border: '2px solid #D4A853',
+              padding: '14px 8px',
+              borderRadius: '12px',
+              fontWeight: '700',
+              fontSize: '0.85rem',
+              textAlign: 'center',
+              cursor: 'pointer',
+              gap: '4px'
+            }}
+          >
+            <span style={{fontSize:'1.5rem'}}>📱</span>
+            <span>TikTok</span>
+          </button>
+
+          <button
+            onClick={() => { 
+              const url = `https://getscriptflow.com/movie/${movieId}`;
+              navigator.clipboard.writeText(url); 
+              setCopied(true); 
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#1a1a1a',
+              color: '#D4A853',
+              border: '2px solid #333',
+              padding: '14px 8px',
+              borderRadius: '12px',
+              fontWeight: '700',
+              fontSize: '0.85rem',
+              textAlign: 'center',
+              cursor: 'pointer',
+              gap: '4px'
+            }}
+          >
+            <span style={{fontSize:'1.5rem'}}>{copied ? '✅' : '🔗'}</span>
+            <span>{copied ? 'Copied!' : 'Copy Link'}</span>
+          </button>
+        </div>
+
+        <p style={{color:'#666',fontSize:'0.72rem',textAlign:'center',lineHeight:'1.6'}}>
+          💡 iPhone: Long press video → Save to Photos
         </p>
 
-        <button
-          type="button"
-          onClick={() => window.open(movie.final_video_url, '_blank')}
-          style={{
-            display: 'block',
-            background: '#1a6fb5',
-            color: 'white',
-            border: 'none',
-            padding: '16px',
-            borderRadius: '100px',
-            fontWeight: '700',
-            fontSize: '1rem',
-            cursor: 'pointer',
-            width: '100%',
-            marginTop: '12px'
-          }}
-        >
-          📱 Open Video to Save
-        </button>
-        <p style={{color:'#888',fontSize:'0.72rem',textAlign:'center',marginTop:'8px',lineHeight:'1.6'}}>
-          💡 Open in Safari for best experience.<br/>
-          Long press video → Save to Photos
-        </p>
-
-        <button
-          onClick={() => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-          style={{background:'#1a1a1a',color:'white',border:'1px solid #333',padding:'16px',borderRadius:'100px',fontWeight:'700',fontSize:'1rem',cursor:'pointer'}}
-        >
-          {copied ? '✅ Link Copied!' : '🔗 Copy Share Link'}
-        </button>
-
-        <a href="/create" style={{display:'block',background:'transparent',color:'#555',padding:'16px',borderRadius:'100px',fontWeight:'600',fontSize:'0.9rem',textDecoration:'none',textAlign:'center',border:'1px solid #222'}}>
+        <a href="/create" style={{display:'block',background:'transparent',color:'#555',padding:'16px',borderRadius:'100px',fontWeight:'600',fontSize:'0.9rem',textDecoration:'none',textAlign:'center',border:'1px solid #222',marginTop:'12px'}}>
           🎬 Make Another Movie
         </a>
 
