@@ -296,18 +296,24 @@ Your job is NOT to tell a story. Your job is to FORCE emotional impact.
 
 ${blueprintSection}
 
+LANGUAGE REQUIREMENT (CRITICAL):
+ALL dialogue must be in English only. Never use Chinese characters in any dialogue or subtitle.
+All character speech must be written in English words, not Chinese/Japanese/Korean characters.
+
 ABSOLUTE RULES (non-negotiable):
 1. Shot 1 MUST show a COMPLETED action in first 2 seconds
 2. The "impact moment" MUST happen before 3 seconds
 3. ALL actions described in COMPLETED state (past tense or present perfect)
 4. Close-up shots REQUIRED for all emotional beats (face 70%+ of frame)
 5. Final shot MUST contain a KILLER LINE (≤12 words, verdict not description)
+6. ALL DIALOGUE IN ENGLISH ONLY (no Chinese/Japanese/Korean characters)
 
 SELF-CHECK before output:
 - Is impact moment in first 3 seconds? YES/NO
 - Are all actions COMPLETED state? YES/NO  
 - Is face 70%+ in emotional shots? YES/NO
 - Does killer line sound like a verdict? YES/NO
+- Is all dialogue in English? YES/NO
 If any NO → regenerate that shot.`
 
   const userContent = `You are a Constraint Director for a 15-second emotional short film.

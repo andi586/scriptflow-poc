@@ -82,12 +82,19 @@ export async function POST(req: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════════════
     // Step 2: Check for DirectorIntent template match
     // ═══════════════════════════════════════════════════════════════════════════
-    const directorIntent = matchDirectorIntent(story)
+    // Skip DirectorIntent for prank template - use CognitiveCore with blueprint instead
+    const skipDirectorIntent = story_category === 'breaking_news' || story_category === 'prank'
+    const directorIntent = skipDirectorIntent ? null : matchDirectorIntent(story)
     let shots: any[] = []
     let archetype: string | null = null
     let hookData: any = null
     
-    if (directorIntent) {
+    if (skipDirectorIntent) {
+      console.log('[movie/generate] 🎭 Prank template - skipping DirectorIntent, using CognitiveCore')
+    }
+    
+    if (directorIntent && !skipDirectorIntent) {
+
       // ✅ DirectorIntent template matched - use fixed shot structure
       console.log(`[movie/generate] 🎬 DirectorIntent matched: "${directorIntent.intent}"`)
       console.log(`[movie/generate] Using template shots instead of CognitiveCore`)
@@ -315,7 +322,7 @@ export async function POST(req: NextRequest) {
         resolution: '720p',
         aspect_ratio: '9:16',
         enable_audio: true,
-        language: 'zh-CN',  // Force Chinese TTS for all dialogue
+        language: 'en',  // Force English TTS for all dialogue
         images: klingImages,
         multi_shots: multiShots
       },
@@ -328,7 +335,7 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    console.log('[movie/generate] Kling API language set to: zh-CN (Chinese)')
+    console.log('[movie/generate] Kling API language set to: en (English)')
 
     const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
       method: 'POST',
