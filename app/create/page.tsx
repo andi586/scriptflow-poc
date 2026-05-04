@@ -172,20 +172,29 @@ export default function CreatePage() {
       
       console.log('[create] extraPhotos state:', extraPhotos)
       console.log('[create] friendPhoto state:', friendPhoto)
+      console.log('[create] friendPhoto.file:', friendPhoto.file)
+      console.log('[create] friendPhoto.url:', friendPhoto.url)
       console.log('[create] selectedTemplate:', selectedTemplate)
+      console.log('[create] mainPhoto.file === friendPhoto.file?', mainPhoto.file === friendPhoto.file)
       
       const additionalImages: string[] = [];
       
       // For prank template: upload friend photo as additional image
       if (selectedTemplate === 'breaking_news' && friendPhoto.file) {
+        console.log('[create] uploading friend photo...')
         const formData = new FormData()
         formData.append('file', friendPhoto.file)
         const res = await fetch('/api/upload-photo', { method: 'POST', body: formData })
         const data = await res.json()
+        console.log('[create] friend photo upload response:', data)
         if (data.url) {
           additionalImages.push(data.url)
           console.log('[create] friend photo uploaded as additional_images[0]:', data.url)
+        } else {
+          console.error('[create] friend photo upload failed - no URL returned')
         }
+      } else {
+        console.log('[create] NOT uploading friend photo. selectedTemplate:', selectedTemplate, 'friendPhoto.file:', !!friendPhoto.file)
       }
       
       for (const photo of extraPhotos) {
