@@ -122,6 +122,13 @@ const ARCHETYPE_BGM_LOCK: Record<string, string> = {
   'lost_someone': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
   'last_person': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
   'breaking_news': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3',
+  // 7 new BGM tracks for emotional templates
+  'phone_3am': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3',
+  'future_warning': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/future_warning_1777949611664.mp3',
+  'friend_betrayal': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/friend_betrayal_1777949613234.mp3',
+  'what_could_have_been': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
+  'group_chat': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
+  'dog_last_words': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3',
 }
 
 // EXECUTION AUTHORITY: Lock BGM by archetype
