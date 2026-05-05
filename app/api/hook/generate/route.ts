@@ -251,34 +251,63 @@ export async function POST(request: NextRequest) {
       { text: lines[2], startTime: 10, endTime: 12 },
     ]
 
-    // Step 8: Try Seedance emotion video first, fallback to FFmpeg
+    // Step 8: Try Seedance emotion video with cache, fallback to FFmpeg
     const basePhotoUrl = twin.frame_url_front ?? twin.frame_url_mid
+    const photoUrl = movie.twin_photo_url || basePhotoUrl
+    const templateId = movie.archetype || 'neutral'
     let hookVideoUrl: string | null = null
 
     try {
-      console.log('[hook/generate] Attempting Seedance emotion video generation...')
+      console.log('[hook/generate] Checking emotion video cache...')
       
-      // Call Railway emotion API
-      const emotionRes = await fetch(
-        `${process.env.RAILWAY_FFMPEG_URL}/api/generate-hook-emotion`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl: movie.twin_photo_url || basePhotoUrl,
-            template_id: movie.archetype || 'neutral'
-          })
-        }
-      )
+      // Check cache first
+      const { data: cached } = await supabase
+        .from('emotion_video_cache')
+        .select('emotion_video_url, emotion')
+        .eq('photo_url', photoUrl)
+        .eq('template_id', templateId)
+        .single()
 
-      if (emotionRes.ok) {
-        const emotionData = await emotionRes.json()
-        if (emotionData.success && emotionData.videoUrl) {
-          console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
-          hookVideoUrl = emotionData.videoUrl
-        }
+      if (cached?.emotion_video_url) {
+        console.log('[hook/generate] ✅ Cache HIT - using cached emotion video:', cached.emotion)
+        hookVideoUrl = cached.emotion_video_url
       } else {
-        console.warn('[hook/generate] Seedance API returned error:', emotionRes.status)
+        console.log('[hook/generate] ❌ Cache MISS - generating new emotion video...')
+        
+        // Call Railway emotion API
+        const emotionRes = await fetch(
+          `${process.env.RAILWAY_FFMPEG_URL}/api/generate-hook-emotion`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageUrl: photoUrl,
+              template_id: templateId
+            })
+          }
+        )
+
+        if (emotionRes.ok) {
+          const emotionData = await emotionRes.json()
+          if (emotionData.success && emotionData.videoUrl) {
+            console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
+            hookVideoUrl = emotionData.videoUrl
+
+            // Save to cache (fire and forget)
+            supabase
+              .from('emotion_video_cache')
+              .upsert({
+                photo_url: photoUrl,
+                template_id: templateId,
+                emotion: emotionData.emotion,
+                emotion_video_url: emotionData.videoUrl
+              })
+              .then(() => console.log('[hook/generate] ✅ Cached emotion video for future use'))
+              .catch((err: any) => console.warn('[hook/generate] Cache save failed (non-fatal):', err?.message))
+          }
+        } else {
+          console.warn('[hook/generate] Seedance API returned error:', emotionRes.status)
+        }
       }
     } catch (seedanceErr) {
       console.warn('[hook/generate] Seedance generation failed, falling back to FFmpeg:', seedanceErr)
