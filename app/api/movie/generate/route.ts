@@ -342,7 +342,8 @@ export async function POST(req: NextRequest) {
         status: 'pending',
         tier,
         story_input: story,
-        twin_photo_url: twin.frame_url_mid
+        twin_photo_url: twin.frame_url_mid,
+        archetype: story_category || archetype
       })
       .select()
       .single()
@@ -402,13 +403,12 @@ export async function POST(req: NextRequest) {
       throw new Error('Kling task creation failed: ' + JSON.stringify(klingData).slice(0, 200))
     }
 
-    // Step 5: Update movie with task_id and archetype
+    // Step 5: Update movie with task_id
     await supabase
       .from('movies')
       .update({
         kling_task_id: taskId,
-        status: 'processing',
-        ...(archetype ? { archetype } : {})
+        status: 'processing'
       })
       .eq('id', movie.id)
 
