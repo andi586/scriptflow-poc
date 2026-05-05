@@ -1,4 +1,6 @@
 {
+  "buildCommand": "next build",
+  "ignoreCommand": "git diff HEAD~1 --quiet -- '*.ts' '*.tsx' '*.js' '*.json' '*.css' '*.scss'",
   "crons": [
     { "path": "/api/cron/step1-retry", "schedule": "*/2 * * * *" },
     { "path": "/api/cron/step2-poll", "schedule": "*/2 * * * *" },

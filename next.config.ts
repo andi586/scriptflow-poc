@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone', // Optimize for smaller builds (reduces deployment size)
   experimental: {
     serverActions: {
       bodySizeLimit: "8mb",
