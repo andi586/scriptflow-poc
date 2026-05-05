@@ -463,3 +463,96 @@ export function validateAgainstBlueprint(
     violations
   }
 }
+
+/**
+ * HOOK SUBTITLES
+ * 
+ * Pre-written emotional subtitles for each template's hook video.
+ * Designed for zero-delay emotional impact - text appears instantly.
+ * 
+ * Format: { time: seconds, text: string }
+ * - time: exact second when subtitle appears
+ * - text: short, punchy line (max 8 words)
+ * 
+ * Hook videos are 5-8 seconds, so subtitles cut off around 6s
+ * to create cliffhanger effect.
+ */
+export interface HookSubtitle {
+  time: number
+  text: string
+}
+
+export const HOOK_SUBTITLES: Record<string, HookSubtitle[]> = {
+  she_didnt_choose_you: [
+    { time: 0.0, text: "She unlocked your phone." },
+    { time: 1.5, text: "3:17 AM." },
+    { time: 3.0, text: "You were sleeping." },
+    { time: 5.0, text: "She saw everything." }
+  ],
+  lost_someone: [
+    { time: 0.0, text: "Your dog just said your name." },
+    { time: 1.5, text: "Out loud." },
+    { time: 3.0, text: "Right before it died." },
+    { time: 5.0, text: "It had something to tell you." }
+  ],
+  dog_last_words: [
+    { time: 0.0, text: "Your dog just said your name." },
+    { time: 1.5, text: "Out loud." },
+    { time: 3.0, text: "Right before it died." },
+    { time: 5.0, text: "It had something to tell you." }
+  ],
+  last_person: [
+    { time: 0.0, text: "They kept talking after you left." },
+    { time: 1.5, text: "About you." },
+    { time: 3.0, text: "Not what you think." },
+    { time: 5.0, text: "You shouldn't read this." }
+  ],
+  future_you: [
+    { time: 0.0, text: "You don't have much time." },
+    { time: 1.5, text: "I'm you." },
+    { time: 3.0, text: "From the future." },
+    { time: 5.0, text: "You already made the wrong choice." }
+  ],
+  future_warning: [
+    { time: 0.0, text: "You don't have much time." },
+    { time: 1.5, text: "I'm you." },
+    { time: 3.0, text: "From the future." },
+    { time: 5.0, text: "You already made the wrong choice." }
+  ],
+  friend_betrayal: [
+    { time: 0.0, text: "He told them everything." },
+    { time: 1.5, text: "Your secret." },
+    { time: 3.0, text: "He was smiling." },
+    { time: 5.0, text: "And you trusted him." }
+  ],
+  what_could_have_been: [
+    { time: 0.0, text: "This was your life." },
+    { time: 1.5, text: "If you said yes." },
+    { time: 3.0, text: "You didn't." },
+    { time: 5.0, text: "Look at what you lost." }
+  ],
+  breaking_news: [
+    { time: 0.0, text: "That's your friend." },
+    { time: 1.5, text: "On the news." },
+    { time: 3.0, text: "For the wrong reason." },
+    { time: 5.0, text: "They're saying his name." }
+  ],
+  phone_3am: [
+    { time: 0.0, text: "She unlocked your phone." },
+    { time: 1.5, text: "3:17 AM." },
+    { time: 3.0, text: "You were sleeping." },
+    { time: 5.0, text: "She saw everything." }
+  ],
+  group_chat: [
+    { time: 0.0, text: "They kept talking after you left." },
+    { time: 1.5, text: "About you." },
+    { time: 3.0, text: "Not what you think." },
+    { time: 5.0, text: "You shouldn't read this." }
+  ],
+  parallel_universe: [
+    { time: 0.0, text: "This is you." },
+    { time: 1.5, text: "In another universe." },
+    { time: 3.0, text: "You made different choices." },
+    { time: 5.0, text: "Look at what happened." }
+  ]
+}

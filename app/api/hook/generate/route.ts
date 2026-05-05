@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getLockedBGM } from '@/app/lib/execution-authority'
+import { HOOK_SUBTITLES } from '@/app/lib/template-blueprints'
 import Replicate from 'replicate'
 
 export const maxDuration = 120
@@ -293,7 +294,7 @@ export async function POST(request: NextRequest) {
             console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
             hookVideoUrl = emotionData.videoUrl
 
-            // Save to cache (fire and forget)
+            // Save to cache (non-blocking)
             supabase
               .from('emotion_video_cache')
               .upsert({
@@ -307,6 +308,36 @@ export async function POST(request: NextRequest) {
           }
         } else {
           console.warn('[hook/generate] Seedance API returned error:', emotionRes.status)
+        }
+      }
+      
+      // Step 8.5: Burn hook subtitles onto emotion video
+      if (hookVideoUrl && HOOK_SUBTITLES[templateId]) {
+        console.log('[hook/generate] Burning hook subtitles onto emotion video...')
+        try {
+          const burnRes = await fetch(
+            `${process.env.RAILWAY_FFMPEG_URL}/api/burn-hook-subtitles`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: hookVideoUrl,
+                subtitles: HOOK_SUBTITLES[templateId]
+              })
+            }
+          )
+          
+          if (burnRes.ok) {
+            const burnData = await burnRes.json()
+            if (burnData.success && burnData.videoUrl) {
+              console.log('[hook/generate] ✅ Subtitles burned:', burnData.videoUrl)
+              hookVideoUrl = burnData.videoUrl
+            }
+          } else {
+            console.warn('[hook/generate] Subtitle burning failed (using video without subtitles):', burnRes.status)
+          }
+        } catch (burnErr) {
+          console.warn('[hook/generate] Subtitle burning error (non-fatal):', burnErr)
         }
       }
     } catch (seedanceErr) {
