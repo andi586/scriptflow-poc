@@ -413,10 +413,23 @@ export const TEMPLATE_BLUEPRINTS: Record<string, TemplateBlueprint> = {
 }
 
 /**
+ * Template ID aliases - maps frontend template IDs to blueprint IDs
+ */
+const TEMPLATE_ALIASES: Record<string, string> = {
+  'phone_3am': 'she_didnt_choose_you',
+  'future_warning': 'future_you',
+  'group_chat': 'last_person',
+  'dog_last_words': 'lost_someone',
+  'what_could_have_been': 'parallel_universe',
+}
+
+/**
  * Get blueprint for a template ID
+ * Handles alias mapping from frontend template IDs to blueprint IDs
  */
 export function getTemplateBlueprint(templateId: string): TemplateBlueprint | null {
-  return TEMPLATE_BLUEPRINTS[templateId] || null
+  const blueprintId = TEMPLATE_ALIASES[templateId] || templateId
+  return TEMPLATE_BLUEPRINTS[blueprintId] || null
 }
 
 /**
