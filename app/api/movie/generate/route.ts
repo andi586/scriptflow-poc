@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
       }))
       
       archetype = story_category // Use template ID as archetype
+      console.log('[DEBUG] archetype SET (emotion blueprint):', archetype)
       hookData = null // Emotion blueprints have built-in hooks
       
       console.log('[movie/generate] Emotion Blueprint shots:', shots.length, 'archetype:', archetype)
@@ -153,6 +154,7 @@ export async function POST(req: NextRequest) {
         
         shots = templateShots
         archetype = directorIntent.archetype
+        console.log('[DEBUG] archetype SET (DirectorIntent):', archetype)
         hookData = null // DirectorIntent templates have built-in hooks in shot 1
         
         console.log('[movie/generate] DirectorIntent shots:', shots.length, 'archetype:', archetype)
@@ -180,6 +182,7 @@ export async function POST(req: NextRequest) {
 
         shots = scriptData?.directionPlan?.shots ?? []
         archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
+        console.log('[DEBUG] archetype SET (CognitiveCore):', archetype)
         hookData = scriptData?.hook ?? null
 
         console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype, 'hook:', !!hookData)
@@ -335,6 +338,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 3: Create movie record
+    console.log('[DEBUG] FINAL archetype before DB:', { story_category, archetype, final: story_category || archetype })
     const { data: movie, error: movieError } = await supabase
       .from('movies')
       .insert({

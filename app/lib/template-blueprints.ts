@@ -429,6 +429,7 @@ const TEMPLATE_ALIASES: Record<string, string> = {
  */
 export function getTemplateBlueprint(templateId: string): TemplateBlueprint | null {
   const blueprintId = TEMPLATE_ALIASES[templateId] || templateId
+  console.log('[DEBUG] blueprint lookup:', { input: templateId, resolved: blueprintId, found: !!TEMPLATE_BLUEPRINTS[blueprintId] })
   return TEMPLATE_BLUEPRINTS[blueprintId] || null
 }
 
