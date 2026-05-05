@@ -225,7 +225,7 @@ export default function CreatePage() {
         userId: userId || crypto.randomUUID(),
         main_photo_url: mainPhotoUrl,
         additional_images: additionalImages,
-        story_category: selectedTemplate === 'breaking_news' ? 'breaking_news' : undefined
+        story_category: selectedTemplate
       };
       
       console.log('[create] SENDING body:', JSON.stringify(body))

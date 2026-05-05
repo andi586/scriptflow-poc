@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { matchDirectorIntent, applyDirectorIntent } from '@/app/lib/templates'
+import { getTemplateBlueprint } from '@/app/lib/template-blueprints'
 
 export const maxDuration = 300
 
@@ -85,68 +86,104 @@ export async function POST(req: NextRequest) {
     console.log('[movie/generate] additional_images received:', additional_images?.length || 0, additional_images)
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Step 2: Check for DirectorIntent template match
+    // Step 2: Check for Emotion Blueprint OR DirectorIntent template match
     // ═══════════════════════════════════════════════════════════════════════════
-    // CRITICAL: Skip DirectorIntent for prank template FIRST (before matching)
-    // DirectorIntent may match keywords in prank story and override the template
-    if (story_category === 'breaking_news' || story_category === 'prank') {
-      console.log('[movie/generate] 🎭 PRANK template detected - skipping DirectorIntent completely')
-    }
     
-    const skipDirectorIntent = story_category === 'breaking_news' || story_category === 'prank'
-    const directorIntent = skipDirectorIntent ? null : matchDirectorIntent(story)
+    // Template ID to Emotion Blueprint mapping
+    const EMOTION_BLUEPRINT_TEMPLATES = [
+      'what_could_have_been',
+      'phone_3am',
+      'she_didnt_choose_you',
+      'future_warning',
+      'future_you',
+      'group_chat',
+      'last_person',
+      'dog_last_words',
+      'lost_someone',
+      'friend_betrayal',
+      'parallel_universe',
+      'breaking_news'
+    ]
+    
     let shots: any[] = []
     let archetype: string | null = null
     let hookData: any = null
     
-    if (skipDirectorIntent) {
-      console.log('[movie/generate] 🎭 Prank template - skipping DirectorIntent, using CognitiveCore')
-    }
+    // Check if story_category matches an emotion blueprint template
+    const emotionBlueprint = story_category ? getTemplateBlueprint(story_category) : null
     
-    if (directorIntent && !skipDirectorIntent) {
-
-      // ✅ DirectorIntent template matched - use fixed shot structure
-      console.log(`[movie/generate] 🎬 DirectorIntent matched: "${directorIntent.intent}"`)
-      console.log(`[movie/generate] Using template shots instead of CognitiveCore`)
+    if (emotionBlueprint) {
+      // ✅ Emotion Blueprint matched - use it directly, skip DirectorIntent
+      console.log(`[movie/generate] 🎨 Emotion Blueprint matched: "${emotionBlueprint.title}"`)
+      console.log(`[movie/generate] Using emotion blueprint directly, skipping DirectorIntent`)
       
-      // Apply template with character details (CognitiveCore only fills in character info)
-      const templateShots = applyDirectorIntent(directorIntent, {
-        mainCharacter: 'character',
-        location: 'scene'
-      })
+      // Convert emotion blueprint shots to the format expected by movie generation
+      shots = emotionBlueprint.shots.map((blueprintShot, index) => ({
+        shotNumber: blueprintShot.shot_number,
+        duration: parseInt(blueprintShot.duration.replace('s', '')),
+        shotType: blueprintShot.must_have.some(req => req.includes('@image')) ? 'face' : 'scene',
+        type: blueprintShot.must_have.some(req => req.includes('@image')) ? 'close-up' : 'wide',
+        emotion: blueprintShot.emotion_beat,
+        description: blueprintShot.must_have.join(', '),
+        visualDescription: blueprintShot.must_have.join(', '),
+        cameraMovement: 'cinematic',
+        lighting: blueprintShot.visual_style,
+        dialogue: index === emotionBlueprint.shots.length - 1 ? emotionBlueprint.ending.killer_line : undefined
+      }))
       
-      shots = templateShots
-      archetype = directorIntent.archetype
-      hookData = null // DirectorIntent templates have built-in hooks in shot 1
+      archetype = story_category // Use template ID as archetype
+      hookData = null // Emotion blueprints have built-in hooks
       
-      console.log('[movie/generate] DirectorIntent shots:', shots.length, 'archetype:', archetype)
+      console.log('[movie/generate] Emotion Blueprint shots:', shots.length, 'archetype:', archetype)
     } else {
-      // ❌ No template match - fall back to CognitiveCore
-      console.log('[movie/generate] No DirectorIntent match, using CognitiveCore')
+      // Check for DirectorIntent match (skip if breaking_news/prank without blueprint)
+      const skipDirectorIntent = story_category === 'breaking_news' || story_category === 'prank'
+      const directorIntent = skipDirectorIntent ? null : matchDirectorIntent(story)
       
-      // Add prank template context if breaking_news category
-      let enhancedStory = story
-      if (story_category === 'prank' || story_category === 'breaking_news') {
-        enhancedStory = `${story}\n\nThis is a prank video. @image_1 is the friend being pranked (main character). @image_2 is the user who set up the prank. Both must appear in the video. @image_1 appears shocked/confused. @image_2 appears amused/laughing.`
-        console.log('[movie/generate] 🎭 Prank template detected - adding two-character context')
+      if (directorIntent) {
+        // ✅ DirectorIntent template matched - use fixed shot structure
+        console.log(`[movie/generate] 🎬 DirectorIntent matched: "${directorIntent.intent}"`)
+        console.log(`[movie/generate] Using template shots instead of CognitiveCore`)
+        
+        // Apply template with character details (CognitiveCore only fills in character info)
+        const templateShots = applyDirectorIntent(directorIntent, {
+          mainCharacter: 'character',
+          location: 'scene'
+        })
+        
+        shots = templateShots
+        archetype = directorIntent.archetype
+        hookData = null // DirectorIntent templates have built-in hooks in shot 1
+        
+        console.log('[movie/generate] DirectorIntent shots:', shots.length, 'archetype:', archetype)
+      } else {
+        // ❌ No template match - fall back to CognitiveCore
+        console.log('[movie/generate] No DirectorIntent match, using CognitiveCore')
+        
+        // Add prank template context if breaking_news category
+        let enhancedStory = story
+        if (story_category === 'prank' || story_category === 'breaking_news') {
+          enhancedStory = `${story}\n\nThis is a prank video. @image_1 is the friend being pranked (main character). @image_2 is the user who set up the prank. Both must appear in the video. @image_1 appears shocked/confused. @image_2 appears amused/laughing.`
+          console.log('[movie/generate] 🎭 Prank template detected - adding two-character context')
+        }
+        
+        const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ template: enhancedStory, personalNote: enhancedStory })
+        })
+        const scriptData = await scriptRes.json()
+        console.log('[DEBUG scriptData]', scriptData)
+        console.log('[DEBUG shots]', scriptData?.shots)
+        console.log('[DEBUG directionPlan]', scriptData?.directionPlan)
+        console.log('[DEBUG hook]', scriptData?.hook)
+
+        shots = scriptData?.directionPlan?.shots ?? []
+        archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
+        hookData = scriptData?.hook ?? null
+
+        console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype, 'hook:', !!hookData)
       }
-      
-      const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: enhancedStory, personalNote: enhancedStory })
-      })
-      const scriptData = await scriptRes.json()
-      console.log('[DEBUG scriptData]', scriptData)
-      console.log('[DEBUG shots]', scriptData?.shots)
-      console.log('[DEBUG directionPlan]', scriptData?.directionPlan)
-      console.log('[DEBUG hook]', scriptData?.hook)
-
-      shots = scriptData?.directionPlan?.shots ?? []
-      archetype = scriptData?.directionPlan?.archetype ?? scriptData?.archetype ?? null
-      hookData = scriptData?.hook ?? null
-
-      console.log('[movie/generate] Cognitive Core shots:', shots.length, 'archetype:', archetype, 'hook:', !!hookData)
     }
 
     // Tier config
