@@ -127,6 +127,79 @@ export const ARCHETYPE_EXECUTION_LOCK: Record<string, {
     klingStyle: "dark to light, build then explode",
     ffmpegVolume: 0.18
   },
+  // Frontend template IDs (emotion blueprints) - using original template IDs as archetype
+  phone_3am: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3",
+    bgmStyle: "melancholic piano",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  she_didnt_choose_you: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3",
+    bgmStyle: "melancholic piano",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  future_warning: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3",
+    bgmStyle: "dramatic urgent",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  future_you: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3",
+    bgmStyle: "dramatic urgent",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  dog_last_words: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Soft_Piano_Hush-3c6453eb-c53e-4b91-99f1-e8ac06cbec25.mp3",
+    bgmStyle: "emotional piano",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  lost_someone: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Soft_Piano_Hush-3c6453eb-c53e-4b91-99f1-e8ac06cbec25.mp3",
+    bgmStyle: "emotional piano",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  group_chat: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3",
+    bgmStyle: "dark electronic",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  last_person: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3",
+    bgmStyle: "dark electronic",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  what_could_have_been: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Sunken_Coral_Compass-8db70fdf-21b6-4142-9926-28e69bb532d5.mp3",
+    bgmStyle: "ambient mysterious",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  parallel_universe: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Sunken_Coral_Compass-8db70fdf-21b6-4142-9926-28e69bb532d5.mp3",
+    bgmStyle: "ambient mysterious",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
+  breaking_news: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Squeaky_Trombones_A.mp3",
+    bgmStyle: "comedy prank",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.15
+  },
+  friend_betrayal: {
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Stringed_Oath_A.mp3",
+    bgmStyle: "cold dramatic",
+    klingStyle: "cinematic 9:16",
+    ffmpegVolume: 0.12
+  },
 }
 
 // Default fallback
