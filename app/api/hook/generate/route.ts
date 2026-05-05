@@ -251,41 +251,73 @@ export async function POST(request: NextRequest) {
       { text: lines[2], startTime: 10, endTime: 12 },
     ]
 
-    // Step 8: Use original photo x3 for all segments (fast generation)
+    // Step 8: Try Seedance emotion video first, fallback to FFmpeg
     const basePhotoUrl = twin.frame_url_front ?? twin.frame_url_mid
-    const photoUrls = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
-    console.log('[hook/generate] using original photo x3 for fast generation')
+    let hookVideoUrl: string | null = null
 
-    // Step 9: Call Railway /hook endpoint
-    const railwayPayload = {
-      photoUrls: photoUrls,  // array of 3 photos (same photo for stability)
-      audioUrls,
-      subtitles,
-      bgmUrl,
-      colorGrade,
-      duration: 15,
-    }
+    try {
+      console.log('[hook/generate] Attempting Seedance emotion video generation...')
+      
+      // Call Railway emotion API
+      const emotionRes = await fetch(
+        `${process.env.RAILWAY_FFMPEG_URL}/api/generate-hook-emotion`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: movie.twin_photo_url || basePhotoUrl,
+            template_id: movie.archetype || 'neutral'
+          })
+        }
+      )
 
-    console.log('[hook/generate] calling Railway /hook with photoUrls:', photoUrls)
-
-    const railwayRes = await fetch(
-      'https://scriptflow-video-merge-production.up.railway.app/hook',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(railwayPayload),
+      if (emotionRes.ok) {
+        const emotionData = await emotionRes.json()
+        if (emotionData.success && emotionData.videoUrl) {
+          console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
+          hookVideoUrl = emotionData.videoUrl
+        }
+      } else {
+        console.warn('[hook/generate] Seedance API returned error:', emotionRes.status)
       }
-    )
-
-    if (!railwayRes.ok) {
-      const errText = await railwayRes.text()
-      throw new Error(`Railway /hook error: ${errText}`)
+    } catch (seedanceErr) {
+      console.warn('[hook/generate] Seedance generation failed, falling back to FFmpeg:', seedanceErr)
     }
 
-    const railwayData = await railwayRes.json()
-    const hookVideoUrl: string = railwayData.hookVideoUrl ?? railwayData.url ?? railwayData.output ?? null
+    // Fallback to FFmpeg if Seedance failed
+    if (!hookVideoUrl) {
+      console.log('[hook/generate] Using FFmpeg fallback (photoUrls x3)')
+      const photoUrls = [basePhotoUrl, basePhotoUrl, basePhotoUrl]
 
-    console.log('[hook/generate] hookVideoUrl:', hookVideoUrl)
+      const railwayPayload = {
+        photoUrls: photoUrls,
+        audioUrls,
+        subtitles,
+        bgmUrl,
+        colorGrade,
+        duration: 15,
+      }
+
+      console.log('[hook/generate] calling Railway /hook with photoUrls:', photoUrls)
+
+      const railwayRes = await fetch(
+        'https://scriptflow-video-merge-production.up.railway.app/hook',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(railwayPayload),
+        }
+      )
+
+      if (!railwayRes.ok) {
+        const errText = await railwayRes.text()
+        throw new Error(`Railway /hook error: ${errText}`)
+      }
+
+      const railwayData = await railwayRes.json()
+      hookVideoUrl = railwayData.hookVideoUrl ?? railwayData.url ?? railwayData.output ?? null
+      console.log('[hook/generate] FFmpeg hookVideoUrl:', hookVideoUrl)
+    }
 
     // Step 9: Save hook_video_url to movies table
     if (hookVideoUrl) {
