@@ -7,6 +7,96 @@ import { getDirectorRules } from './director-rules'
 import { buildGrowthPrompt } from './growth-os'
 import { getTemplateBlueprint, type TemplateBlueprint } from './template-blueprints'
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ENDING LINE LIBRARY - 70 Emotional Precision Lines
+// ═══════════════════════════════════════════════════════════════════════════
+const ENDING_LINE_LIBRARY = {
+  phone_3am: [
+    "I only looked because I still loved you.",
+    "She wasn't looking for proof. She was looking for goodbye.",
+    "She cried before she unlocked it.",
+    "The photos weren't of you.",
+    "Now we're both strangers at 3AM.",
+    "She found nothing. Somehow, that was worse.",
+    "At 3:01, she stopped being yours.",
+    "I deleted mine first so you'd never know.",
+    "She put it back. She liked the lies better.",
+    "You never locked it… because you trusted me."
+  ],
+  dog_last_words: [
+    "Take care of Mom for me.",
+    "I wasn't waiting to leave. I was waiting for you.",
+    "Close your eyes. I'll find you again.",
+    "I only learned one word. Yours.",
+    "Don't bury me there. I'm already home.",
+    "You called me good. I called you mine.",
+    "I stayed ten years extra just for you.",
+    "Tell the new puppy I said hi.",
+    "I left fur behind, so you'd still find me.",
+    "Look for me where the sunlight sleeps."
+  ],
+  group_chat: [
+    "He's gone. Finally.",
+    "We were never really friends.",
+    "You weren't excluded. You were archived.",
+    "Nobody defended you. Everyone reread it.",
+    "The quietest friend sent the screenshot.",
+    "Your name became easier when you weren't there.",
+    "They missed you most when you stopped replying.",
+    "One heart reaction did more damage than words.",
+    "Should we tell him we knew?",
+    "Delete the evidence before he sees."
+  ],
+  future_warning: [
+    "Whatever you do… don't trust me.",
+    "I didn't come to save you. I came to apologize.",
+    "I changed the past. You still became me.",
+    "Don't open the door at 2:17.",
+    "I came back too late the first time.",
+    "You survive everything. That's the problem.",
+    "Tomorrow remembers what you're about to forget.",
+    "I'm not here to save you. Just to watch.",
+    "Tell Mom I'm sorry.",
+    "The mistake starts with the word 'finally.'"
+  ],
+  friend_betrayal: [
+    "Now we're even.",
+    "The knife hurt less because it knew your name.",
+    "Enemies guess your weakness. Friends remember it.",
+    "You didn't lose a friend. They lost a witness.",
+    "The apology sounded rehearsed because it was.",
+    "They didn't betray you suddenly. You just noticed suddenly.",
+    "You were becoming too happy.",
+    "Some friendships have expiration dates.",
+    "Your secrets were never safe with me.",
+    "They hugged you with one hand on the receipt."
+  ],
+  what_could_have_been: [
+    "In another life, we were boring. I think we were happy.",
+    "We were one brave sentence away.",
+    "I miss the person I never became with you.",
+    "The house exists. Just not here.",
+    "Somewhere, you came home five minutes earlier.",
+    "You weren't my mistake. You were my maybe.",
+    "The almost version of us still sets the table.",
+    "She said yes in that timeline.",
+    "Close enough to touch… never again.",
+    "The kids have your eyes."
+  ],
+  breaking_news: [
+    "He said your name during the confession.",
+    "They denied everything, then posted it on Instagram.",
+    "Police confirmed the only victim was common sense.",
+    "The FBI declined comment. Their mom did not.",
+    "They were innocent until the camera roll loaded.",
+    "He married your ex. On live TV.",
+    "Their bail was set at one group dinner.",
+    "Experts warn: do not feed them attention after midnight.",
+    "He's wanted in three states. For dad jokes.",
+    "The bank robbery? He brought snacks."
+  ]
+}
+
 export interface ProducerOutput {
   mode: 'social' | 'emotional' | 'artistic'
   story_category: 'pet' | 'grief' | 'love' | 'family' | 'prank' | 'achievement' | 'nostalgia' | 'hope'
@@ -347,6 +437,45 @@ ${HOOK_FORMULAS.map(h => `${h.type}: ${h.description} | example: ${h.example}`).
 
 ENDING FORMULAS (final shot must use one of these):
 ${ENDING_FORMULAS.map(e => `${e.type}: ${e.description} | music: ${e.music} | example: ${e.example}`).join('\n')}
+
+═══ ENDING LINE LIBRARY - EMOTIONAL PRECISION SYSTEM ═══
+
+After generating shots, you MUST select ONE ending line from the matching template's library.
+Pick the line with highest emotional impact for this specific story.
+This line MUST appear as the final dialogue in the last shot.
+NEVER generate your own ending line - ALWAYS use the library.
+
+LIBRARY BY TEMPLATE:
+
+phone_3am (She checked your phone at 3AM):
+${ENDING_LINE_LIBRARY.phone_3am.map((line, i) => `${i + 1}. "${line}"`).join('\n')}
+
+dog_last_words (Your dog spoke to you one last time):
+${ENDING_LINE_LIBRARY.dog_last_words.map((line, i) => `${i + 1}. "${line}"`).join('\n')}
+
+group_chat (The group chat after you left):
+${ENDING_LINE_LIBRARY.group_chat.map((line, i) => `${i + 1}. "${line}"`).join('\n')}
+
+future_warning (Your future self came back with a warning):
+${ENDING_LINE_LIBRARY.future_warning.map((line, i) => `${i + 1}. "${line}"`).join('\n')}
+
+friend_betrayal (Your friend betrayed you):
+${ENDING_LINE_LIBRARY.friend_betrayal.map((line, i) => `${i + 1}. "${line}"`).join('\n')}
+
+what_could_have_been (What Could Have Been):
+${ENDING_LINE_LIBRARY.what_could_have_been.map((line, i) => `${i + 1}. "${line}"`).join('\n')}
+
+breaking_news (Breaking News prank):
+${ENDING_LINE_LIBRARY.breaking_news.map((line, i) => `${i + 1}. "${line}"`).join('\n')}
+
+SELECTION RULES:
+1. Match the template to the story theme
+2. Pick the line that hits hardest for THIS specific story
+3. Use the EXACT line from the library (no modifications)
+4. Place it in the final shot's dialogue field
+5. If no template matches, use the general ENDING_FORMULAS above
+
+═══ END ENDING LINE LIBRARY ═══
 
 EMOTION TRANSITIONS (use when shifting between emotions):
 ${EMOTION_TRANSITIONS.map(t => `${t.from}->${t.to}: ${t.transition} | camera: ${t.camera} | ${t.duration}`).join('\n')}
