@@ -16,7 +16,42 @@ export default function MoviePage() {
   const [isFirstTime, setIsFirstTime] = useState(true)
   const [price, setPrice] = useState(2.9)
   const [videoLoading, setVideoLoading] = useState(true)
+  const [showCutoff, setShowCutoff] = useState(false)
+  const [cutoffTriggered, setCutoffTriggered] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const paywallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Emotional cutoff lines based on template
+  const CUTOFF_LINES: Record<string, string> = {
+    'she_didnt_choose_you': "The message wasn't from another girl.\nIt was from her.",
+    'phone_3am': "The message wasn't from another girl.\nIt was from her.",
+    'lost_someone': "I wasn't waiting to leave.\nI was waiting for you to understand…",
+    'dog_last_words': "I wasn't waiting to leave.\nI was waiting for you to understand…",
+    'last_person': "They didn't remove you from the chat.\nThey muted you.",
+    'group_chat': "They didn't remove you from the chat.\nThey muted you.",
+    'future_you': "I didn't come back to save you.\nI came back to stop you—",
+    'future_warning': "I didn't come back to save you.\nI came back to stop you—",
+    'friend_betrayal': "I didn't betray you.\nYou told me to.",
+    'what_could_have_been': "We were happy.\nUntil you chose this life.",
+    'parallel_universe': "We were happy.\nUntil you chose this life.",
+    'breaking_news': "Authorities confirm the suspect is—"
+  }
+
+  // Template-specific CTAs
+  const PAYWALL_CTA: Record<string, string> = {
+    'she_didnt_choose_you': "Finish your story.",
+    'phone_3am': "Finish your story.",
+    'lost_someone': "Hear the last words.",
+    'dog_last_words': "Hear the last words.",
+    'last_person': "See what they said next.",
+    'group_chat': "See what they said next.",
+    'future_you': "Find out what you become.",
+    'future_warning': "Find out what you become.",
+    'friend_betrayal': "Remember what you said.",
+    'what_could_have_been': "See the life you lost.",
+    'parallel_universe': "See the life you lost.",
+    'breaking_news': "Reveal the suspect."
+  }
 
   useEffect(() => {
     const id = window.location.pathname.split('/').pop()
@@ -55,17 +90,31 @@ export default function MoviePage() {
     return () => clearInterval(interval)
   }, [movieId])
 
-  // Show paywall after 5 seconds if hook video is playing and not paid
+  // Emotional cutoff at 10-12 seconds
   useEffect(() => {
-    if (movie?.hook_video_url && !movie?.paid) {
-      paywallTimerRef.current = setTimeout(() => {
-        setShowPaywall(true)
-      }, 5000)
+    if (!videoRef.current || !movie?.hook_video_url || movie?.paid || cutoffTriggered) return
+
+    const video = videoRef.current
+    
+    const handleTimeUpdate = () => {
+      // Trigger cutoff at 10-12 seconds
+      if (video.currentTime >= 10 && !cutoffTriggered) {
+        setCutoffTriggered(true)
+        setShowCutoff(true)
+        
+        // Pause video
+        video.pause()
+        
+        // Show paywall after cutoff animation
+        setTimeout(() => {
+          setShowPaywall(true)
+        }, 1500)
+      }
     }
-    return () => {
-      if (paywallTimerRef.current) clearTimeout(paywallTimerRef.current)
-    }
-  }, [movie?.hook_video_url, movie?.paid])
+
+    video.addEventListener('timeupdate', handleTimeUpdate)
+    return () => video.removeEventListener('timeupdate', handleTimeUpdate)
+  }, [movie?.hook_video_url, movie?.paid, cutoffTriggered])
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) return (
@@ -113,6 +162,7 @@ export default function MoviePage() {
             </div>
           )}
           <video
+            ref={videoRef}
             src={movie.hook_video_url}
             autoPlay
             playsInline
@@ -123,9 +173,39 @@ export default function MoviePage() {
               maxWidth:'360px',
               borderRadius:'16px',
               boxShadow:'0 0 60px rgba(212,168,83,0.2)',
-              display: videoLoading ? 'none' : 'block'
+              display: videoLoading ? 'none' : 'block',
+              animation: showCutoff ? 'screenShake 0.5s ease-in-out' : 'none'
             }}
           />
+
+          {/* Cutoff overlay - emotional interrupt */}
+          {showCutoff && (
+            <div style={{
+              position:'absolute',
+              inset:0,
+              borderRadius:'16px',
+              background:'rgba(0,0,0,0.95)',
+              display:'flex',
+              flexDirection:'column',
+              alignItems:'center',
+              justifyContent:'center',
+              padding:'32px 24px',
+              animation: 'fadeIn 0.3s ease-in'
+            }}>
+              <div style={{
+                color:'#fff',
+                fontSize:'1.3rem',
+                fontWeight:'700',
+                textAlign:'center',
+                lineHeight:'1.6',
+                whiteSpace:'pre-line',
+                marginBottom:'24px',
+                animation: 'glitchText 0.5s ease-in-out'
+              }}>
+                {CUTOFF_LINES[movie.archetype] || "The story continues..."}
+              </div>
+            </div>
+          )}
 
           {/* Paywall overlay */}
           {showPaywall && (
@@ -139,10 +219,11 @@ export default function MoviePage() {
               alignItems:'center',
               justifyContent:'flex-end',
               padding:'32px 24px',
-              gap:'12px'
+              gap:'12px',
+              animation: 'fadeIn 0.5s ease-in'
             }}>
-              <p style={{color:'#D4A853',fontWeight:'800',fontSize:'1.1rem',textAlign:'center',margin:0}}>
-                🎬 Unlock Your Movie
+              <p style={{color:'#D4A853',fontWeight:'800',fontSize:'1.3rem',textAlign:'center',margin:0,marginBottom:'8px'}}>
+                {PAYWALL_CTA[movie.archetype] || "Unlock Your Movie"}
               </p>
               <p style={{color:'#aaa',fontSize:'0.85rem',textAlign:'center',margin:0}}>
                 {isFirstTime ? '$2.9 - First Movie Special' : '$4.9 - Unlock Full Movie'}
@@ -172,12 +253,22 @@ export default function MoviePage() {
                   color:'#000',
                   border:'none',
                   borderRadius:'100px',
-                  padding:'14px 36px',
+                  padding:'16px 40px',
                   fontWeight:'800',
-                  fontSize:'1rem',
+                  fontSize:'1.1rem',
                   cursor:'pointer',
                   width:'100%',
-                  maxWidth:'280px'
+                  maxWidth:'280px',
+                  boxShadow:'0 8px 30px rgba(212,168,83,0.4)',
+                  transition:'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(212,168,83,0.6)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 8px 30px rgba(212,168,83,0.4)';
                 }}
               >
                 🔓 Unlock now → ${price}
@@ -196,6 +287,55 @@ export default function MoviePage() {
             Full movie unlocks in a moment...
           </p>
         )}
+
+        {/* CSS Animations for cutoff effects */}
+        <style jsx>{`
+          @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0); }
+            10% { transform: translate(-5px, 2px); }
+            20% { transform: translate(5px, -2px); }
+            30% { transform: translate(-3px, 3px); }
+            40% { transform: translate(3px, -3px); }
+            50% { transform: translate(-2px, 2px); }
+            60% { transform: translate(2px, -2px); }
+            70% { transform: translate(-1px, 1px); }
+            80% { transform: translate(1px, -1px); }
+            90% { transform: translate(0, 0); }
+          }
+
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+
+          @keyframes glitchText {
+            0% { 
+              opacity: 0;
+              transform: translateX(-10px);
+              filter: blur(5px);
+            }
+            20% {
+              opacity: 0.5;
+              transform: translateX(5px);
+              filter: blur(2px);
+            }
+            40% {
+              opacity: 0.8;
+              transform: translateX(-3px);
+              filter: blur(1px);
+            }
+            60% {
+              opacity: 1;
+              transform: translateX(2px);
+              filter: blur(0px);
+            }
+            100% {
+              opacity: 1;
+              transform: translateX(0);
+              filter: blur(0px);
+            }
+          }
+        `}</style>
       </div>
     )
   }
