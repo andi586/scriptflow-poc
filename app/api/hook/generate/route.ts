@@ -295,6 +295,8 @@ export async function POST(request: NextRequest) {
             
             // Send Seedance video to Railway /hook for BGM + subtitles
             console.log('[hook/generate] Adding BGM and subtitles via Railway /hook...')
+            console.log('[hook/generate] bgmUrl:', bgmUrl)
+            console.log('[hook/generate] subtitles:', JSON.stringify(subtitles))
             try {
               const hookRes = await fetch(
                 `${process.env.RAILWAY_FFMPEG_URL}/hook`,
@@ -304,7 +306,7 @@ export async function POST(request: NextRequest) {
                   body: JSON.stringify({
                     movieId: movieId,
                     videoUrl: emotionData.videoUrl,
-                    bgmUrl: bgmUrl,
+                    bgmUrl: bgmUrl,  // Ensure BGM is passed
                     subtitles: subtitles,
                     colorGrade: 'cinematic'
                   })
