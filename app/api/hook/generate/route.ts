@@ -304,11 +304,11 @@ export async function POST(request: NextRequest) {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    movieId: movieId,
-                    videoUrl: emotionData.videoUrl,
-                    bgmUrl: bgmUrl,  // Ensure BGM is passed
+                    photoUrl: emotionData.videoUrl,  // single video URL
+                    bgmUrl: bgmUrl,
                     subtitles: subtitles,
-                    colorGrade: 'cinematic'
+                    colorGrade: 'cinematic',
+                    movieId: movieId
                   })
                 }
               )
