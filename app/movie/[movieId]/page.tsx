@@ -71,11 +71,6 @@ export default function MoviePage() {
       console.log('[movie page] data:', data)
       setMovie(data)
       setLoading(false)
-      
-      // Show paywall immediately if paid=false and hook video exists
-      if (data && !data.paid && data.hook_video_url) {
-        setShowPaywall(true)
-      }
     }
 
     fetchMovie()
@@ -88,12 +83,6 @@ export default function MoviePage() {
         .single()
       if (data) {
         setMovie(data)
-        
-        // Show paywall immediately if paid=false and hook video exists
-        if (!data.paid && data.hook_video_url) {
-          setShowPaywall(true)
-        }
-        
         if (data?.final_video_url && data?.paid) {
           clearInterval(interval)
         }
