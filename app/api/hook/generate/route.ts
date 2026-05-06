@@ -293,41 +293,38 @@ export async function POST(request: NextRequest) {
           if (emotionData.success && emotionData.videoUrl) {
             console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
             
-            // Send Seedance video to Railway /hook for BGM + subtitles
-            console.log('[hook/generate] Adding BGM and subtitles via Railway /hook...')
+            // Add BGM to Seedance video
+            console.log('[hook/generate] Adding BGM to Seedance video...')
             console.log('[hook/generate] bgmUrl:', bgmUrl)
-            console.log('[hook/generate] subtitles:', JSON.stringify(subtitles))
             try {
-              const hookRes = await fetch(
-                `${process.env.RAILWAY_FFMPEG_URL}/hook`,
+              const bgmRes = await fetch(
+                `${process.env.RAILWAY_FFMPEG_URL}/api/add-bgm-to-video`,
                 {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    photoUrl: emotionData.videoUrl,  // single video URL
+                    videoUrl: emotionData.videoUrl,
                     bgmUrl: bgmUrl,
-                    subtitles: subtitles,
-                    colorGrade: 'cinematic',
                     movieId: movieId
                   })
                 }
               )
               
-              if (hookRes.ok) {
-                const hookData = await hookRes.json()
-                if (hookData.success && hookData.hookVideoUrl) {
-                  console.log('[hook/generate] ✅ BGM + subtitles added:', hookData.hookVideoUrl)
-                  hookVideoUrl = hookData.hookVideoUrl
+              if (bgmRes.ok) {
+                const bgmData = await bgmRes.json()
+                if (bgmData.success && bgmData.videoUrl) {
+                  console.log('[hook/generate] ✅ BGM added:', bgmData.videoUrl)
+                  hookVideoUrl = bgmData.videoUrl
                 } else {
-                  console.warn('[hook/generate] Railway /hook failed, using raw Seedance video')
+                  console.warn('[hook/generate] BGM addition failed, using raw Seedance video')
                   hookVideoUrl = emotionData.videoUrl
                 }
               } else {
-                console.warn('[hook/generate] Railway /hook error:', hookRes.status, 'using raw Seedance video')
+                console.warn('[hook/generate] BGM API error:', bgmRes.status, 'using raw Seedance video')
                 hookVideoUrl = emotionData.videoUrl
               }
-            } catch (hookErr) {
-              console.warn('[hook/generate] Railway /hook exception (using raw video):', hookErr)
+            } catch (bgmErr) {
+              console.warn('[hook/generate] BGM exception (using raw video):', bgmErr)
               hookVideoUrl = emotionData.videoUrl
             }
 
