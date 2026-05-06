@@ -292,7 +292,42 @@ export async function POST(request: NextRequest) {
           const emotionData = await emotionRes.json()
           if (emotionData.success && emotionData.videoUrl) {
             console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
-            hookVideoUrl = emotionData.videoUrl
+            
+            // Send Seedance video to Railway /hook for BGM + subtitles
+            console.log('[hook/generate] Adding BGM and subtitles via Railway /hook...')
+            try {
+              const hookRes = await fetch(
+                `${process.env.RAILWAY_FFMPEG_URL}/hook`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    movieId: movieId,
+                    videoUrl: emotionData.videoUrl,
+                    bgmUrl: bgmUrl,
+                    subtitles: subtitles,
+                    colorGrade: 'cinematic'
+                  })
+                }
+              )
+              
+              if (hookRes.ok) {
+                const hookData = await hookRes.json()
+                if (hookData.success && hookData.hookVideoUrl) {
+                  console.log('[hook/generate] ✅ BGM + subtitles added:', hookData.hookVideoUrl)
+                  hookVideoUrl = hookData.hookVideoUrl
+                } else {
+                  console.warn('[hook/generate] Railway /hook failed, using raw Seedance video')
+                  hookVideoUrl = emotionData.videoUrl
+                }
+              } else {
+                console.warn('[hook/generate] Railway /hook error:', hookRes.status, 'using raw Seedance video')
+                hookVideoUrl = emotionData.videoUrl
+              }
+            } catch (hookErr) {
+              console.warn('[hook/generate] Railway /hook exception (using raw video):', hookErr)
+              hookVideoUrl = emotionData.videoUrl
+            }
 
             // Save to cache (non-blocking)
             try {
