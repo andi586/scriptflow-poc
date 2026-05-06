@@ -133,12 +133,16 @@ export default function MoviePage() {
     </div>
   )
 
-  // ── Hook video + paywall (paid=false, hook ready) ─────────
-  if (movie?.hook_video_url && !movie?.paid) {
+  // ── Paywall view (paid=false) - show regardless of hook status ─────────
+  if (!movie?.paid) {
     return (
       <div style={{background:'#0a0a0a',minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',padding:'48px 20px 120px',color:'white',fontFamily:'system-ui'}}>
-        <h1 style={{color:'#D4A853',fontSize:'1.3rem',marginBottom:'4px'}}>🎬 Your Preview is Ready</h1>
-        <p style={{color:'#555',fontSize:'0.85rem',marginBottom:'24px'}}>Watch the first 15 seconds of your movie</p>
+        <h1 style={{color:'#D4A853',fontSize:'1.3rem',marginBottom:'4px'}}>
+          {movie?.hook_video_url ? '🎬 Your Preview is Ready' : '⏳ Generating Your Preview...'}
+        </h1>
+        <p style={{color:'#555',fontSize:'0.85rem',marginBottom:'24px'}}>
+          {movie?.hook_video_url ? 'Watch the first 15 seconds of your movie' : 'Your hook video is being created'}
+        </p>
 
         <div style={{position:'relative',display:'inline-block',marginBottom:'8px'}}>
           {/* Loading skeleton */}
