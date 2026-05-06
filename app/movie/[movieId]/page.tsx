@@ -92,15 +92,15 @@ export default function MoviePage() {
     return () => clearInterval(interval)
   }, [movieId])
 
-  // Emotional cutoff at 10-12 seconds
+  // Emotional cutoff at 3 seconds (hook video is only 5 seconds)
   useEffect(() => {
     if (!videoRef.current || !movie?.hook_video_url || movie?.paid || cutoffTriggered) return
 
     const video = videoRef.current
     
     const handleTimeUpdate = () => {
-      // Trigger cutoff at 10-12 seconds
-      if (video.currentTime >= 10 && !cutoffTriggered) {
+      // Trigger cutoff at 3 seconds
+      if (video.currentTime >= 3 && !cutoffTriggered) {
         setCutoffTriggered(true)
         setShowCutoff(true)
         
