@@ -314,7 +314,33 @@ export async function POST(request: NextRequest) {
                 const bgmData = await bgmRes.json()
                 if (bgmData.success && bgmData.videoUrl) {
                   console.log('[hook/generate] ✅ BGM added:', bgmData.videoUrl)
-                  hookVideoUrl = bgmData.videoUrl
+                  
+                  // Burn subtitles onto BGM video
+                  const hookSubtitles = HOOK_SUBTITLES[templateId]
+                  if (hookSubtitles) {
+                    console.log('[hook/generate] Burning subtitles...')
+                    try {
+                      const subtitleRes = await fetch(
+                        `${process.env.RAILWAY_FFMPEG_URL}/api/burn-hook-subtitles`,
+                        {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            videoUrl: bgmData.videoUrl,
+                            subtitles: hookSubtitles
+                          })
+                        }
+                      )
+                      const subtitleData = await subtitleRes.json()
+                      hookVideoUrl = subtitleData.videoUrl || bgmData.videoUrl
+                      console.log('[hook/generate] ✅ Subtitles burned:', hookVideoUrl)
+                    } catch (subErr) {
+                      console.warn('[hook/generate] Subtitle burning failed, using BGM video:', subErr)
+                      hookVideoUrl = bgmData.videoUrl
+                    }
+                  } else {
+                    hookVideoUrl = bgmData.videoUrl
+                  }
                 } else {
                   console.warn('[hook/generate] BGM addition failed, using raw Seedance video')
                   hookVideoUrl = emotionData.videoUrl
@@ -345,36 +371,6 @@ export async function POST(request: NextRequest) {
           }
         } else {
           console.warn('[hook/generate] Seedance API returned error:', emotionRes.status)
-        }
-      }
-      
-      // Step 8.5: Burn hook subtitles onto emotion video
-      if (hookVideoUrl && HOOK_SUBTITLES[templateId]) {
-        console.log('[hook/generate] Burning hook subtitles onto emotion video...')
-        try {
-          const burnRes = await fetch(
-            `${process.env.RAILWAY_FFMPEG_URL}/api/burn-hook-subtitles`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                videoUrl: hookVideoUrl,
-                subtitles: HOOK_SUBTITLES[templateId]
-              })
-            }
-          )
-          
-          if (burnRes.ok) {
-            const burnData = await burnRes.json()
-            if (burnData.success && burnData.videoUrl) {
-              console.log('[hook/generate] ✅ Subtitles burned:', burnData.videoUrl)
-              hookVideoUrl = burnData.videoUrl
-            }
-          } else {
-            console.warn('[hook/generate] Subtitle burning failed (using video without subtitles):', burnRes.status)
-          }
-        } catch (burnErr) {
-          console.warn('[hook/generate] Subtitle burning error (non-fatal):', burnErr)
         }
       }
     } catch (seedanceErr) {

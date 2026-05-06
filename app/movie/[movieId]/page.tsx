@@ -81,9 +81,11 @@ export default function MoviePage() {
         .select('*')
         .eq('id', movieId)
         .single()
-      if (data?.final_video_url || data?.hook_video_url) {
+      if (data) {
         setMovie(data)
-        if (data?.final_video_url) clearInterval(interval)
+        if (data?.final_video_url && data?.paid) {
+          clearInterval(interval)
+        }
       }
     }, 5000)
 
