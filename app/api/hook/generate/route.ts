@@ -295,16 +295,19 @@ export async function POST(request: NextRequest) {
             hookVideoUrl = emotionData.videoUrl
 
             // Save to cache (non-blocking)
-            supabase
-              .from('emotion_video_cache')
-              .upsert({
-                photo_url: photoUrl,
-                template_id: templateId,
-                emotion: emotionData.emotion,
-                emotion_video_url: emotionData.videoUrl
-              })
-              .then(() => console.log('[hook/generate] ✅ Cached emotion video for future use'))
-              .catch((err: any) => console.warn('[hook/generate] Cache save failed (non-fatal):', err?.message))
+            try {
+              await supabase
+                .from('emotion_video_cache')
+                .upsert({
+                  photo_url: photoUrl,
+                  template_id: templateId,
+                  emotion: emotionData.emotion,
+                  emotion_video_url: emotionData.videoUrl
+                })
+              console.log('[hook/generate] ✅ Cached emotion video for future use')
+            } catch (cacheErr) {
+              console.warn('[hook/generate] Cache save failed (non-fatal):', cacheErr)
+            }
           }
         } else {
           console.warn('[hook/generate] Seedance API returned error:', emotionRes.status)
