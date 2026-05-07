@@ -357,7 +357,7 @@ export async function POST(request: NextRequest) {
               body: JSON.stringify({
                 videoUrl: emotionData.videoUrl,
                 bgmUrl: bgmUrl,
-                subtitles: hookSubtitles || [],
+                subtitles: subtitles || [],
                 movieId: movieId
               })
             }).catch(err => console.error('[hook] Railway process-hook error:', err))
