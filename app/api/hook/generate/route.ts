@@ -15,24 +15,24 @@ const HOOK_DIALOGUE = {
     "You were sleeping."
   ],
   'lost_someone': [
-    "Your dog just said your name.",
+    "He said my name.",
     "Out loud.",
-    "Right before it died."
+    "He died last year."
   ],
   'last_person': [
-    "They kept talking after you left.",
-    "About you.",
-    "Not what you think."
+    "They kept talking.",
+    "After you left.",
+    "About you."
   ],
   'future_you': [
-    "You don't have much time.",
+    "I came back.",
     "I'm you.",
-    "From the future."
+    "Don't open that door."
   ],
   'friend_betrayal': [
-    "He told them everything.",
-    "Your secret.",
-    "He was smiling."
+    "He smiled.",
+    "When he told them.",
+    "Everything."
   ],
   'what_could_have_been': [
     "This was your life.",
@@ -45,9 +45,9 @@ const HOOK_DIALOGUE = {
     "For the wrong reason."
   ],
   'parallel_universe': [
-    "You don't have much time.",
-    "I'm you.",
-    "From the future."
+    "My future self.",
+    "Sent this.",
+    "Don't ignore it."
   ]
 }
 
