@@ -341,32 +341,32 @@ export async function POST(request: NextRequest) {
           if (emotionData.success && emotionData.videoUrl) {
             console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
             
-            // Add BGM to Seedance video
-            console.log('[hook/generate] Adding BGM to Seedance video...')
-            console.log('[hook/generate] bgmUrl:', bgmUrl)
-            try {
-              const bgmRes = await fetch(
-                `${process.env.RAILWAY_FFMPEG_URL}/api/add-bgm-to-video`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    videoUrl: emotionData.videoUrl,
-                    bgmUrl: bgmUrl,
-                    movieId: movieId
-                  })
-                }
-              )
-              
+            // Save Seedance video immediately
+            hookVideoUrl = emotionData.videoUrl
+            await supabase.from('movies')
+              .update({ hook_video_url: hookVideoUrl })
+              .eq('id', movieId)
+            console.log('[hook/generate] ✅ Saved raw Seedance video as hook_video_url')
+            
+            // Add BGM in background (fire and forget)
+            console.log('[hook/generate] Triggering BGM addition in background...')
+            fetch(`${process.env.RAILWAY_FFMPEG_URL}/api/add-bgm-to-video`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: emotionData.videoUrl,
+                bgmUrl: bgmUrl,
+                movieId: movieId
+              })
+            }).then(async (bgmRes) => {
               if (bgmRes.ok) {
                 const bgmData = await bgmRes.json()
                 if (bgmData.success && bgmData.videoUrl) {
-                  console.log('[hook/generate] ✅ BGM added:', bgmData.videoUrl)
+                  console.log('[hook] BGM added in background:', bgmData.videoUrl)
                   
-                  // Burn subtitles onto BGM video
+                  // Burn subtitles
                   const hookSubtitles = HOOK_SUBTITLES[templateId]
                   if (hookSubtitles) {
-                    console.log('[hook/generate] Burning subtitles...')
                     try {
                       const subtitleRes = await fetch(
                         `${process.env.RAILWAY_FFMPEG_URL}/api/burn-hook-subtitles`,
@@ -380,27 +380,30 @@ export async function POST(request: NextRequest) {
                         }
                       )
                       const subtitleData = await subtitleRes.json()
-                      hookVideoUrl = subtitleData.videoUrl || bgmData.videoUrl
-                      console.log('[hook/generate] ✅ Subtitles burned:', hookVideoUrl)
+                      const finalUrl = subtitleData.videoUrl || bgmData.videoUrl
+                      
+                      // Update with final video (BGM + subtitles)
+                      await supabase.from('movies')
+                        .update({ hook_video_url: finalUrl })
+                        .eq('id', movieId)
+                      console.log('[hook] ✅ Updated with BGM + subtitles:', finalUrl)
                     } catch (subErr) {
-                      console.warn('[hook/generate] Subtitle burning failed, using BGM video:', subErr)
-                      hookVideoUrl = bgmData.videoUrl
+                      // Just use BGM video without subtitles
+                      await supabase.from('movies')
+                        .update({ hook_video_url: bgmData.videoUrl })
+                        .eq('id', movieId)
+                      console.warn('[hook] Subtitle burning failed, updated with BGM only:', subErr)
                     }
                   } else {
-                    hookVideoUrl = bgmData.videoUrl
+                    // Update with BGM video
+                    await supabase.from('movies')
+                      .update({ hook_video_url: bgmData.videoUrl })
+                      .eq('id', movieId)
+                    console.log('[hook] ✅ Updated with BGM video:', bgmData.videoUrl)
                   }
-                } else {
-                  console.warn('[hook/generate] BGM addition failed, using raw Seedance video')
-                  hookVideoUrl = emotionData.videoUrl
                 }
-              } else {
-                console.warn('[hook/generate] BGM API error:', bgmRes.status, 'using raw Seedance video')
-                hookVideoUrl = emotionData.videoUrl
               }
-            } catch (bgmErr) {
-              console.warn('[hook/generate] BGM exception (using raw video):', bgmErr)
-              hookVideoUrl = emotionData.videoUrl
-            }
+            }).catch(err => console.error('[hook] BGM background error:', err))
 
             // Save to cache (non-blocking)
             try {
