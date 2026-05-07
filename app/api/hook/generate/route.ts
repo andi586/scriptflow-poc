@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
               .eq('id', movieId)
             console.log('[hook/generate] ✅ Saved stable video URL as hook_video_url')
             
-            // Fire single request to Railway to process everything (BGM + subtitles)
+            // Fire single request to Railway to process everything (BGM + audio + subtitles)
             const hookSubtitles = HOOK_SUBTITLES[templateId]
             console.log('[hook/generate] Triggering Railway /api/process-hook (fire and forget)...')
             fetch(`${process.env.RAILWAY_FFMPEG_URL}/api/process-hook`, {
@@ -373,6 +373,7 @@ export async function POST(request: NextRequest) {
               body: JSON.stringify({
                 videoUrl: stableVideoUrl,  // ← stable Supabase URL
                 bgmUrl: bgmUrl,
+                audioUrls: audioUrls,  // ← dialogue audio files
                 subtitles: subtitles || [],
                 movieId: movieId
               })
