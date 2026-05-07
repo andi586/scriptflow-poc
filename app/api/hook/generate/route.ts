@@ -341,66 +341,60 @@ export async function POST(request: NextRequest) {
           if (emotionData.success && emotionData.videoUrl) {
             console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
             
-            // Save Seedance video immediately
-            hookVideoUrl = emotionData.videoUrl
+            // Burn subtitles on raw Seedance video FIRST (before returning)
+            const hookSubtitles = HOOK_SUBTITLES[templateId]
+            if (hookSubtitles) {
+              console.log('[hook/generate] Burning subtitles on raw Seedance video...')
+              try {
+                const subtitleRes = await fetch(
+                  `${process.env.RAILWAY_FFMPEG_URL}/api/burn-hook-subtitles`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      videoUrl: emotionData.videoUrl,
+                      subtitles: hookSubtitles
+                    })
+                  }
+                )
+                const subtitleData = await subtitleRes.json()
+                if (subtitleData.videoUrl) {
+                  hookVideoUrl = subtitleData.videoUrl
+                  console.log('[hook/generate] ✅ Subtitles burned on raw video:', hookVideoUrl)
+                } else {
+                  hookVideoUrl = emotionData.videoUrl
+                  console.warn('[hook/generate] Subtitle burning returned no URL, using raw video')
+                }
+              } catch (subErr) {
+                console.warn('[hook/generate] Subtitle burning failed, using raw video:', subErr)
+                hookVideoUrl = emotionData.videoUrl
+              }
+            } else {
+              hookVideoUrl = emotionData.videoUrl
+              console.log('[hook/generate] No subtitles for template, using raw video')
+            }
+            
+            // Save subtitled video immediately
             await supabase.from('movies')
               .update({ hook_video_url: hookVideoUrl })
               .eq('id', movieId)
-            console.log('[hook/generate] ✅ Saved raw Seedance video as hook_video_url')
+            console.log('[hook/generate] ✅ Saved subtitled video as hook_video_url')
             
-            // Add BGM in background (fire and forget)
+            // Add BGM in background (fire and forget) - will update hook_video_url when done
             console.log('[hook/generate] Triggering BGM addition in background...')
             fetch(`${process.env.RAILWAY_FFMPEG_URL}/api/add-bgm-to-video`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                videoUrl: emotionData.videoUrl,
+                videoUrl: hookVideoUrl, // Use subtitled video as input
                 bgmUrl: bgmUrl,
                 movieId: movieId
               })
             }).then(async (bgmRes) => {
               if (bgmRes.ok) {
                 const bgmData = await bgmRes.json()
-                if (bgmData.success && bgmData.videoUrl) {
-                  console.log('[hook] BGM added in background:', bgmData.videoUrl)
-                  
-                  // Burn subtitles
-                  const hookSubtitles = HOOK_SUBTITLES[templateId]
-                  if (hookSubtitles) {
-                    try {
-                      const subtitleRes = await fetch(
-                        `${process.env.RAILWAY_FFMPEG_URL}/api/burn-hook-subtitles`,
-                        {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            videoUrl: bgmData.videoUrl,
-                            subtitles: hookSubtitles
-                          })
-                        }
-                      )
-                      const subtitleData = await subtitleRes.json()
-                      const finalUrl = subtitleData.videoUrl || bgmData.videoUrl
-                      
-                      // Update with final video (BGM + subtitles)
-                      await supabase.from('movies')
-                        .update({ hook_video_url: finalUrl })
-                        .eq('id', movieId)
-                      console.log('[hook] ✅ Updated with BGM + subtitles:', finalUrl)
-                    } catch (subErr) {
-                      // Just use BGM video without subtitles
-                      await supabase.from('movies')
-                        .update({ hook_video_url: bgmData.videoUrl })
-                        .eq('id', movieId)
-                      console.warn('[hook] Subtitle burning failed, updated with BGM only:', subErr)
-                    }
-                  } else {
-                    // Update with BGM video
-                    await supabase.from('movies')
-                      .update({ hook_video_url: bgmData.videoUrl })
-                      .eq('id', movieId)
-                    console.log('[hook] ✅ Updated with BGM video:', bgmData.videoUrl)
-                  }
+                if (bgmData.videoUrl) {
+                  console.log('[hook] ✅ BGM added in background, hook_video_url updated:', bgmData.videoUrl)
                 }
               }
             }).catch(err => console.error('[hook] BGM background error:', err))
