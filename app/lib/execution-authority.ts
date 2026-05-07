@@ -141,25 +141,25 @@ export const ARCHETYPE_EXECUTION_LOCK: Record<string, {
     ffmpegVolume: 0.12
   },
   future_warning: {
-    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3",
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Neon_Sweat_Pump-44af055b-838a-4bbd-b2fe-198014def499.mp3",
     bgmStyle: "dramatic urgent",
     klingStyle: "cinematic 9:16",
     ffmpegVolume: 0.12
   },
   future_you: {
-    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3",
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Neon_Sweat_Pump-44af055b-838a-4bbd-b2fe-198014def499.mp3",
     bgmStyle: "dramatic urgent",
     klingStyle: "cinematic 9:16",
     ffmpegVolume: 0.12
   },
   dog_last_words: {
-    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Soft_Piano_Hush-3c6453eb-c53e-4b91-99f1-e8ac06cbec25.mp3",
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Fallen_Piano_Wax_A.mp3",
     bgmStyle: "emotional piano",
     klingStyle: "cinematic 9:16",
     ffmpegVolume: 0.12
   },
   lost_someone: {
-    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Soft_Piano_Hush-3c6453eb-c53e-4b91-99f1-e8ac06cbec25.mp3",
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Fallen_Piano_Wax_A.mp3",
     bgmStyle: "emotional piano",
     klingStyle: "cinematic 9:16",
     ffmpegVolume: 0.12
@@ -195,7 +195,7 @@ export const ARCHETYPE_EXECUTION_LOCK: Record<string, {
     ffmpegVolume: 0.15
   },
   friend_betrayal: {
-    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Stringed_Oath_A.mp3",
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3",
     bgmStyle: "cold dramatic",
     klingStyle: "cinematic 9:16",
     ffmpegVolume: 0.12
