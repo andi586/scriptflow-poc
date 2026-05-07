@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   // Update movies table (new single Kling 3.0 architecture)
   // First, look up the movie to get its id
   const { data: movie } = await supabaseAdmin.from('movies')
-    .select('id, story_input, archetype')
+    .select('id, story_input, archetype, script_raw')
     .eq('kling_task_id', taskId)
     .single()
 
@@ -164,6 +164,83 @@ const movieArchetype = movie.archetype || storyProfile.primaryEmotion
 const bgmUrl = getLockedBGM(movieArchetype)
 console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.split('/').pop())
     console.log('[webhook] BGM selected:', bgmUrl)
+    
+    // Generate dialogue audio with ElevenLabs before merge
+    const ELEVENLABS_VOICE_ID = 'KdYTpVAufDTTk08g3eJi' // Narrator voice
+    const HOOK_DIALOGUE: Record<string, string[]> = {
+      'she_didnt_choose_you': ["She unlocked your phone.", "3:17 AM.", "You were sleeping."],
+      'lost_someone': ["He said my name.", "Out loud.", "He died last year."],
+      'last_person': ["They kept talking.", "After you left.", "About you."],
+      'future_you': ["I came back.", "I'm you.", "Don't open that door."],
+      'friend_betrayal': ["He smiled.", "When he told them.", "Everything."],
+      'what_could_have_been': ["This was your life.", "If you said yes.", "You didn't."],
+      'breaking_news': ["That's your friend.", "On the news.", "For the wrong reason."],
+      'parallel_universe': ["My future self.", "Sent this.", "Don't ignore it."],
+      'phone_3am': ["She unlocked your phone.", "3:17 AM.", "You were sleeping."],
+      'future_warning': ["I came back.", "I'm you.", "Don't open that door."],
+      'group_chat': ["They kept talking.", "After you left.", "About you."],
+      'dog_last_words': ["He said my name.", "Out loud.", "He died last year."]
+    }
+    
+    let audioUrls: string[] = []
+    
+    // Get dialogue lines from template or script_raw
+    const dialogueLines = HOOK_DIALOGUE[movieArchetype] || 
+      (movie.script_raw ? movie.script_raw.split('\n').filter((l: string) => l.trim()).slice(0, 3) : [])
+    
+    if (dialogueLines.length > 0 && process.env.ELEVENLABS_API_KEY) {
+      console.log('[webhook] Generating dialogue audio with ElevenLabs...')
+      try {
+        for (let i = 0; i < dialogueLines.length; i++) {
+          const line = dialogueLines[i]
+          console.log(`[webhook] TTS line ${i + 1}:`, line)
+          
+          const ttsRes = await fetch(
+            `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
+            {
+              method: 'POST',
+              headers: {
+                'xi-api-key': process.env.ELEVENLABS_API_KEY!,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                text: line,
+                model_id: 'eleven_turbo_v2',
+                voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+              })
+            }
+          )
+          
+          if (!ttsRes.ok) {
+            console.warn(`[webhook] TTS failed for line ${i + 1}:`, ttsRes.status)
+            continue
+          }
+          
+          const audioBuffer = await ttsRes.arrayBuffer()
+          const fileName = `dialogue/${movie.id}/line-${i + 1}-${Date.now()}.mp3`
+          
+          const { error: uploadErr } = await supabaseAdmin.storage
+            .from('generated-audio')
+            .upload(fileName, Buffer.from(audioBuffer), { contentType: 'audio/mpeg', upsert: true })
+          
+          if (uploadErr) {
+            console.warn(`[webhook] Audio upload failed for line ${i + 1}:`, uploadErr.message)
+            continue
+          }
+          
+          const { data } = supabaseAdmin.storage.from('generated-audio').getPublicUrl(fileName)
+          audioUrls.push(data.publicUrl)
+          console.log(`[webhook] Audio ${i + 1} uploaded:`, data.publicUrl)
+        }
+        console.log('[webhook] Generated', audioUrls.length, 'dialogue audio files')
+      } catch (ttsErr) {
+        console.error('[webhook] TTS generation error:', ttsErr)
+        audioUrls = [] // Fallback to no audio
+      }
+    } else {
+      console.log('[webhook] No dialogue lines or ElevenLabs API key, skipping TTS')
+    }
+    
     try {
       const mergeRes = await fetch(`${FFMPEG_URL}/merge`, {
         method: 'POST',
@@ -172,7 +249,7 @@ console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.
           projectId: movie.id,
           videoUrls: [videoUrl],
           bgmUrl: bgmUrl,
-          audioUrls: [],
+          audioUrls: audioUrls, // ← Pass generated dialogue audio
           projectTitle: 'ScriptFlow Movie'
         })
       })
