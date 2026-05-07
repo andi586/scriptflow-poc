@@ -186,32 +186,23 @@ console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.
         if (endingLine) {
           console.log('[webhook] Burning ending subtitle:', endingLine)
           try {
-            const subtitleRes = await fetch(`${FFMPEG_URL}/burn-subtitle`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                videoUrl: finalVideoUrl,
-                text: endingLine,
-                startTime: 11,
-                duration: 4,
-                position: 'bottom',
-                yOffset: 150,
-                fontStyle: 'bold',
-                fontSize: 48,
-                fontColor: 'white',
-                shadowColor: 'black',
-                shadowOffset: 2
-              })
-            })
-            
-            if (subtitleRes.ok) {
-              const subtitleData = await subtitleRes.json()
-              if (subtitleData.success && subtitleData.videoUrl) {
-                finalVideoUrl = subtitleData.videoUrl
-                console.log('[webhook] ✅ Ending subtitle burned:', finalVideoUrl)
+            const subtitleRes = await fetch(
+              `${process.env.RAILWAY_FFMPEG_URL}/api/burn-subtitle`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  videoUrl: finalVideoUrl,
+                  subtitle: endingLine,
+                  startTime: 11,
+                  duration: 4
+                })
               }
-            } else {
-              console.warn('[webhook] Subtitle burning failed, using video without subtitle')
+            )
+            const subtitleData = await subtitleRes.json()
+            if (subtitleData.videoUrl) {
+              finalVideoUrl = subtitleData.videoUrl
+              console.log('[webhook] ✅ Ending subtitle burned:', finalVideoUrl)
             }
           } catch (subErr) {
             console.warn('[webhook] Subtitle burning exception (non-fatal):', subErr)
