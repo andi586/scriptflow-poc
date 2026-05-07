@@ -3,6 +3,34 @@ import { createClient } from '@supabase/supabase-js'
 import { selectBGMv2 } from '@/app/lib/bgm-selector-v2'
 import { getLockedBGM } from '@/app/lib/execution-authority'
 
+const ENDING_LINE_LIBRARY: Record<string, string> = {
+  'she_didnt_choose_you': "Trust doesn't come back.",
+  'lost_someone': "Thank you for being my human.",
+  'last_person': "Real friends don't need a group chat.",
+  'future_you': "Don't make my mistakes.",
+  'friend_betrayal': "He told them everything.",
+  'what_could_have_been': "Some paths are beautiful because we didn't take them.",
+  'breaking_news': "The truth always finds a camera.",
+  'parallel_universe': "Some doors should stay closed.",
+  'phone_3am': "Trust doesn't come back.",
+  'future_warning': "Don't make my mistakes.",
+  'group_chat': "Real friends don't need a group chat.",
+  'dog_last_words': "Thank you for being my human.",
+  // Legacy archetypes
+  'pet_daily': "Every moment was a gift.",
+  'playful_chaos': "Life is better with you.",
+  'late_regret': "Some words come too late.",
+  'heartbreak': "Love doesn't always stay.",
+  'lonely_reflection': "Sometimes alone is better.",
+  'hero_moment': "This is who I was meant to be.",
+  'martial_arts': "Strength comes from within.",
+  'chase_escape': "Freedom has a price.",
+  'unspoken_love': "I should have said it.",
+  'reconciliation': "Forgiveness changes everything.",
+  'spring_festival': "Home is where the heart returns.",
+  'christmas': "Magic lives in the moments we share."
+}
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -152,6 +180,45 @@ console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.
       if (mergeData.success && mergeData.finalVideoUrl) {
         finalVideoUrl = mergeData.finalVideoUrl
         console.log('[webhook] BGM added:', finalVideoUrl)
+        
+        // Burn ending subtitle onto final video
+        const endingLine = ENDING_LINE_LIBRARY[movieArchetype]
+        if (endingLine) {
+          console.log('[webhook] Burning ending subtitle:', endingLine)
+          try {
+            const subtitleRes = await fetch(`${FFMPEG_URL}/burn-subtitle`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoUrl: finalVideoUrl,
+                text: endingLine,
+                startTime: 11,
+                duration: 4,
+                position: 'bottom',
+                yOffset: 150,
+                fontStyle: 'bold',
+                fontSize: 48,
+                fontColor: 'white',
+                shadowColor: 'black',
+                shadowOffset: 2
+              })
+            })
+            
+            if (subtitleRes.ok) {
+              const subtitleData = await subtitleRes.json()
+              if (subtitleData.success && subtitleData.videoUrl) {
+                finalVideoUrl = subtitleData.videoUrl
+                console.log('[webhook] ✅ Ending subtitle burned:', finalVideoUrl)
+              }
+            } else {
+              console.warn('[webhook] Subtitle burning failed, using video without subtitle')
+            }
+          } catch (subErr) {
+            console.warn('[webhook] Subtitle burning exception (non-fatal):', subErr)
+          }
+        } else {
+          console.log('[webhook] No ending line found for archetype:', movieArchetype)
+        }
       }
     } catch (e) {
       console.error('[webhook] BGM merge failed, using original:', e)
