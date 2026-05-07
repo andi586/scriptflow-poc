@@ -8,6 +8,49 @@ export const maxDuration = 120
 
 const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM' // Rachel
 
+const HOOK_DIALOGUE = {
+  'she_didnt_choose_you': [
+    "She unlocked your phone.",
+    "3:17 AM.",
+    "You were sleeping."
+  ],
+  'lost_someone': [
+    "Your dog just said your name.",
+    "Out loud.",
+    "Right before it died."
+  ],
+  'last_person': [
+    "They kept talking after you left.",
+    "About you.",
+    "Not what you think."
+  ],
+  'future_you': [
+    "You don't have much time.",
+    "I'm you.",
+    "From the future."
+  ],
+  'friend_betrayal': [
+    "He told them everything.",
+    "Your secret.",
+    "He was smiling."
+  ],
+  'what_could_have_been': [
+    "This was your life.",
+    "If you said yes.",
+    "You didn't."
+  ],
+  'breaking_news': [
+    "That's your friend.",
+    "On the news.",
+    "For the wrong reason."
+  ],
+  'parallel_universe': [
+    "You don't have much time.",
+    "I'm you.",
+    "From the future."
+  ]
+}
+
 // ── Replicate SDXL expression generation ─────────────────────────────────────
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
@@ -119,6 +162,11 @@ async function uploadAudio(buffer: Buffer, filePath: string): Promise<string> {
 
 // ── Generate 3 dialogue lines from story or archetype ────────────────────────
 async function generateDialogueLines(story: string, archetype: string | null): Promise<string[]> {
+  // Check HOOK_DIALOGUE first for template-specific lines
+  if (archetype && HOOK_DIALOGUE[archetype as keyof typeof HOOK_DIALOGUE]) {
+    return HOOK_DIALOGUE[archetype as keyof typeof HOOK_DIALOGUE]
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
 
   // Try Claude first
