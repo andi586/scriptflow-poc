@@ -341,12 +341,28 @@ export async function POST(request: NextRequest) {
           if (emotionData.success && emotionData.videoUrl) {
             console.log('[hook/generate] Seedance emotion video generated:', emotionData.emotion, emotionData.videoUrl)
             
-            // Save raw Seedance video immediately
-            hookVideoUrl = emotionData.videoUrl
+            // Download Seedance video and save to Supabase IMMEDIATELY
+            console.log('[hook/generate] Downloading Seedance video to Supabase...')
+            const seedanceResponse = await fetch(emotionData.videoUrl)
+            const seedanceBuffer = await seedanceResponse.arrayBuffer()
+            const seedanceFileName = `hooks/seedance_${Date.now()}.mp4`
+            await supabase.storage
+              .from('generated-videos')
+              .upload(seedanceFileName, Buffer.from(seedanceBuffer), 
+                { contentType: 'video/mp4', upsert: true })
+            const { data: seedanceUrlData } = supabase.storage
+              .from('generated-videos')
+              .getPublicUrl(seedanceFileName)
+            
+            const stableVideoUrl = seedanceUrlData.publicUrl
+            console.log('[hook/generate] ✅ Seedance video saved to Supabase:', stableVideoUrl)
+            
+            // Save stable Supabase URL as hook_video_url
+            hookVideoUrl = stableVideoUrl
             await supabase.from('movies')
               .update({ hook_video_url: hookVideoUrl })
               .eq('id', movieId)
-            console.log('[hook/generate] ✅ Saved raw Seedance video as hook_video_url')
+            console.log('[hook/generate] ✅ Saved stable video URL as hook_video_url')
             
             // Fire single request to Railway to process everything (BGM + subtitles)
             const hookSubtitles = HOOK_SUBTITLES[templateId]
@@ -355,7 +371,7 @@ export async function POST(request: NextRequest) {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                videoUrl: emotionData.videoUrl,
+                videoUrl: stableVideoUrl,  // ← stable Supabase URL
                 bgmUrl: bgmUrl,
                 subtitles: subtitles || [],
                 movieId: movieId
