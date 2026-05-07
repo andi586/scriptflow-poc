@@ -8,7 +8,7 @@ export const ARCHETYPE_EXECUTION_LOCK: Record<string, {
   ffmpegVolume: number
 }> = {
   pet_daily: {
-    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3",
+    bgmUrl: "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3",
     bgmStyle: "playful ukulele",
     klingStyle: "bright natural light, fast cuts, playful",
     ffmpegVolume: 0.12
@@ -203,7 +203,7 @@ export const ARCHETYPE_EXECUTION_LOCK: Record<string, {
 }
 
 // Default fallback
-export const DEFAULT_BGM_URL = "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3"
+export const DEFAULT_BGM_URL = "https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3"
 
 export function getLockedBGM(archetype: string): string {
   return ARCHETYPE_EXECUTION_LOCK[archetype]?.bgmUrl || DEFAULT_BGM_URL
