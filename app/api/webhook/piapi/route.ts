@@ -48,22 +48,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false })
   }
 
-  // Update omnihuman_jobs
-  await supabaseAdmin.from('omnihuman_jobs')
-    .update({ status: 'completed', result_video_url: videoUrl })
-    .eq('task_id', taskId)
-
-  // Update movie_shots omni_video_url
-  await supabaseAdmin.from('movie_shots')
-    .update({ omni_video_url: videoUrl, status: 'processing' })
-    .eq('omni_task_id', taskId)
-
-  // Update movie_shots kling_scene_url  
-  await supabaseAdmin.from('movie_shots')
-    .update({ kling_scene_url: videoUrl, status: 'processing' })
-    .eq('kling_task_id', taskId)
-
-  // Update movies table (new single Kling 3.0 architecture)
+  // Process movie (single Kling 3.0 architecture)
   const FFMPEG_URL = 'https://scriptflow-video-merge-production.up.railway.app'
   
   try {
