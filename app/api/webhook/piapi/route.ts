@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: movie, error: movieError } = await supabaseAdmin
       .from('movies')
-      .select('id, story_input, archetype, script_raw')
+      .select('id, story_input, archetype')
       .eq('kling_task_id', taskId)
       .single()
     
@@ -76,14 +76,8 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', movie.id)
       
-      // Get dialogue from script
-      const scriptData = movie.script_raw
-      let dialogueLines: string[] = []
-      if (scriptData?.shots) {
-        dialogueLines = scriptData.shots
-          .map((s: any) => s.dialogue)
-          .filter(Boolean)
-      }
+      // Dialogue lines (empty for now - will be added later)
+      const dialogueLines: string[] = []
       
       console.log('[webhook] dialogue lines:', dialogueLines.length)
       
