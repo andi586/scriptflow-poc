@@ -72,125 +72,34 @@ export async function POST(req: NextRequest) {
 
   const FFMPEG_URL = 'https://scriptflow-video-merge-production.up.railway.app'
 
-  // Add BGM to video
-  let finalVideoUrl = videoUrl
   if (movie) {
-    // Get story profile from movie or detect from story_input
-    const story = movie.story_input || ''
-    const s = story.toLowerCase()
-
-    // Detect primary emotion from story text, mapping archetypes → BGM emotion keys
-    const detectPrimaryEmotion = (s: string): string => {
-      // Action archetypes
-      if (['武打', '功夫', 'martial arts', 'fight', '战争', '牺牲', 'war', '街头', '打架', '英雄', 'hero', '追逐', '逃跑', 'chase'].some(k => s.includes(k))) return 'action'
-      // Travel
-      if (['旅行', '旅游', 'travel', 'travel_memory'].some(k => s.includes(k))) return 'travel'
-      // Fitness
-      if (['健身', '运动', 'fitness', 'training', 'workout'].some(k => s.includes(k))) return 'fitness'
-      // Baby
-      if (['宝宝', '成长', 'baby', 'baby_growth'].some(k => s.includes(k))) return 'baby'
-      // Wedding
-      if (['婚礼', '结婚', 'wedding', 'wedding_memory'].some(k => s.includes(k))) return 'wedding'
-      // Nostalgia
-      if (['童年', '小时候', 'childhood', '回忆', 'memory', 'nostalgia', '怀念'].some(k => s.includes(k))) return 'nostalgia'
-      // Betrayal
-      if (['背叛', 'betrayal'].some(k => s.includes(k))) return 'betrayal'
-      // Hope
-      if (['希望', 'hope'].some(k => s.includes(k))) return 'hope'
-      // Inspiring (comeback_story / exam_victory / startup_hustle)
-      if (['逆转', 'comeback', '考试', '成绩', 'exam', '创业', 'startup', '奋斗', 'hustle', '励志', 'inspiring'].some(k => s.includes(k))) return 'inspiring'
-      // Festive (spring_festival / christmas / birthday_celebration)
-      if (['春节', '过年', 'spring festival', '新年', '圣诞', 'christmas', '生日', 'birthday', '节日', 'festive'].some(k => s.includes(k))) return 'festive'
-      // Funny (prank_friend / fail_moments / pet_funny / awkward_daily)
-      if (['整蛊', 'prank', '搞笑', '恶作剧', '翻车', 'fail', '出糗', '宠物搞笑', '逗猫', '逗狗', '尴尬', 'awkward', 'funny'].some(k => s.includes(k))) return 'funny'
-      // Bittersweet (bittersweet / letting_go / self_discovery)
-      if (['放下', '释怀', 'letting go', '自我', '觉醒', 'self discovery', 'bittersweet', '苦涩'].some(k => s.includes(k))) return 'bittersweet'
-      // Legacy emotion detection
-      if (['猫', 'dog', 'cat', 'pet', '宠物'].some(k => s.includes(k))) return 'playful'
-      if (['妈', 'mom', 'miss', '想你'].some(k => s.includes(k))) return 'grief'
-      if (['爱', 'love'].some(k => s.includes(k))) return 'romantic'
-      if (['家', 'family'].some(k => s.includes(k))) return 'warm'
-      return 'warm'
-    }
-
-    const primaryEmotion = detectPrimaryEmotion(s)
-
-    // Use buildStoryProfile to get precise valence/arousal/bannedDirections from emotion overrides
-    const { buildStoryProfile } = await import('@/app/lib/bgm-selector-v2')
-    const storyProfile = buildStoryProfile({ primaryEmotion })
-    // Enrich protagonistType and setting from story text
-    if (s.includes('猫') || s.includes('dog') || s.includes('cat') || s.includes('pet') || s.includes('宠物')) {
-      storyProfile.protagonistType = 'pet'
-    } else if (s.includes('家') || s.includes('family') || s.includes('妈') || s.includes('爸')) {
-      storyProfile.protagonistType = 'family'
-    } else if (s.includes('爱') || s.includes('love')) {
-      storyProfile.protagonistType = 'couple'
-    }
-    storyProfile.setting = s.includes('outdoor') || s.includes('park') || s.includes('nature') ? 'outdoor' : 'indoor'
-
-    console.log('[webhook] story profile:', storyProfile.primaryEmotion, storyProfile.valence, storyProfile.arousal)
-    // EXECUTION AUTHORITY: Lock BGM by archetype
-const ARCHETYPE_BGM_LOCK: Record<string, string> = {
-  'pet_daily': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3',
-  'playful_chaos': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Ukulele_Cat_Pants-ac740d3e-475d-46ff-aa30-b7d02ffdaa7f.mp3',
-  'late_regret': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
-  'heartbreak': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
-  'lonely_reflection': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
-  'hero_moment': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Triumphant_No-Vocal-0249cc79-3054-483b-8a4f-8c211e555672.mp3',
-  'martial_arts': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Triumphant_No-Vocal-0249cc79-3054-483b-8a4f-8c211e555672.mp3',
-  'chase_escape': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3',
-  'unspoken_love': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3',
-  'reconciliation': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3',
-  'spring_festival': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-鞭炮回响-a8dab44d-4f85-4524-8a21-194aaefc19c2.mp3',
-  'christmas': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-dd16ffbd-1798-47bc-b484-934095a07e37.mp3',
-  // New emotional templates
-  'parallel_universe': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
-  'she_didnt_choose_you': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
-  'future_you': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Triumphant_No-Vocal-0249cc79-3054-483b-8a4f-8c211e555672.mp3',
-  'lost_someone': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
-  'last_person': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
-  'breaking_news': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3',
-  // 7 new BGM tracks for emotional templates
-  'phone_3am': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Trainyard_Countdown-09711e21-388c-4700-b84b-1f2db4ee0aa2.mp3',
-  'future_warning': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/future_warning_1777949611664.mp3',
-  'friend_betrayal': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/friend_betrayal_1777949613234.mp3',
-  'what_could_have_been': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/Broken_Metronome_new_A.mp3',
-  'group_chat': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Snowdrift_Loop-33fedaab-51b4-44d6-9fd3-b05079c609dc.mp3',
-  'dog_last_words': 'https://ktrtheitjtwpdvdvnlzj.supabase.co/storage/v1/object/public/music/My_Workspace-Fallen_Piano_Wax_A.mp3',
-}
-
-// EXECUTION AUTHORITY: Lock BGM by archetype
-const movieArchetype = movie.archetype || storyProfile.primaryEmotion
-const bgmUrl = getLockedBGM(movieArchetype)
-console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.split('/').pop())
-    console.log('[webhook] BGM selected:', bgmUrl)
+    const movieArchetype = movie.archetype || 'neutral'
+    const bgmUrl = getLockedBGM(movieArchetype)
     
-    // Get dialogue lines from script
-    const scriptData = movie.script_raw
-    let dialogueLines: string[] = []
+    console.log('[webhook] movie found:', movie.id)
+    console.log('[webhook] archetype:', movieArchetype)
+    console.log('[webhook] bgmUrl:', bgmUrl)
     
-    // Try to extract from script structure first
-    if (scriptData && typeof scriptData === 'object' && Array.isArray(scriptData.shots)) {
-      dialogueLines = scriptData.shots
-        .map((s: any) => s.dialogue)
-        .filter(Boolean)
-    } else if (typeof scriptData === 'string') {
-      // Fallback: parse as text
-      dialogueLines = scriptData.split('\n').filter((l: string) => l.trim()).slice(0, 3)
-    }
-    
-    console.log('[webhook] Extracted', dialogueLines.length, 'dialogue lines from script')
-    
-    // Save raw Kling video immediately
+    // Save raw video immediately
     await supabaseAdmin.from('movies')
       .update({ 
         final_video_url: videoUrl,
         status: 'processing'
       })
-      .eq('kling_task_id', taskId)
-    console.log('[webhook] Saved raw Kling video, triggering Railway finalization...')
+      .eq('id', movie.id)
     
-    // Fire Railway to handle all post-processing (fire and forget)
+    // Get dialogue from script
+    const scriptData = movie.script_raw
+    let dialogueLines: string[] = []
+    if (scriptData?.shots) {
+      dialogueLines = scriptData.shots
+        .map((s: any) => s.dialogue)
+        .filter(Boolean)
+    }
+    
+    console.log('[webhook] dialogue lines:', dialogueLines.length)
+    
+    // Fire Railway finalize (fire and forget)
     fetch(`${FFMPEG_URL}/api/finalize-movie`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -201,24 +110,16 @@ console.log('[webhook] BGM locked for archetype:', movieArchetype, '->', bgmUrl.
         dialogueLines: dialogueLines,
         bgmUrl: bgmUrl
       })
-    }).catch(err => console.error('[webhook] Railway finalize-movie error:', err))
-  }
-
-  // Update movies table status
-  await supabaseAdmin.from('movies')
-    .update({ status: 'processing' })
-    .eq('kling_task_id', taskId)
-
-  // Trigger hook generation after movie is complete
-  if (movie?.id) {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
-    fetch(`${baseUrl}/api/hook/generate`, {
+    }).then(r => console.log('[webhook] Railway triggered:', r.status))
+      .catch(err => console.error('[webhook] Railway error:', err))
+    
+    // Trigger hook generation
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
+    fetch(`${appUrl}/api/hook/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ movieId: movie.id })
-    }).catch(err => console.error('[webhook] hook trigger failed:', err))
-
-    console.log('[webhook] hook generation triggered for:', movie.id)
+    }).catch(err => console.error('[webhook] hook error:', err))
   }
 
   console.log('[webhook/piapi] updated task:', taskId)
