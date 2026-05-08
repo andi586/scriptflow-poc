@@ -27,16 +27,49 @@ export async function POST(req: NextRequest) {
     console.log('[movie/generate] main_photo_url received:', main_photo_url)
 
     // ── Daily cost guard ──────────────────────────────────────────────────────
+    const ADMIN_USER_ID = 'e01310e2-41dc-46b5-818e-a6104f48796a'
+    
+    // Check if user is paid (has any paid movies)
+    const { data: paidMovies } = await supabase
+      .from('movies')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('paid', true)
+      .limit(1)
+    
+    const isPaid = paidMovies && paidMovies.length > 0
+    
+    // Get today's movie count for this user
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const { count: dailyCount } = await supabase
       .from('movies')
       .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
       .gte('created_at', today.toISOString())
-    const dailyLimit = parseInt(process.env.DAILY_MOVIE_LIMIT || '10', 10)
-    console.log('[cost-guard] daily count:', dailyCount, '/ limit:', dailyLimit)
+    
+    // Apply limits based on user type
+    let dailyLimit: number
+    let limitMessage: string = 'Daily limit reached. Please try again tomorrow.'
+    
+    if (userId === ADMIN_USER_ID) {
+      // Admin: unlimited
+      dailyLimit = Infinity
+      console.log('[cost-guard] admin user - no limit')
+    } else if (isPaid) {
+      // Paid users: 20 per day
+      dailyLimit = 20
+      limitMessage = 'Daily limit reached (20 movies/day for paid users). Please try again tomorrow.'
+      console.log('[cost-guard] paid user - daily count:', dailyCount, '/ limit:', dailyLimit)
+    } else {
+      // Free users: 3 per day
+      dailyLimit = 3
+      limitMessage = 'Daily limit reached (3 movies/day for free users). Upgrade to create more!'
+      console.log('[cost-guard] free user - daily count:', dailyCount, '/ limit:', dailyLimit)
+    }
+    
     if ((dailyCount ?? 0) >= dailyLimit) {
-      return NextResponse.json({ error: 'Daily limit reached. Please try again tomorrow.' }, { status: 429 })
+      return NextResponse.json({ error: limitMessage }, { status: 429 })
     }
 
     // ── PiAPI balance log ─────────────────────────────────────────────────────
