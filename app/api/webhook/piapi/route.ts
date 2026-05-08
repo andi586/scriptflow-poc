@@ -64,62 +64,70 @@ export async function POST(req: NextRequest) {
     .eq('kling_task_id', taskId)
 
   // Update movies table (new single Kling 3.0 architecture)
-  // First, look up the movie to get its id
-  const { data: movie } = await supabaseAdmin.from('movies')
-    .select('id, story_input, archetype, script_raw')
-    .eq('kling_task_id', taskId)
-    .single()
-
   const FFMPEG_URL = 'https://scriptflow-video-merge-production.up.railway.app'
-
-  if (movie) {
-    const movieArchetype = movie.archetype || 'neutral'
-    const bgmUrl = getLockedBGM(movieArchetype)
+  
+  try {
+    const { data: movie, error: movieError } = await supabaseAdmin
+      .from('movies')
+      .select('id, story_input, archetype, script_raw')
+      .eq('kling_task_id', taskId)
+      .single()
     
-    console.log('[webhook] movie found:', movie.id)
-    console.log('[webhook] archetype:', movieArchetype)
-    console.log('[webhook] bgmUrl:', bgmUrl)
+    console.log('[webhook] movie query result:', movie?.id, movieError?.message)
     
-    // Save raw video immediately
-    await supabaseAdmin.from('movies')
-      .update({ 
-        final_video_url: videoUrl,
-        status: 'processing'
-      })
-      .eq('id', movie.id)
-    
-    // Get dialogue from script
-    const scriptData = movie.script_raw
-    let dialogueLines: string[] = []
-    if (scriptData?.shots) {
-      dialogueLines = scriptData.shots
-        .map((s: any) => s.dialogue)
-        .filter(Boolean)
+    if (movie) {
+      const movieArchetype = movie.archetype || 'neutral'
+      const bgmUrl = getLockedBGM(movieArchetype)
+      
+      console.log('[webhook] movie found:', movie.id)
+      console.log('[webhook] archetype:', movieArchetype)
+      console.log('[webhook] bgmUrl:', bgmUrl)
+      
+      // Save raw video immediately
+      await supabaseAdmin.from('movies')
+        .update({ 
+          final_video_url: videoUrl,
+          status: 'processing'
+        })
+        .eq('id', movie.id)
+      
+      // Get dialogue from script
+      const scriptData = movie.script_raw
+      let dialogueLines: string[] = []
+      if (scriptData?.shots) {
+        dialogueLines = scriptData.shots
+          .map((s: any) => s.dialogue)
+          .filter(Boolean)
+      }
+      
+      console.log('[webhook] dialogue lines:', dialogueLines.length)
+      
+      // Fire Railway finalize (fire and forget)
+      fetch(`${FFMPEG_URL}/api/finalize-movie`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoUrl: videoUrl,
+          movieId: movie.id,
+          archetype: movieArchetype,
+          dialogueLines: dialogueLines,
+          bgmUrl: bgmUrl
+        })
+      }).then(r => console.log('[webhook] Railway triggered:', r.status))
+        .catch(err => console.error('[webhook] Railway error:', err))
+      
+      // Trigger hook generation
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
+      fetch(`${appUrl}/api/hook/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieId: movie.id })
+      }).catch(err => console.error('[webhook] hook error:', err))
+    } else {
+      console.warn('[webhook] movie not found for taskId:', taskId)
     }
-    
-    console.log('[webhook] dialogue lines:', dialogueLines.length)
-    
-    // Fire Railway finalize (fire and forget)
-    fetch(`${FFMPEG_URL}/api/finalize-movie`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        videoUrl: videoUrl,
-        movieId: movie.id,
-        archetype: movieArchetype,
-        dialogueLines: dialogueLines,
-        bgmUrl: bgmUrl
-      })
-    }).then(r => console.log('[webhook] Railway triggered:', r.status))
-      .catch(err => console.error('[webhook] Railway error:', err))
-    
-    // Trigger hook generation
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
-    fetch(`${appUrl}/api/hook/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ movieId: movie.id })
-    }).catch(err => console.error('[webhook] hook error:', err))
+  } catch (err) {
+    console.error('[webhook] movie processing error:', err)
   }
 
   console.log('[webhook/piapi] updated task:', taskId)
