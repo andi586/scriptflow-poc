@@ -81,23 +81,24 @@ export async function POST(req: NextRequest) {
       
       console.log('[webhook] dialogue lines:', dialogueLines.length)
       
-      // Fire Railway finalize (await to ensure it triggers before Vercel terminates)
-      try {
-        const railwayRes = await fetch(`${FFMPEG_URL}/api/finalize-movie`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoUrl: videoUrl,
-            movieId: movie.id,
-            archetype: movieArchetype,
-            dialogueLines: dialogueLines,
-            bgmUrl: bgmUrl
-          })
+      // Don't await - just fire
+      fetch(`${FFMPEG_URL}/api/finalize-movie`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoUrl: videoUrl,
+          movieId: movie.id,
+          archetype: movieArchetype,
+          dialogueLines: dialogueLines,
+          bgmUrl: bgmUrl
         })
-        console.log('[webhook] Railway triggered:', railwayRes.status)
-      } catch (err) {
-        console.error('[webhook] Railway error:', err)
-      }
+      }).then(r => console.log('[webhook] Railway triggered:', r.status))
+        .catch(err => console.error('[webhook] Railway error:', err))
+      
+      // Small delay to let fetch initiate
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      console.log('[webhook] Railway call initiated')
       
       // Trigger hook generation (fire and forget is OK here)
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
