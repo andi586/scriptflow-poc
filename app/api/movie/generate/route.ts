@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
       console.log('[movie/generate] scaled durations to fit 15s limit:', multiShots.map((s: any) => s.duration))
     }
 
-    // Step 3: Create movie record
+    // Step 3: Create movie record with shots data
     console.log('[DEBUG] FINAL archetype before DB:', { story_category, archetype, final: story_category || archetype })
     const { data: movie, error: movieError } = await supabase
       .from('movies')
@@ -345,7 +345,7 @@ export async function POST(req: NextRequest) {
         user_id: userId,
         status: 'pending',
         tier,
-        story_input: story,
+        story_input: JSON.stringify({ shots: shotsForKling }),
         twin_photo_url: twin.frame_url_mid,
         archetype: story_category || archetype
       })
@@ -354,7 +354,7 @@ export async function POST(req: NextRequest) {
 
     if (movieError) throw new Error('Failed to create movie: ' + movieError.message)
 
-    console.log('[movie/generate] movie created:', movie.id)
+    console.log('[movie/generate] movie created:', movie.id, 'with', shotsForKling.length, 'shots')
 
     // Step 4: Call Kling 3.0 Omni - ONE API call with native audio
     // Prepare images array with 7-image limit for Kling API

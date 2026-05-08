@@ -76,8 +76,13 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', movie.id)
       
-      // Dialogue lines (empty for now - will be added later)
-      const dialogueLines: string[] = []
+      // Extract dialogue from story_input
+      const scriptData = movie.story_input ? 
+        JSON.parse(movie.story_input) : null
+      
+      const dialogueLines = scriptData?.shots
+        ?.map((s: any) => s.dialogue)
+        ?.filter(Boolean) || []
       
       console.log('[webhook] dialogue lines:', dialogueLines.length)
       
