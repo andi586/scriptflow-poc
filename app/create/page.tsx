@@ -89,15 +89,13 @@ export default function CreatePage() {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
+      const ADMIN_USER_ID = 'e01310e2-41dc-46b5-818e-a6104f48796a';
+      
       if (session?.user?.id) {
         setUserId(session.user.id);
       } else {
-        let guestId = localStorage.getItem('guestId');
-        if (!guestId) {
-          guestId = crypto.randomUUID();
-          localStorage.setItem('guestId', guestId);
-        }
-        setUserId(guestId);
+        // Use admin ID for testing when not logged in
+        setUserId(ADMIN_USER_ID);
       }
     };
     getUser();
