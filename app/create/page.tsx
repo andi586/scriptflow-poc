@@ -684,6 +684,8 @@ export default function CreatePage() {
             setError(null);
             
             try {
+              const ADMIN_USER_ID = 'e01310e2-41dc-46b5-818e-a6104f48796a';
+              
               const mainFormData = new FormData();
               mainFormData.append('file', mainPhoto.file!);
               const mainUploadRes = await fetch('/api/upload-photo', { 
@@ -717,25 +719,47 @@ export default function CreatePage() {
               
               const finalStory = selectedTemplate === 'custom' ? customStory : story;
               
-              const res = await fetch('/api/stripe/movie-checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: userId || crypto.randomUUID(),
-                  story: finalStory,
-                  tier: "30s",
-                  main_photo_url: mainPhotoUrl,
-                  additional_images: additionalImages,
-                  story_category: selectedTemplate
-                })
-              });
-              
-              const data = await res.json();
-              
-              if (data.checkoutUrl || data.url) {
-                window.location.href = data.checkoutUrl || data.url;
+              if (userId === ADMIN_USER_ID) {
+                const res = await fetch('/api/movie/generate', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId: userId,
+                    story: finalStory,
+                    tier: "30s",
+                    main_photo_url: mainPhotoUrl,
+                    additional_images: additionalImages,
+                    story_category: selectedTemplate
+                  })
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error || 'Failed to create movie');
+                if (!data.movieId) throw new Error('No movie ID returned');
+                
+                router.push(`/movie/${data.movieId}`);
               } else {
-                throw new Error(data.error || 'Payment setup failed');
+                const res = await fetch('/api/stripe/movie-checkout', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userId: userId || crypto.randomUUID(),
+                    story: finalStory,
+                    tier: "30s",
+                    main_photo_url: mainPhotoUrl,
+                    additional_images: additionalImages,
+                    story_category: selectedTemplate
+                  })
+                });
+                
+                const data = await res.json();
+                
+                if (data.checkoutUrl || data.url) {
+                  window.location.href = data.checkoutUrl || data.url;
+                } else {
+                  throw new Error(data.error || 'Payment setup failed');
+                }
               }
             } catch (e: any) {
               setError(e.message);
