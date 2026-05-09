@@ -94,6 +94,30 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
     
     console.log('[stripe webhook] ✅ Movie marked as paid:', movieId)
 
+    // Insert payment record
+    const paymentIntentId = typeof session.payment_intent === 'string' 
+      ? session.payment_intent 
+      : session.payment_intent?.id ?? null
+    
+    const { error: paymentError } = await supabaseAdmin
+      .from('payments')
+      .insert({
+        movie_id: movieId,
+        user_id: userId,
+        amount: session.amount_total,
+        currency: session.currency,
+        stripe_payment_intent_id: paymentIntentId,
+        stripe_session_id: session.id,
+        status: 'succeeded'
+      })
+    
+    if (paymentError) {
+      console.error('[stripe webhook] failed to insert payment record:', paymentError.message)
+      // Non-fatal - continue with movie generation
+    } else {
+      console.log('[stripe webhook] ✅ Payment record created:', paymentIntentId)
+    }
+
     // Trigger movie generation pipeline (fire-and-forget)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
     fetch(`${baseUrl}/api/movie/generate`, {
