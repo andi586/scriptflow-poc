@@ -571,22 +571,28 @@ export default function CreatePage() {
                   {/* Show textarea inside custom card when selected */}
                   {template.id === 'custom' && selectedTemplate === 'custom' ? (
                     <textarea
-                      value={customStory}
-                      onChange={(e) => setCustomStory(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        setCustomStory(e.target.value)
+                      }}
+                      value={customStory}
                       placeholder="Describe your story... What happened? What do you feel?"
                       autoFocus
                       style={{
                         width: '100%',
-                        flex: 1,
-                        minHeight: '150px',
-                        background: 'rgba(0,0,0,0.3)',
-                        border: '1px solid rgba(0,0,0,0.5)',
+                        minHeight: '100px',
+                        background: '#1a1a1a',
+                        border: '1px solid #D4A853',
                         borderRadius: '8px',
-                        padding: '12px',
-                        color: '#000',
-                        fontSize: '0.9rem',
+                        padding: '10px',
+                        color: 'white',
+                        fontSize: '0.85rem',
                         resize: 'none',
+                        cursor: 'text',
+                        pointerEvents: 'all',
+                        position: 'relative',
+                        zIndex: 10,
                         fontFamily: 'system-ui',
                         lineHeight: '1.5',
                         marginTop: '8px'
