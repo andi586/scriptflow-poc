@@ -78,9 +78,45 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session):
   if (session.metadata?.type === 'movie_generation') {
     const movieId = session.metadata.movie_id
     const userId = session.metadata.supabase_user_id
-    console.log('[stripe webhook] movie payment detected - movieId:', movieId, 'userId:', userId)
+    const customerEmail = session.customer_details?.email
+    console.log('[stripe webhook] movie payment detected - movieId:', movieId, 'userId:', userId, 'email:', customerEmail)
     
     if (!movieId || !userId) throw new Error('Missing movie_id or supabase_user_id in metadata')
+
+    // Create user account if not exists
+    if (customerEmail) {
+      try {
+        const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(userId)
+        
+        if (!existingUser.user) {
+          console.log('[stripe webhook] Creating new user account for:', customerEmail)
+          const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+            email: customerEmail,
+            email_confirm: true,
+            user_metadata: { created_via: 'stripe_payment' }
+          })
+          
+          if (createError) {
+            console.error('[stripe webhook] failed to create user:', createError.message)
+          } else {
+            console.log('[stripe webhook] ✅ User account created:', newUser.user?.id)
+            
+            // Update movie with new user_id if different
+            if (newUser.user?.id && newUser.user.id !== userId) {
+              await supabaseAdmin
+                .from('movies')
+                .update({ user_id: newUser.user.id })
+                .eq('id', movieId)
+              console.log('[stripe webhook] Movie linked to new user:', newUser.user.id)
+            }
+          }
+        } else {
+          console.log('[stripe webhook] User already exists:', userId)
+        }
+      } catch (userErr) {
+        console.error('[stripe webhook] user creation error (non-fatal):', userErr)
+      }
+    }
 
     // Mark movie as paid
     const { error: updateError } = await supabaseAdmin

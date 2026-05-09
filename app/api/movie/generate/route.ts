@@ -422,22 +422,52 @@ export async function POST(req: NextRequest) {
     
     console.log('[movie/generate] Kling API language set to: en (English)')
 
-    const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
-      method: 'POST',
-      headers: {
-        'x-api-key': process.env.PIAPI_API_KEY!,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(klingBody)
-    })
+    // Kling API call with auto-retry
+    let klingData: any = null
+    let taskId: string | null = null
+    let retryCount = 0
+    const MAX_RETRIES = 1
 
-    const klingData = await klingRes.json()
-    const taskId = klingData?.data?.task_id
+    while (retryCount <= MAX_RETRIES && !taskId) {
+      try {
+        if (retryCount > 0) {
+          console.log(`[movie/generate] Retry attempt ${retryCount}/${MAX_RETRIES} after 30s...`)
+          await new Promise(resolve => setTimeout(resolve, 30000)) // Wait 30 seconds
+        }
 
-    console.log('[movie/generate] Kling task_id:', taskId)
+        const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
+          method: 'POST',
+          headers: {
+            'x-api-key': process.env.PIAPI_API_KEY!,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(klingBody)
+        })
+
+        klingData = await klingRes.json()
+        taskId = klingData?.data?.task_id
+
+        console.log(`[movie/generate] Kling attempt ${retryCount + 1} - task_id:`, taskId)
+
+        if (!taskId) {
+          console.warn(`[movie/generate] Kling attempt ${retryCount + 1} failed:`, JSON.stringify(klingData).slice(0, 200))
+          retryCount++
+        }
+      } catch (klingErr) {
+        console.error(`[movie/generate] Kling attempt ${retryCount + 1} error:`, klingErr)
+        retryCount++
+      }
+    }
 
     if (!taskId) {
-      throw new Error('Kling task creation failed: ' + JSON.stringify(klingData).slice(0, 200))
+      // All retries failed - mark movie as failed and notify user
+      await supabase
+        .from('movies')
+        .update({ status: 'failed' })
+        .eq('id', movie.id)
+      
+      console.error('[movie/generate] Kling task creation failed after retries:', JSON.stringify(klingData).slice(0, 200))
+      throw new Error('Kling task creation failed after retries. Please try again later.')
     }
 
     // Step 5: Update movie with task_id
