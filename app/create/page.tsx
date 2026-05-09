@@ -63,6 +63,13 @@ const TEMPLATES = [
     outcome: "The truth you weren't ready for",
     description: "Add your friend's photo — put them on the news",
     story: "Breaking news intro with police lights. The uploaded person appears as central figure in developing situation. Witnesses react. Close-up of confused face. Twist reveal - harmless misunderstanding. Reporter awkward smile. End: 'Send this to them 😂'"
+  },
+  {
+    id: "custom",
+    title: "✍️ Your Story",
+    emoji: "✨",
+    outcome: "Write your own narrative",
+    story: ""
   }
 ];
 
@@ -573,29 +580,46 @@ export default function CreatePage() {
               ))}
             </div>
 
-            {/* Custom Story Input */}
-            <div style={{marginTop:'24px'}}>
-              <label style={{color:'#D4A853',fontSize:'0.9rem',display:'block',marginBottom:'8px'}}>
-                Your Story (optional - customize the narrative)
-              </label>
-              <textarea
-                value={customStory}
-                onChange={(e) => setCustomStory(e.target.value)}
-                placeholder="Write your own story here... or leave blank to use the template story."
-                style={{
-                  width:'100%',
-                  minHeight:'120px',
-                  background:'#111',
-                  border:'1px solid #333',
-                  borderRadius:'12px',
-                  padding:'12px',
-                  color:'white',
-                  fontSize:'0.9rem',
-                  resize:'vertical',
-                  fontFamily:'system-ui'
-                }}
-              />
-            </div>
+            {/* Custom Story Textarea - Shows below grid when "custom" is selected */}
+            {selectedTemplate === 'custom' && (
+              <div style={{
+                marginTop: '16px',
+                marginBottom: '24px',
+                padding: '20px',
+                background: '#111',
+                border: '2px solid #D4A853',
+                borderRadius: '14px'
+              }}>
+                <label style={{
+                  color: '#D4A853',
+                  fontSize: '1rem',
+                  fontWeight: '700',
+                  display: 'block',
+                  marginBottom: '12px'
+                }}>
+                  ✍️ Write Your Story
+                </label>
+                <textarea
+                  value={customStory}
+                  onChange={(e) => setCustomStory(e.target.value)}
+                  placeholder="Describe your story... What happened? What do you feel?"
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    minHeight: '150px',
+                    background: '#0a0a0a',
+                    border: '1px solid #333',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    color: 'white',
+                    fontSize: '1rem',
+                    resize: 'vertical',
+                    fontFamily: 'system-ui',
+                    lineHeight: '1.6'
+                  }}
+                />
+              </div>
+            )}
 
             {/* Error */}
             {error && (
