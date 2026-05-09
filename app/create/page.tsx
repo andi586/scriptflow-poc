@@ -512,7 +512,13 @@ export default function CreatePage() {
               {TEMPLATES.map((template) => (
                 <div
                   key={template.id}
-                  onClick={() => template.id !== 'custom' && handleTemplateClick(template)}
+                  onClick={() => {
+                    if (template.id === 'custom') {
+                      setSelectedTemplate('custom')
+                    } else {
+                      handleTemplateClick(template)
+                    }
+                  }}
                   style={{
                     background: selectedTemplate === template.id ? 'linear-gradient(135deg, #D4A853 0%, #B8923F 100%)' : '#111',
                     border: selectedTemplate === template.id ? '3px solid #F4D03F' : '1px solid #222',
