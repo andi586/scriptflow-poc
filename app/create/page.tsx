@@ -677,7 +677,71 @@ export default function CreatePage() {
         </button>
 
         <button
-          onClick={handleGenerate}
+          onClick={async () => {
+            if (loading || !canGenerate) return;
+            
+            setLoading(true);
+            setError(null);
+            
+            try {
+              const mainFormData = new FormData();
+              mainFormData.append('file', mainPhoto.file!);
+              const mainUploadRes = await fetch('/api/upload-photo', { 
+                method: 'POST', 
+                body: mainFormData 
+              });
+              const mainUploadData = await mainUploadRes.json();
+              const mainPhotoUrl = mainUploadData.url;
+              
+              if (!mainPhotoUrl) throw new Error('Failed to upload main photo');
+              
+              const additionalImages: string[] = [];
+              
+              if (selectedTemplate === 'breaking_news' && friendPhoto.file) {
+                const formData = new FormData();
+                formData.append('file', friendPhoto.file);
+                const res = await fetch('/api/upload-photo', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.url) additionalImages.push(data.url);
+              }
+              
+              for (const photo of extraPhotos) {
+                if (photo.file) {
+                  const form = new FormData();
+                  form.append('file', photo.file);
+                  const res = await fetch('/api/upload-photo', { method: 'POST', body: form });
+                  const data = await res.json();
+                  if (data.url) additionalImages.push(data.url);
+                }
+              }
+              
+              const finalStory = selectedTemplate === 'custom' ? customStory : story;
+              
+              const res = await fetch('/api/stripe/movie-checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: userId || crypto.randomUUID(),
+                  story: finalStory,
+                  tier: "30s",
+                  main_photo_url: mainPhotoUrl,
+                  additional_images: additionalImages,
+                  story_category: selectedTemplate
+                })
+              });
+              
+              const data = await res.json();
+              
+              if (data.checkoutUrl || data.url) {
+                window.location.href = data.checkoutUrl || data.url;
+              } else {
+                throw new Error(data.error || 'Payment setup failed');
+              }
+            } catch (e: any) {
+              setError(e.message);
+              setLoading(false);
+            }
+          }}
           disabled={loading || !canGenerate}
           style={{
             background: canGenerate && !loading ? '#D4A853' : '#333',
@@ -710,9 +774,9 @@ export default function CreatePage() {
           }}
         >
           {loading ? (
-            '✨ Creating Your Movie...'
+            '✨ Processing...'
           ) : canGenerate ? (
-            '🎬 Generate Your Movie — $2.9'
+            '💳 Pay $2.9 → Generate Movie'
           ) : (
             'Upload photo to continue'
           )}

@@ -104,14 +104,6 @@ export async function POST(req: NextRequest) {
       await new Promise(resolve => setTimeout(resolve, 100))
       
       console.log('[webhook] Railway call initiated')
-      
-      // Trigger hook generation (fire and forget is OK here)
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://getscriptflow.com'
-      fetch(`${appUrl}/api/hook/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ movieId: movie.id })
-      }).catch(err => console.error('[webhook] hook error:', err))
     } else {
       console.warn('[webhook] movie not found for taskId:', taskId)
     }
