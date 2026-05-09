@@ -76,6 +76,7 @@ export default function CreatePage() {
   const [friendPhoto, setFriendPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
   const [userSelfPhoto, setUserSelfPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
   const [story, setStory] = useState("");
+  const [customStory, setCustomStory] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -218,7 +219,7 @@ export default function CreatePage() {
       }
       
       const body = {
-        story,
+        story: customStory || story,
         tier: "30s",
         userId: userId || crypto.randomUUID(),
         main_photo_url: mainPhotoUrl,
@@ -570,6 +571,30 @@ export default function CreatePage() {
                   </p>
                 </div>
               ))}
+            </div>
+
+            {/* Custom Story Input */}
+            <div style={{marginTop:'24px'}}>
+              <label style={{color:'#D4A853',fontSize:'0.9rem',display:'block',marginBottom:'8px'}}>
+                Your Story (optional - customize the narrative)
+              </label>
+              <textarea
+                value={customStory}
+                onChange={(e) => setCustomStory(e.target.value)}
+                placeholder="Write your own story here... or leave blank to use the template story."
+                style={{
+                  width:'100%',
+                  minHeight:'120px',
+                  background:'#111',
+                  border:'1px solid #333',
+                  borderRadius:'12px',
+                  padding:'12px',
+                  color:'white',
+                  fontSize:'0.9rem',
+                  resize:'vertical',
+                  fontFamily:'system-ui'
+                }}
+              />
             </div>
 
             {/* Error */}
