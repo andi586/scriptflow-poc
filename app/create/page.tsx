@@ -512,23 +512,23 @@ export default function CreatePage() {
               {TEMPLATES.map((template) => (
                 <div
                   key={template.id}
-                  onClick={() => handleTemplateClick(template)}
+                  onClick={() => template.id !== 'custom' && handleTemplateClick(template)}
                   style={{
                     background: selectedTemplate === template.id ? 'linear-gradient(135deg, #D4A853 0%, #B8923F 100%)' : '#111',
                     border: selectedTemplate === template.id ? '3px solid #F4D03F' : '1px solid #222',
                     borderRadius: '14px',
                     padding: '16px',
-                    cursor: 'pointer',
+                    cursor: template.id === 'custom' && selectedTemplate === 'custom' ? 'default' : 'pointer',
                     transition: 'all 0.2s',
                     transform: selectedTemplate === template.id ? 'scale(1.03)' : 'scale(1)',
                     boxShadow: selectedTemplate === template.id ? '0 0 25px rgba(244,208,63,0.6)' : 'none',
                     opacity: selectedTemplate && selectedTemplate !== template.id ? 0.6 : 1,
-                    minHeight: '130px',
+                    minHeight: template.id === 'custom' && selectedTemplate === 'custom' ? '250px' : '130px',
                     display: 'flex',
                     flexDirection: 'column'
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedTemplate !== template.id) {
+                    if (selectedTemplate !== template.id && !(template.id === 'custom' && selectedTemplate === 'custom')) {
                       e.currentTarget.style.transform = 'scale(1.01)';
                       e.currentTarget.style.borderColor = '#444';
                     }
@@ -567,59 +567,45 @@ export default function CreatePage() {
                   }}>
                     {template.title}
                   </h3>
-                  <p style={{ 
-                    margin: 0, 
-                    fontSize: '0.8rem',
-                    color: selectedTemplate === template.id ? 'rgba(0,0,0,0.7)' : '#888',
-                    lineHeight: 1.3,
-                    flex: 1
-                  }}>
-                    {template.outcome}
-                  </p>
+                  
+                  {/* Show textarea inside custom card when selected */}
+                  {template.id === 'custom' && selectedTemplate === 'custom' ? (
+                    <textarea
+                      value={customStory}
+                      onChange={(e) => setCustomStory(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Describe your story... What happened? What do you feel?"
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        flex: 1,
+                        minHeight: '150px',
+                        background: 'rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(0,0,0,0.5)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: '#000',
+                        fontSize: '0.9rem',
+                        resize: 'none',
+                        fontFamily: 'system-ui',
+                        lineHeight: '1.5',
+                        marginTop: '8px'
+                      }}
+                    />
+                  ) : (
+                    <p style={{ 
+                      margin: 0, 
+                      fontSize: '0.8rem',
+                      color: selectedTemplate === template.id ? 'rgba(0,0,0,0.7)' : '#888',
+                      lineHeight: 1.3,
+                      flex: 1
+                    }}>
+                      {template.outcome}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
-
-            {/* Custom Story Textarea - Shows below grid when "custom" is selected */}
-            {selectedTemplate === 'custom' && (
-              <div style={{
-                marginTop: '16px',
-                marginBottom: '24px',
-                padding: '20px',
-                background: '#111',
-                border: '2px solid #D4A853',
-                borderRadius: '14px'
-              }}>
-                <label style={{
-                  color: '#D4A853',
-                  fontSize: '1rem',
-                  fontWeight: '700',
-                  display: 'block',
-                  marginBottom: '12px'
-                }}>
-                  ✍️ Write Your Story
-                </label>
-                <textarea
-                  value={customStory}
-                  onChange={(e) => setCustomStory(e.target.value)}
-                  placeholder="Describe your story... What happened? What do you feel?"
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    minHeight: '150px',
-                    background: '#0a0a0a',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    color: 'white',
-                    fontSize: '1rem',
-                    resize: 'vertical',
-                    fontFamily: 'system-ui',
-                    lineHeight: '1.6'
-                  }}
-                />
-              </div>
-            )}
 
             {/* Error */}
             {error && (
