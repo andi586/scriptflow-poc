@@ -226,7 +226,7 @@ export default function CreatePage() {
       }
       
       const body = {
-        story: customStory || story,
+        story: selectedTemplate === 'custom' ? (customStory || 'A personal story') : story,
         tier: "30s",
         userId: userId || crypto.randomUUID(),
         main_photo_url: mainPhotoUrl,
