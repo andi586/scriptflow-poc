@@ -39,37 +39,6 @@ const TEMPLATES = [
     id: "lost_someone",
     title: "Your dog spoke to you one last time",
     emoji: "🕯️",
-In app/create/page.tsx
-
-The textarea onChange is not updating customStory correctly.
-
-Find the textarea for custom story and replace with:
-
-<textarea
-  onClick={(e) => e.stopPropagation()}
-  onInput={(e) => {
-    e.stopPropagation()
-    const val = (e.target as HTMLTextAreaElement).value
-    setCustomStory(val)
-    console.log('[create] customStory updated:', val)
-  }}
-  onChange={(e) => {
-    e.stopPropagation()
-    setCustomStory(e.target.value)
-  }}
-  defaultValue={customStory}
-  placeholder="Describe your story... What happened? What do you feel?"
-  ...
-/>
-
-Also in the submit function:
-const finalStory = selectedTemplate === 'custom' 
-  ? customStory 
-  : story
-
-Use finalStory instead of customStory || story
-
-Do NOT push - I will push manually
     outcome: "A goodbye you'll never forget",
     story: "Flashes of memory with someone important. They slowly fade away. You are left alone with the echo of what was."
   },
@@ -115,7 +84,6 @@ export default function CreatePage() {
   const [userSelfPhoto, setUserSelfPhoto] = useState<{ file: File | null; url: string | null }>({ file: null, url: null });
   const [story, setStory] = useState("");
   const [customStory, setCustomStory] = useState("");
-  const [storyConfirmed, setStoryConfirmed] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -257,17 +225,8 @@ export default function CreatePage() {
         }
       }
       
-      const finalStory = selectedTemplate === 'custom' 
-        ? customStory 
-        : story
-      
-      console.log('[create] customStory:', customStory)
-      console.log('[create] story:', story)
-      console.log('[create] selectedTemplate:', selectedTemplate)
-      console.log('[create] final story:', finalStory)
-      
       const body = {
-        story: finalStory,
+        story: customStory || story,
         tier: "30s",
         userId: userId || crypto.randomUUID(),
         main_photo_url: mainPhotoUrl,
@@ -619,17 +578,11 @@ export default function CreatePage() {
                   {template.id === 'custom' && selectedTemplate === 'custom' ? (
                     <textarea
                       onClick={(e) => e.stopPropagation()}
-                      onInput={(e) => {
-                        e.stopPropagation()
-                        const val = (e.target as HTMLTextAreaElement).value
-                        setCustomStory(val)
-                        console.log('[create] customStory updated:', val)
-                      }}
                       onChange={(e) => {
                         e.stopPropagation()
                         setCustomStory(e.target.value)
                       }}
-                      defaultValue={customStory}
+                      value={customStory}
                       placeholder="Describe your story... What happened? What do you feel?"
                       autoFocus
                       style={{
