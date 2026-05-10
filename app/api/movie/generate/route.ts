@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { matchDirectorIntent, applyDirectorIntent } from '@/app/lib/templates'
 import { getTemplateBlueprint } from '@/app/lib/template-blueprints'
+import { getFormatRules, FormatType } from '../../../../../lib/format-adapter'
 
 export const maxDuration = 300
 
@@ -17,13 +18,18 @@ export async function POST(req: NextRequest) {
     console.log('[DEBUG] additional_images raw:', body.additional_images)
     console.log('[DEBUG] story_category:', body.story_category)
     
-    const { story, tier = '60s', userId, additional_images, story_category, main_photo_url } = body
+    const { story, tier = '60s', userId, additional_images, story_category, main_photo_url, format } = body
 
     if (!story) {
       return NextResponse.json({ error: 'Story is required' }, { status: 400 })
     }
 
+    // Get format rules
+    const formatType = (format || 'hook_15s') as FormatType
+    const formatRules = getFormatRules(formatType)
+    
     console.log('[movie/generate] story:', story, 'tier:', tier)
+    console.log('[movie/generate] format:', formatType, 'duration:', formatRules.duration, 'maxShots:', formatRules.maxShots)
     console.log('[movie/generate] main_photo_url received:', main_photo_url)
 
     // ── Daily cost guard ──────────────────────────────────────────────────────
@@ -222,17 +228,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Tier config
-    const tierConfig: Record<string, { shots: number; duration: number }> = {
-      '30s': { shots: 4, duration: 6 },
-      '60s': { shots: 6, duration: 8 },
-      '90s': { shots: 8, duration: 8 },
-    }
-    const config = tierConfig[tier] ?? tierConfig['60s']
-    const selectedShots = shots.slice(0, config.shots)
+    // Use format rules to determine shot count and duration
+    const maxShots = formatRules.maxShots || 4
+    const shotDurationSeconds = formatRules.duration / maxShots
+    const selectedShots = shots.slice(0, maxShots)
 
-    // Force override duration — use tier duration from config
-    const forcedDuration = config.duration
+    // Use format-based duration per shot
+    const forcedDuration = Math.floor(shotDurationSeconds)
+    
+    console.log('[movie/generate] Using format rules - maxShots:', maxShots, 'duration per shot:', forcedDuration)
 
     // Build multi_shots prompts from shot plan
     const cameraMovements = [
