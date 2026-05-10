@@ -20,6 +20,8 @@ export default function MoviePage() {
   const [cutoffTriggered, setCutoffTriggered] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const paywallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const startTimeRef = useRef<number | null>(null)
+  const videoDurationRef = useRef<number>(0)
 
   // Emotional cutoff lines based on template
   const CUTOFF_LINES: Record<string, string> = {
@@ -165,6 +167,29 @@ export default function MoviePage() {
           autoPlay
           playsInline
           style={{maxHeight:'70vh',maxWidth:'360px',borderRadius:'16px',boxShadow:'0 0 60px rgba(212,168,83,0.2)'}}
+          onPlay={() => {
+            if (!startTimeRef.current) {
+              startTimeRef.current = Date.now()
+            }
+          }}
+          onLoadedMetadata={(e) => {
+            videoDurationRef.current = (e.target as HTMLVideoElement).duration
+          }}
+          onEnded={() => {
+            if (startTimeRef.current && movieId) {
+              const watchTime = (Date.now() - startTimeRef.current) / 1000
+              fetch('/api/analytics/watch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  movieId,
+                  watchTime,
+                  completed: watchTime >= (videoDurationRef.current * 0.8),
+                  shared: false
+                })
+              }).catch(err => console.error('[analytics] failed:', err))
+            }
+          }}
         />
         {!movie.paid && (
           <a href="https://getscriptflow.com" target="_blank" style={{position:'absolute',bottom:'12px',right:'12px',color:'rgba(255,255,255,0.5)',fontSize:'0.65rem',textDecoration:'none',background:'rgba(0,0,0,0.3)',padding:'3px 8px',borderRadius:'20px'}}>
@@ -189,6 +214,20 @@ export default function MoviePage() {
           <a
             href={movie.final_video_url}
             download="my-movie.mp4"
+            onClick={() => {
+              if (movieId) {
+                fetch('/api/analytics/watch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    movieId,
+                    watchTime: 0,
+                    completed: false,
+                    shared: true
+                  })
+                }).catch(err => console.error('[analytics] share failed:', err))
+              }
+            }}
             style={{
               display: 'flex',
               flexDirection: 'column',
@@ -211,6 +250,19 @@ export default function MoviePage() {
 
           <button
             onClick={() => {
+              // Track share
+              if (movieId) {
+                fetch('/api/analytics/watch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    movieId,
+                    watchTime: 0,
+                    completed: false,
+                    shared: true
+                  })
+                }).catch(err => console.error('[analytics] share failed:', err))
+              }
               // Try to open TikTok app or web
               const tiktokUrl = `https://www.tiktok.com/upload`;
               window.open(tiktokUrl, '_blank');
