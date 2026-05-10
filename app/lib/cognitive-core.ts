@@ -544,6 +544,11 @@ IMPERFECTION RULES (mandatory - must apply to final output):
 - Avoid smooth camera movements - prefer static or slight drift over dolly/tracking
 - Imperfection creates authenticity - perfect shots feel artificial
 
+SILENCE BEAT RULE (mandatory):
+- Every scene must include at least one 2-3 second silence beat where nothing is said
+- Silence creates emotional weight and allows the audience to feel
+- Mark silence beats explicitly in shot descriptions
+
 EMOTION CURVE (follow exactly):
 ${emotionCurve?.map(s => `Shot${s.shot}: ${s.emotion} intensity:${s.intensity} type:${s.type}`).join('\n') || ''}
 
