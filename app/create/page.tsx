@@ -264,7 +264,12 @@ export default function CreatePage() {
     }
   };
 
-  const canGenerate = !!mainPhoto.file && !!selectedTemplate;
+  // Generate button should show when:
+  // - Photo is uploaded AND
+  // - Template is selected AND
+  // - If "custom" template, customStory must have content
+  const canGenerate = !!mainPhoto.file && !!selectedTemplate && 
+    (selectedTemplate !== 'custom' || customStory.trim().length > 0);
   const uploadedCount = extraPhotos.filter(p => p.file).length;
 
   return (
