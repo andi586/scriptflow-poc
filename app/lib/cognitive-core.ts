@@ -535,6 +535,15 @@ PACING: ${directorRules?.pacingDirective || ''}
 DIALOGUE: ${directorRules?.dialogueDirective || ''}
 MUSIC: ${directorRules?.musicDirective || ''}
 
+IMPERFECTION RULES (mandatory - must apply to final output):
+- At least one shot must have micro-tremor or handheld shake
+- At least one moment of hesitation in dialogue (pause, "..." or incomplete sentence)
+- Avoid perfect symmetry in all shots - prefer off-center compositions
+- One shot should be slightly underlit or overexposed for realism
+- Character should NOT look directly at camera unless it's the final beat
+- Avoid smooth camera movements - prefer static or slight drift over dolly/tracking
+- Imperfection creates authenticity - perfect shots feel artificial
+
 EMOTION CURVE (follow exactly):
 ${emotionCurve?.map(s => `Shot${s.shot}: ${s.emotion} intensity:${s.intensity} type:${s.type}`).join('\n') || ''}
 
