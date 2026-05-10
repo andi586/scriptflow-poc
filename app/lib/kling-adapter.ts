@@ -14,7 +14,7 @@ export interface KlingGenerateResult {
 
 export class KlingAdapter {
   private apiKey: string
-  private maxRetries: number = 1
+  private maxRetries: number = 3
 
   constructor() {
     this.apiKey = process.env.PIAPI_API_KEY!
@@ -23,7 +23,7 @@ export class KlingAdapter {
     }
   }
 
-  async generate(params: KlingGenerateParams): Promise<KlingGenerateResult> {
+  private async callKlingAPI(params: KlingGenerateParams): Promise<KlingGenerateResult> {
     const { shots, images, duration, format, webhookUrl } = params
 
     // Prepare Kling API request body
@@ -48,58 +48,66 @@ export class KlingAdapter {
       }
     }
 
-    console.log('[KlingAdapter] Generating video - format:', format, 'duration:', duration, 'shots:', shots.length, 'images:', images.length)
+    const response = await fetch('https://api.piapi.ai/api/v1/task', {
+      method: 'POST',
+      headers: {
+        'x-api-key': this.apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(klingBody)
+    })
 
-    // Retry logic
-    let taskId: string | null = null
-    let retryCount = 0
-    let lastError: any = null
-
-    while (retryCount <= this.maxRetries && !taskId) {
-      try {
-        if (retryCount > 0) {
-          console.log(`[KlingAdapter] Retry attempt ${retryCount}/${this.maxRetries} after 30s...`)
-          await new Promise(resolve => setTimeout(resolve, 30000)) // Wait 30 seconds
-        }
-
-        const response = await fetch('https://api.piapi.ai/api/v1/task', {
-          method: 'POST',
-          headers: {
-            'x-api-key': this.apiKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(klingBody)
-        })
-
-        const data = await response.json()
-        taskId = data?.data?.task_id
-
-        console.log(`[KlingAdapter] Attempt ${retryCount + 1} - task_id:`, taskId)
-
-        if (!taskId) {
-          console.warn(`[KlingAdapter] Attempt ${retryCount + 1} failed:`, JSON.stringify(data).slice(0, 200))
-          lastError = data
-          retryCount++
-        }
-      } catch (err) {
-        console.error(`[KlingAdapter] Attempt ${retryCount + 1} error:`, err)
-        lastError = err
-        retryCount++
-      }
-    }
+    const data = await response.json()
+    const taskId = data?.data?.task_id
 
     if (!taskId) {
-      console.error('[KlingAdapter] All retries failed:', JSON.stringify(lastError).slice(0, 200))
-      return {
-        taskId: null,
-        status: 'failed',
-        error: 'Kling task creation failed after retries'
-      }
+      throw new Error(`Kling API returned no task_id: ${JSON.stringify(data).slice(0, 200)}`)
     }
 
     return {
       taskId,
       status: 'success'
+    }
+  }
+
+  async generate(params: KlingGenerateParams): Promise<KlingGenerateResult> {
+    const { shots, images, duration, format } = params
+    
+    console.log('[KlingAdapter] Generating video - format:', format, 'duration:', duration, 'shots:', shots.length, 'images:', images.length)
+
+    // Try Kling up to 3 times
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        console.log(`[KlingAdapter] Attempt ${attempt}/${this.maxRetries}`)
+        const result = await this.callKlingAPI(params)
+        
+        if (result.taskId) {
+          console.log(`[KlingAdapter] Success on attempt ${attempt} - task_id:`, result.taskId)
+          return result
+        }
+      } catch (err) {
+        console.error(`[KlingAdapter] Attempt ${attempt}/${this.maxRetries} failed:`, err)
+        
+        if (attempt === this.maxRetries) {
+          console.error('[KlingAdapter] All attempts failed')
+          return {
+            taskId: null,
+            status: 'failed',
+            error: 'Video generation failed after 3 attempts'
+          }
+        }
+        
+        // Wait 2 seconds before retry
+        console.log(`[KlingAdapter] Waiting 2s before retry...`)
+        await new Promise(r => setTimeout(r, 2000))
+      }
+    }
+
+    // Fallback (should never reach here)
+    return {
+      taskId: null,
+      status: 'failed',
+      error: 'Video generation failed after all retries'
     }
   }
 
