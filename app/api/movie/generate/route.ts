@@ -211,7 +211,14 @@ export async function POST(req: NextRequest) {
         const scriptRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/generate-script`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ template: enhancedStory, personalNote: enhancedStory })
+          body: JSON.stringify({ 
+            template: enhancedStory, 
+            personalNote: enhancedStory,
+            format: formatType,
+            maxShots: formatRules.maxShots,
+            targetDuration: formatRules.duration,
+            shotDurations: formatRules.shotDuration
+          })
         })
         const scriptData = await scriptRes.json()
         console.log('[DEBUG scriptData]', scriptData)
