@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { matchDirectorIntent, applyDirectorIntent } from '@/app/lib/templates'
 import { getTemplateBlueprint } from '@/app/lib/template-blueprints'
-import { getFormatRules, FormatType } from '../../../../../lib/format-adapter'
+import { getFormatRules, FormatType } from '@/lib/format-adapter'
 
 export const maxDuration = 300
 
