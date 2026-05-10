@@ -13,6 +13,12 @@ interface CharacterPhoto {
   url: string | null;
 }
 
+const FORMATS = [
+  { id: 'hook_15s', label: '15s', desc: 'Emotion Hook' },
+  { id: 'short_60s', label: '60s', desc: 'Short Film' },
+  { id: 'short_3min', label: '3 min', desc: 'Short Story' },
+]
+
 const TEMPLATES = [
   {
     id: "parallel_universe",
@@ -85,6 +91,7 @@ export default function CreatePage() {
   const [story, setStory] = useState("");
   const [customStory, setCustomStory] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<string>('hook_15s');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -619,6 +626,36 @@ export default function CreatePage() {
               ))}
             </div>
 
+            {/* Format Selector */}
+            <div style={{marginTop:'24px'}}>
+              <p style={{color:'#888',fontSize:'0.85rem',marginBottom:'8px'}}>
+                Choose format:
+              </p>
+              <div style={{display:'flex',gap:'8px'}}>
+                {FORMATS.map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => setSelectedFormat(f.id)}
+                    style={{
+                      padding:'8px 16px',
+                      borderRadius:'20px',
+                      border: selectedFormat === f.id ? '2px solid #D4A853' : '1px solid #333',
+                      background: selectedFormat === f.id ? '#D4A853' : '#111',
+                      color: selectedFormat === f.id ? '#000' : '#888',
+                      fontWeight:'700',
+                      cursor:'pointer',
+                      fontSize:'0.85rem'
+                    }}
+                  >
+                    {f.label}
+                    <span style={{display:'block',fontSize:'0.7rem',fontWeight:'400'}}>
+                      {f.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Error */}
             {error && (
               <div style={{
@@ -729,7 +766,8 @@ export default function CreatePage() {
                     tier: "30s",
                     main_photo_url: mainPhotoUrl,
                     additional_images: additionalImages,
-                    story_category: selectedTemplate
+                    story_category: selectedTemplate,
+                    format: selectedFormat
                   })
                 });
                 
@@ -749,7 +787,8 @@ export default function CreatePage() {
                     tier: "30s",
                     main_photo_url: mainPhotoUrl,
                     additional_images: additionalImages,
-                    story_category: selectedTemplate
+                    story_category: selectedTemplate,
+                    format: selectedFormat
                   })
                 });
                 
