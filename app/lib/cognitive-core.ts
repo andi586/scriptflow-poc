@@ -7,6 +7,8 @@ import { NEW_ARCHETYPES, matchArchetypeExtended } from './film-os'
 import { getDirectorRules } from './director-rules'
 import { buildGrowthPrompt } from './growth-os'
 import { getTemplateBlueprint, type TemplateBlueprint } from './template-blueprints'
+import { buildDirectorPrompt } from '@/lib/format-adapter/director-prompt'
+import type { FormatType } from '@/lib/format-adapter'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
