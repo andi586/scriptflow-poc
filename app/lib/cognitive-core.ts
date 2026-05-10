@@ -558,6 +558,14 @@ SILENCE BEAT RULE (mandatory):
 - Silence creates emotional weight and allows the audience to feel
 - Mark silence beats explicitly in shot descriptions
 
+LANGUAGE RULE (mandatory):
+- Detect the language of the story input
+- ALL dialogue and subtitles must be in the SAME language as the story
+- If story is in Chinese: all text in Chinese
+- If story is in English: all text in English
+- NEVER mix languages in the same video
+- Keep subtitles concise: max 10 characters for Chinese, max 8 words for English
+
 EMOTION CURVE (follow exactly):
 ${emotionCurve?.map(s => `Shot${s.shot}: ${s.emotion} intensity:${s.intensity} type:${s.type}`).join('\n') || ''}
 
