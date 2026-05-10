@@ -4,6 +4,7 @@ import { matchDirectorIntent, applyDirectorIntent } from '@/app/lib/templates'
 import { getTemplateBlueprint } from '@/app/lib/template-blueprints'
 import { getFormatRules, FormatType } from '@/lib/format-adapter'
 import { KlingAdapter } from '@/app/lib/kling-adapter'
+import { createMemory, addVisualSymbol } from '@/lib/long-emotional-memory'
 
 export const maxDuration = 300
 
@@ -148,6 +149,7 @@ export async function POST(req: NextRequest) {
     let shots: any[] = []
     let archetype: string | null = null
     let hookData: any = null
+    let scriptData: any = null
     
     // Check if story_category matches an emotion blueprint template
     const emotionBlueprint = story_category ? getTemplateBlueprint(story_category) : null
@@ -221,7 +223,7 @@ export async function POST(req: NextRequest) {
             shotDurations: formatRules.shotDuration
           })
         })
-        const scriptData = await scriptRes.json()
+        scriptData = await scriptRes.json()
         console.log('[DEBUG scriptData]', scriptData)
         console.log('[DEBUG shots]', scriptData?.shots)
         console.log('[DEBUG directionPlan]', scriptData?.directionPlan)
@@ -400,6 +402,33 @@ export async function POST(req: NextRequest) {
     if (movieError) throw new Error('Failed to create movie: ' + movieError.message)
 
     console.log('[movie/generate] movie created:', movie.id, 'with', shotsForKling.length, 'shots')
+
+    // Save emotional memory if we have foreshadowing data from CognitiveCore
+    try {
+      const storyState = scriptData?.storyState
+      if (storyState?.foreshadowing_element) {
+        const memory = createMemory(movie.id)
+        const memoryWithSymbol = addVisualSymbol(
+          memory,
+          storyState.foreshadowing_element,
+          1,
+          'foreshadowing element'
+        )
+        
+        // Save to Supabase
+        await supabase.from('emotional_memory').insert({
+          project_id: movie.id,
+          movie_id: movie.id,
+          characters: storyState.characters || [],
+          visual_symbols: memoryWithSymbol.visualSymbols,
+          format_type: formatType
+        })
+        
+        console.log('[LongMemory] Saved emotional memory for:', movie.id, 'symbol:', storyState.foreshadowing_element)
+      }
+    } catch (memErr) {
+      console.warn('[LongMemory] Failed to save emotional memory (non-fatal):', memErr)
+    }
 
     // Step 4: Call Kling 3.0 Omni - ONE API call with native audio
     // Prepare images array with 7-image limit for Kling API
