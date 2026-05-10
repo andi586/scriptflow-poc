@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { matchDirectorIntent, applyDirectorIntent } from '@/app/lib/templates'
 import { getTemplateBlueprint } from '@/app/lib/template-blueprints'
 import { getFormatRules, FormatType } from '@/lib/format-adapter'
+import { KlingAdapter } from '@/app/lib/kling-adapter'
 
 export const maxDuration = 300
 
@@ -410,76 +411,26 @@ export async function POST(req: NextRequest) {
     const klingImages = allImages.filter(Boolean).slice(0, 7)
     console.log('[movie/generate] sending', klingImages.length, 'images to Kling API:', klingImages)
     
-    const klingBody = {
-      model: 'kling',
-      task_type: 'omni_video_generation',
-      input: {
-        version: '3.0',
-        resolution: '720p',
-        aspect_ratio: '9:16',
-        enable_audio: true,
-        language: 'en',  // Force English TTS for all dialogue
-        images: klingImages,
-        multi_shots: multiShots
-      },
-      config: {
-        service_mode: 'public',
-        webhook_config: {
-          endpoint: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhook/piapi`,
-          secret: ''
-        }
-      }
-    }
-    
-    console.log('[movie/generate] Kling API language set to: en (English)')
+    // Use KlingAdapter for video generation
+    const adapter = new KlingAdapter()
+    const result = await adapter.generate({
+      shots: multiShots,
+      images: klingImages,
+      duration: formatRules.duration,
+      format: formatType
+    })
 
-    // Kling API call with auto-retry
-    let klingData: any = null
-    let taskId: string | null = null
-    let retryCount = 0
-    const MAX_RETRIES = 1
-
-    while (retryCount <= MAX_RETRIES && !taskId) {
-      try {
-        if (retryCount > 0) {
-          console.log(`[movie/generate] Retry attempt ${retryCount}/${MAX_RETRIES} after 30s...`)
-          await new Promise(resolve => setTimeout(resolve, 30000)) // Wait 30 seconds
-        }
-
-        const klingRes = await fetch('https://api.piapi.ai/api/v1/task', {
-          method: 'POST',
-          headers: {
-            'x-api-key': process.env.PIAPI_API_KEY!,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(klingBody)
-        })
-
-        klingData = await klingRes.json()
-        taskId = klingData?.data?.task_id
-
-        console.log(`[movie/generate] Kling attempt ${retryCount + 1} - task_id:`, taskId)
-
-        if (!taskId) {
-          console.warn(`[movie/generate] Kling attempt ${retryCount + 1} failed:`, JSON.stringify(klingData).slice(0, 200))
-          retryCount++
-        }
-      } catch (klingErr) {
-        console.error(`[movie/generate] Kling attempt ${retryCount + 1} error:`, klingErr)
-        retryCount++
-      }
-    }
-
-    if (!taskId) {
-      // All retries failed - mark movie as failed and notify user
+    if (result.status === 'failed' || !result.taskId) {
+      // Mark movie as failed and notify user
       await supabase
         .from('movies')
         .update({ status: 'failed' })
         .eq('id', movie.id)
       
-      console.error('[movie/generate] Kling task creation failed after retries:', JSON.stringify(klingData).slice(0, 200))
-      throw new Error('Kling task creation failed after retries. Please try again later.')
+      throw new Error(result.error || 'Kling task creation failed after retries. Please try again later.')
     }
+
+    const taskId = result.taskId
 
     // Step 5: Update movie with task_id
     await supabase
