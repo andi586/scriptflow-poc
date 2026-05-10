@@ -155,6 +155,8 @@ export interface StoryState {
   coreConflict: string
   narrativeGoal: string
   tensionCurve: Array<'low' | 'medium' | 'high' | 'peak'>
+  foreshadowing_element?: string
+  callback_shot?: number
 }
 
 export interface DirectionPlan {
@@ -565,6 +567,16 @@ LANGUAGE RULE (mandatory):
 - If story is in English: all text in English
 - NEVER mix languages in the same video
 - Keep subtitles concise: max 10 characters for Chinese, max 8 words for English
+
+NARRATIVE FORESHADOWING RULES (mandatory):
+- Shot 1 must contain one visual element that returns in the final shot
+- This element should be subtle in Shot 1, prominent in final shot
+- Examples:
+  * A door in background (Shot 1) → same door in foreground (final)
+  * A hand gesture (Shot 1) → same gesture with different meaning (final)
+  * A color or light quality (Shot 1) → same color changed (final)
+- Never explain the callback. Let audience discover it.
+- Include foreshadowing_element in your output metadata
 
 EMOTION CURVE (follow exactly):
 ${emotionCurve?.map(s => `Shot${s.shot}: ${s.emotion} intensity:${s.intensity} type:${s.type}`).join('\n') || ''}
@@ -1036,6 +1048,27 @@ export async function runCognitiveCore(userInput: string, template: string, temp
 
   console.log('[CognitiveCore] Starting Director...')
   const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint, dynamicDirectorRules)
+
+  // Extract foreshadowing element from shots
+  const firstShot = rawDirectionPlan.shots[0]
+  const lastShot = rawDirectionPlan.shots[rawDirectionPlan.shots.length - 1]
+  
+  // Try to detect foreshadowing element by comparing first and last shot descriptions
+  const firstDesc = (firstShot?.description || firstShot?.scenePrompt || '').toLowerCase()
+  const lastDesc = (lastShot?.description || lastShot?.scenePrompt || '').toLowerCase()
+  
+  // Look for common visual elements (simple heuristic)
+  const commonWords = firstDesc.split(' ').filter(word => 
+    word.length > 4 && lastDesc.includes(word) && 
+    !['shot', 'frame', 'camera', 'light', 'scene'].includes(word)
+  )
+  
+  if (commonWords.length > 0) {
+    const foreshadowingElement = commonWords[0]
+    storyState.foreshadowing_element = foreshadowingElement
+    storyState.callback_shot = rawDirectionPlan.shots.length
+    console.log('[Narrative] foreshadowing:', foreshadowingElement, '(Shot 1 → Shot', storyState.callback_shot, ')')
+  }
 
   console.log('[CognitiveCore] Checking reality anchors...')
   const anchoredPlan = checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
