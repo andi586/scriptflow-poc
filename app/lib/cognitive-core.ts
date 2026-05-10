@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js'
 import { DIRECTOR_BRAIN } from './director-brain'
 import { EMOTION_ARCHETYPES, DURATION_FORMULAS, matchArchetype } from './emotion-archetypes'
 import { SYMBOL_OBJECTS, SUBTEXT_TEMPLATES, EMOTION_TRANSITIONS, HOOK_FORMULAS, ENDING_FORMULAS } from './director-knowledge'
@@ -6,6 +7,11 @@ import { NEW_ARCHETYPES, matchArchetypeExtended } from './film-os'
 import { getDirectorRules } from './director-rules'
 import { buildGrowthPrompt } from './growth-os'
 import { getTemplateBlueprint, type TemplateBlueprint } from './template-blueprints'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ENDING LINE LIBRARY - 70 Emotional Precision Lines
@@ -315,7 +321,8 @@ async function runDirector(
   emotionCurve: ReturnType<typeof getEmotionProgression>,
   directorRules: ReturnType<typeof getDirectorRules>,
   durationFormula: typeof DURATION_FORMULAS[string],
-  blueprint?: TemplateBlueprint | null
+  blueprint?: TemplateBlueprint | null,
+  dynamicDirectorRules?: string
 ): Promise<DirectionPlan> {
   const { visual_constraints, emotion_profile } = producerOutput
   const abstractionLevel = emotion_profile.abstraction_level
@@ -534,6 +541,8 @@ LIGHTING: ${directorRules?.lightingDirective || ''}
 PACING: ${directorRules?.pacingDirective || ''}
 DIALOGUE: ${directorRules?.dialogueDirective || ''}
 MUSIC: ${directorRules?.musicDirective || ''}
+
+${dynamicDirectorRules ? `DYNAMIC DIRECTOR RULES (from Supabase - must follow):\n${dynamicDirectorRules}` : ''}
 
 IMPERFECTION RULES (mandatory - must apply to final output):
 - At least one shot must have micro-tremor or handheld shake
@@ -960,6 +969,21 @@ async function runNEL(
 export async function runCognitiveCore(userInput: string, template: string, templateId?: string): Promise<CognitiveCoreOutput> {
   console.log('[CognitiveCore] Starting Producer...')
   
+  // Load director rules from Supabase
+  let dynamicDirectorRules = ''
+  try {
+    const { data: rules } = await supabase
+      .from('director_rules')
+      .select('rule, reason')
+    
+    if (rules && rules.length > 0) {
+      dynamicDirectorRules = rules.map(r => `- ${r.rule} (${r.reason})`).join('\n')
+      console.log('[CognitiveCore] Loaded', rules.length, 'director rules from Supabase')
+    }
+  } catch (err) {
+    console.warn('[CognitiveCore] Failed to load director_rules from Supabase:', err)
+  }
+  
   // Check if we have a locked template blueprint
   const blueprint = templateId ? getTemplateBlueprint(templateId) : null
   if (blueprint) {
@@ -1003,7 +1027,7 @@ export async function runCognitiveCore(userInput: string, template: string, temp
   console.log('[CognitiveCore] klingTemplate hookShot:', klingTemplate.hookShot.slice(0, 60))
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint)
+  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint, dynamicDirectorRules)
 
   console.log('[CognitiveCore] Checking reality anchors...')
   const anchoredPlan = checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
