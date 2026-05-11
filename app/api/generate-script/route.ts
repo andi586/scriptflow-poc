@@ -52,6 +52,12 @@ export async function POST(request: NextRequest) {
       if (planV2 && planV2.shots.length > 0) {
         hook = generateHookShot(planV2.shots[0], primaryEmotion)
         console.log('[generate-script] hook generated via director-v2:', hook.text)
+        
+        // Language check: Remove English hook if Chinese mode
+        if (isChinese && hook.text && /[a-zA-Z]{3,}/.test(hook.text)) {
+          console.warn('[generate-script] English hook detected in Chinese mode, removing:', hook.text)
+          hook.text = '' // Remove English hook for Chinese content
+        }
       }
     } catch (hookErr) {
       // Non-fatal: hook generation failure does not break existing pipeline
