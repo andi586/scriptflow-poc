@@ -1099,7 +1099,7 @@ export async function runCognitiveCore(userInput: string, template: string, temp
   }
 
   console.log('[CognitiveCore] Checking reality anchors...')
-  const anchoredPlan = checkRealityAnchors(rawDirectionPlan, producerOutput.visual_constraints.must_show)
+  const anchoredPlan = checkRealityAnchors(languageEnforcedPlan, producerOutput.visual_constraints.must_show)
 
   console.log('[CognitiveCore] Validating face shot lengths...')
   const { plan: directionPlan, violations } = validateAndFixFaceShots(anchoredPlan)
