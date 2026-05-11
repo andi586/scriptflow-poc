@@ -393,16 +393,10 @@ Your creative freedom is LIMITED to:
 ═══ END BLUEPRINT ═══
 ` : ''
 
-  const systemPrompt = `You are a Constraint Director for a 15-second emotional short film.
+  const systemPrompt = `${languageInstruction ? `CRITICAL: ${languageInstruction}\nThis overrides everything. All text output must follow this rule.\n\n` : ''}You are a Constraint Director for a 15-second emotional short film.
 Your job is NOT to tell a story. Your job is to FORCE emotional impact.
 
-${languageInstruction ? `CRITICAL LANGUAGE RULE: ${languageInstruction}\n\n` : ''}
-
 ${blueprintSection}
-
-LANGUAGE REQUIREMENT (CRITICAL):
-ALL dialogue must be in English only. Never use Chinese characters in any dialogue or subtitle.
-All character speech must be written in English words, not Chinese/Japanese/Korean characters.
 
 ABSOLUTE RULES (non-negotiable):
 1. Shot 1 MUST show a COMPLETED action in first 2 seconds
@@ -867,7 +861,7 @@ function checkRealityAnchors(plan: DirectionPlan, mustShow: string[]): Direction
   return { ...plan, shots: fixedShots }
 }
 
-const MAX_FACE_CHARS = 20
+const MAX_FACE_CHARS = 50
 
 function validateAndFixFaceShots(plan: DirectionPlan): { plan: DirectionPlan; violations: string[] } {
   const violations: string[] = []
