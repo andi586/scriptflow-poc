@@ -582,7 +582,6 @@ ${emotionCurve?.map(s => `Shot${s.shot}: ${s.emotion} intensity:${s.intensity} t
 
 SHOT DURATIONS: ${durationFormula.distribution.join('s, ')}s
 
-
 REALITY ANCHOR RULES (MANDATORY):
 - must_show items: ${JSON.stringify(visual_constraints.must_show)}
   -> Every item in must_show MUST appear in at least 2 shots
@@ -810,7 +809,9 @@ Output ONLY valid JSON. No other text. Use this exact structure:
   ]
 }
 
-CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }`
+CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explanations. Start with { and end with }
+
+${languageInstruction ? `\n\n⚠️ LANGUAGE REQUIREMENT: ${languageInstruction}\nEvery single word of dialogue and subtitles MUST follow this.` : ''}`
   
   const raw = await callClaude(systemPrompt, userContent)
   console.log('[CognitiveCore] extracted raw:', raw?.substring(0, 200))
@@ -822,6 +823,30 @@ CRITICAL: Output ONLY a valid JSON object. No markdown. No backticks. No explana
     console.error('[CognitiveCore] JSON parse error, raw was:', raw?.substring(0, 200))
     throw parseErr
   }
+}
+
+function needsTranslation(text: string, language: string): boolean {
+  if (language !== 'zh') return false
+  // Check if text contains 3+ consecutive English letters (indicates English text in Chinese mode)
+  return /[a-zA-Z]{3,}/.test(text)
+}
+
+function enforceLanguageInShots(plan: DirectionPlan, languageInstruction?: string): DirectionPlan {
+  if (!languageInstruction || !languageInstruction.includes('Chinese')) return plan
+  
+  const correctedShots = plan.shots.map(shot => {
+    let correctedShot = { ...shot }
+    
+    // Check dialogue
+    if (shot.dialogue && needsTranslation(shot.dialogue, 'zh')) {
+      console.warn('[Language] English detected in Chinese mode, removing:', shot.dialogue)
+      correctedShot.dialogue = '' // Remove wrong language dialogue
+    }
+    
+    return correctedShot
+  })
+  
+  return { ...plan, shots: correctedShots }
 }
 
 function checkRealityAnchors(plan: DirectionPlan, mustShow: string[]): DirectionPlan {
@@ -1048,9 +1073,13 @@ export async function runCognitiveCore(userInput: string, template: string, temp
   console.log('[CognitiveCore] Starting Director...')
   const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint, dynamicDirectorRules, languageInstruction)
 
+  // Enforce language in shots (post-processing)
+  console.log('[CognitiveCore] Enforcing language requirements...')
+  const languageEnforcedPlan = enforceLanguageInShots(rawDirectionPlan, languageInstruction)
+
   // Extract foreshadowing element from shots
-  const firstShot = rawDirectionPlan.shots[0]
-  const lastShot = rawDirectionPlan.shots[rawDirectionPlan.shots.length - 1]
+  const firstShot = languageEnforcedPlan.shots[0]
+  const lastShot = languageEnforcedPlan.shots[languageEnforcedPlan.shots.length - 1]
   
   // Try to detect foreshadowing element by comparing first and last shot descriptions
   const firstDesc = (firstShot?.description || firstShot?.scenePrompt || '').toLowerCase()
