@@ -326,7 +326,8 @@ async function runDirector(
   directorRules: ReturnType<typeof getDirectorRules>,
   durationFormula: typeof DURATION_FORMULAS[string],
   blueprint?: TemplateBlueprint | null,
-  dynamicDirectorRules?: string
+  dynamicDirectorRules?: string,
+  languageInstruction?: string
 ): Promise<DirectionPlan> {
   const { visual_constraints, emotion_profile } = producerOutput
   const abstractionLevel = emotion_profile.abstraction_level
@@ -394,6 +395,8 @@ Your creative freedom is LIMITED to:
 
   const systemPrompt = `You are a Constraint Director for a 15-second emotional short film.
 Your job is NOT to tell a story. Your job is to FORCE emotional impact.
+
+${languageInstruction ? `CRITICAL LANGUAGE RULE: ${languageInstruction}\n\n` : ''}
 
 ${blueprintSection}
 
@@ -988,7 +991,7 @@ async function runNEL(
   }
 }
 
-export async function runCognitiveCore(userInput: string, template: string, templateId?: string): Promise<CognitiveCoreOutput> {
+export async function runCognitiveCore(userInput: string, template: string, templateId?: string, languageInstruction?: string): Promise<CognitiveCoreOutput> {
   console.log('[CognitiveCore] Starting Producer...')
   
   // Load director rules from Supabase
@@ -1049,7 +1052,7 @@ export async function runCognitiveCore(userInput: string, template: string, temp
   console.log('[CognitiveCore] klingTemplate hookShot:', klingTemplate.hookShot.slice(0, 60))
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint, dynamicDirectorRules)
+  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint, dynamicDirectorRules, languageInstruction)
 
   // Extract foreshadowing element from shots
   const firstShot = rawDirectionPlan.shots[0]

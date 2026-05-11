@@ -25,7 +25,16 @@ export async function POST(request: NextRequest) {
 
     const story = personalNote ?? template
 
-    const output = await runCognitiveCore(story, template)
+    // Detect input language
+    const isChinese = /[\u4e00-\u9fff]/.test(story)
+    const language = isChinese ? 'zh' : 'en'
+    const languageInstruction = isChinese 
+      ? 'ALL dialogue, subtitles, and text must be in Chinese (中文). No English allowed.'
+      : 'ALL dialogue, subtitles, and text must be in English. No Chinese allowed.'
+    
+    console.log('[generate-script] Detected language:', language, '- instruction:', languageInstruction)
+
+    const output = await runCognitiveCore(story, template, undefined, languageInstruction)
 
     console.log('[generate-script] CognitiveCore complete. Shots:', output.executionPlan.pipeline.length, 'category:', output.story_category)
 
