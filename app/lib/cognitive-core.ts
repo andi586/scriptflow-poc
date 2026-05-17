@@ -327,7 +327,8 @@ async function runDirector(
   durationFormula: typeof DURATION_FORMULAS[string],
   blueprint?: TemplateBlueprint | null,
   dynamicDirectorRules?: string,
-  languageInstruction?: string
+  languageInstruction?: string,
+  emotionInjection?: string
 ): Promise<DirectionPlan> {
   const { visual_constraints, emotion_profile } = producerOutput
   const abstractionLevel = emotion_profile.abstraction_level
@@ -544,6 +545,8 @@ DIALOGUE: ${directorRules?.dialogueDirective || ''}
 MUSIC: ${directorRules?.musicDirective || ''}
 
 ${dynamicDirectorRules ? `DYNAMIC DIRECTOR RULES (from Supabase - must follow):\n${dynamicDirectorRules}` : ''}
+
+${emotionInjection ? emotionInjection : ''}
 
 IMPERFECTION RULES (mandatory - must apply to final output):
 - At least one shot must have micro-tremor or handheld shake
@@ -1010,7 +1013,7 @@ async function runNEL(
   }
 }
 
-export async function runCognitiveCore(userInput: string, template: string, templateId?: string, languageInstruction?: string): Promise<CognitiveCoreOutput> {
+export async function runCognitiveCore(userInput: string, template: string, templateId?: string, languageInstruction?: string, emotionInjection?: string): Promise<CognitiveCoreOutput> {
   console.log('[CognitiveCore] Starting Producer...')
   
   // Load director rules from Supabase
@@ -1071,7 +1074,7 @@ export async function runCognitiveCore(userInput: string, template: string, temp
   console.log('[CognitiveCore] klingTemplate hookShot:', klingTemplate.hookShot.slice(0, 60))
 
   console.log('[CognitiveCore] Starting Director...')
-  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint, dynamicDirectorRules, languageInstruction)
+  const rawDirectionPlan = await runDirector(producerOutput, template, archetypeName, shotDurations, klingTemplate, emotionCurve, directorRules, durationFormula, blueprint, dynamicDirectorRules, languageInstruction, emotionInjection)
 
   // Enforce language in shots (post-processing)
   console.log('[CognitiveCore] Enforcing language requirements...')
