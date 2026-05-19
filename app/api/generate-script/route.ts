@@ -3,6 +3,11 @@ import { runCognitiveCore } from '@/app/lib/cognitive-core'
 import { buildExecutionPlan as buildExecutionPlanV2 } from '@/app/lib/director-v2'
 import { generateHookShot } from '@/app/lib/hook-engine'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import {
+  buildDirectorEmotionInjection,
+  EMOTION_CATALOG_LIMITS,
+  loadEmotionPatternsForDirector,
+} from '@/lib/emotion-patterns/director-injection'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -35,27 +40,28 @@ export async function POST(request: NextRequest) {
     
     console.log('[generate-script] Detected language:', language, '- instruction:', languageInstruction)
 
-    // Fetch emotion data from Supabase
+    // Fetch emotion catalog from Supabase (patterns: non-fatal on failure)
+    const emotionPatterns = await loadEmotionPatternsForDirector(
+      EMOTION_CATALOG_LIMITS.patterns,
+    )
+
     const { data: emotionLines } = await supabaseAdmin
       .from('emotion_lines')
       .select('text, why_it_hurts, human_detail')
       .order('universality_score', { ascending: false })
-      .limit(5)
+      .limit(EMOTION_CATALOG_LIMITS.lines)
 
     const { data: emotionDetails } = await supabaseAdmin
       .from('emotion_details')
       .select('text, visual_symbol, human_truth')
       .order('cinematic_potential', { ascending: false })
-      .limit(3)
+      .limit(EMOTION_CATALOG_LIMITS.details)
 
-    // Build emotion injection string
-    const emotionInjection = `
-EMOTION LIBRARY (draw from these):
-${emotionLines?.map(l => `- "${l.text}" (${l.why_it_hurts})`).join('\n')}
-
-HUMAN DETAILS (use as visual anchors):
-${emotionDetails?.map(d => `- ${d.text}: ${d.visual_symbol}`).join('\n')}
-`
+    const emotionInjection = buildDirectorEmotionInjection(
+      emotionLines,
+      emotionDetails,
+      emotionPatterns,
+    )
 
     const output = await runCognitiveCore(story, template, undefined, languageInstruction, emotionInjection)
 
