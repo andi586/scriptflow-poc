@@ -455,6 +455,7 @@ export async function POST(req: NextRequest) {
         .from('movies')
         .update({ status: 'failed' })
         .eq('id', movie.id)
+        .is('final_video_url', null)
       
       throw new Error(result.error || 'Kling task creation failed after retries. Please try again later.')
     }

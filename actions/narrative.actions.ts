@@ -19,6 +19,7 @@ import {
   parseKlingVideoPollTerminal,
 } from "@/lib/kling-piapi-output";
 import { getKlingVideoStatusPollUrl } from "@/lib/kling-video-poll";
+import { syncMovieCompleteFromVideoUrl } from "@/lib/movie-status-sync";
 import { PROJECT_CAST_TABLE } from "@/lib/project-cast-table";
 import { requireProjectId } from "@/lib/project-id";
 
@@ -1177,6 +1178,11 @@ export async function pollKlingTasksAction(input: {
             })
             .eq("task_id", taskId);
           if (updateError) throw updateError;
+          await syncMovieCompleteFromVideoUrl(supabase, {
+            movieId: projectId,
+            taskId,
+            videoUrl: storedVideoUrl,
+          });
         } else if (isFailed) {
           const piNestedObj =
             piNested && typeof piNested === "object" ? (piNested as Record<string, unknown>) : null;
@@ -1342,6 +1348,14 @@ async function fetchKlingTasksAlignedToOrderedTaskIds(
     .filter((t): t is KlingTaskItem => t !== null);
 
   alignedRows.sort((a, b) => a.beat_number - b.beat_number);
+  const completed = alignedRows.find((t) => t.status === "success" && t.video_url);
+  if (completed?.video_url) {
+    await syncMovieCompleteFromVideoUrl(supabase, {
+      movieId: projectId,
+      taskId: completed.task_id,
+      videoUrl: completed.video_url,
+    });
+  }
   return alignedRows;
 }
 
@@ -1672,6 +1686,11 @@ async function pollOneKlingTaskFromVideoApi(
       .eq("project_id", projectId)
       .eq("task_id", taskId);
     if (upErr) throw upErr;
+    await syncMovieCompleteFromVideoUrl(supabase, {
+      movieId: projectId,
+      taskId,
+      videoUrl: outputUrl ?? trimmed,
+    });
     return {};
   }
 
@@ -1779,4 +1798,3 @@ export async function pollSingleKlingVideoTaskAction(input: {
     return { success: false, error: formatUnknownError(e) };
   }
 }
-

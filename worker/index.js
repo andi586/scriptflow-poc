@@ -28,13 +28,14 @@ async function pollMovies() {
 
       if ((status === 'completed' || status === 'success') && videoUrl) {
         await supabase.from('movies')
-          .update({ final_video_url: videoUrl, status: 'complete' })
+          .update({ final_video_url: videoUrl, status: 'complete', error_message: null, updated_at: new Date().toISOString() })
           .eq('id', movie.id)
         console.log('[worker] Movie complete:', movie.id, videoUrl)
       } else if (status === 'failed') {
         await supabase.from('movies')
-          .update({ status: 'failed' })
+          .update({ status: 'failed', updated_at: new Date().toISOString() })
           .eq('id', movie.id)
+          .is('final_video_url', null)
         console.log('[worker] Movie failed:', movie.id)
       }
     } catch (e) {

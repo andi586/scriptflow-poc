@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { syncMovieCompleteFromVideoUrl, markMovieFailedIfNoVideo } from '@/lib/movie-status-sync'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -455,10 +456,12 @@ export async function GET() {
           if (finalUrl) {
             await db.from('omnihuman_jobs').update({ result_video_url: finalUrl, status: 'completed', shotstack_render_id: null, updated_at: new Date().toISOString() }).eq('id', job.id)
             await db.from('movie_shots').update({ status: 'final_complete' }).eq('movie_id', job.task_id)
+            await syncMovieCompleteFromVideoUrl(db, { movieId: job.task_id, videoUrl: finalUrl })
             log.push(`[step5] movie ${job.task_id} final_complete: ${finalUrl}`)
           }
         } else if (renderStatus === 'failed') {
           await db.from('omnihuman_jobs').update({ status: 'failed', shotstack_render_id: null, updated_at: new Date().toISOString() }).eq('id', job.id)
+          await markMovieFailedIfNoVideo(db, { movieId: job.task_id })
           log.push(`[step5] movie ${job.task_id} final render failed`)
         }
       } catch (e) {

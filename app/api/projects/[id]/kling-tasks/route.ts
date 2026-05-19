@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { syncMovieCompleteFromVideoUrl } from "@/lib/movie-status-sync";
 import { NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 export async function GET(
   request: Request,
@@ -32,6 +34,23 @@ export async function GET(
         { error: error.message },
         { status: 500 }
       );
+    }
+
+    const completedTask = tasks?.find((task) => task.status === "success" && task.video_url);
+    if (completedTask?.video_url) {
+      const syncClient = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+        ? createSupabaseClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY,
+            { auth: { persistSession: false } },
+          )
+        : supabase;
+
+      await syncMovieCompleteFromVideoUrl(syncClient, {
+        movieId: projectId,
+        taskId: completedTask.task_id,
+        videoUrl: completedTask.video_url,
+      });
     }
 
     console.log("[KLING_TASKS API] Returning", tasks?.length || 0, "tasks");

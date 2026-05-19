@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { selectBGMv2 } from '@/app/lib/bgm-selector-v2'
 import { getLockedBGM } from '@/app/lib/execution-authority'
+import { syncMovieCompleteFromVideoUrl } from '@/lib/movie-status-sync'
 
 const ENDING_LINE_LIBRARY: Record<string, string> = {
   'she_didnt_choose_you': "Trust doesn't come back.",
@@ -40,11 +41,16 @@ export async function POST(req: NextRequest) {
   const payload = await req.json()
   const taskId = payload?.data?.task_id
   const status = payload?.data?.status
-  const videoUrl = payload?.data?.output?.video
+  const videoUrl =
+    payload?.data?.output?.video?.resource_without_watermark ??
+    payload?.data?.output?.video_url ??
+    payload?.data?.output?.video ??
+    payload?.data?.output?.url ??
+    null
 
   console.log('[webhook/piapi] received:', taskId, status)
 
-  if (!taskId || status !== 'completed' || !videoUrl) {
+  if (!taskId || !['completed', 'success'].includes(status) || !videoUrl) {
     return NextResponse.json({ ok: false })
   }
 
@@ -69,12 +75,11 @@ export async function POST(req: NextRequest) {
       console.log('[webhook] bgmUrl:', bgmUrl)
       
       // Save raw video immediately
-      await supabaseAdmin.from('movies')
-        .update({ 
-          final_video_url: videoUrl,
-          status: 'processing'
-        })
-        .eq('id', movie.id)
+      await syncMovieCompleteFromVideoUrl(supabaseAdmin, {
+        movieId: movie.id,
+        taskId,
+        videoUrl,
+      })
       
       // Extract dialogue from story_input
       const scriptData = movie.story_input ? 
@@ -106,6 +111,7 @@ export async function POST(req: NextRequest) {
       console.log('[webhook] Railway call initiated')
     } else {
       console.warn('[webhook] movie not found for taskId:', taskId)
+      await syncMovieCompleteFromVideoUrl(supabaseAdmin, { taskId, videoUrl })
     }
   } catch (err) {
     console.error('[webhook] movie processing error:', err)
